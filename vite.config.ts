@@ -32,6 +32,16 @@ export default defineConfig({
         }),
     ]),
     server: {
+        // Vite работает в Docker: слушаем все интерфейсы контейнера,
+        // а браузер и HMR ходят на опубликованный порт localhost.
+        host: '0.0.0.0',
+        port: Number(process.env.VITE_PORT ?? 5173),
+        strictPort: true,
+        // По этому имени php-контейнер ходит в Vite за SSR (INERTIA_SSR_HOT_URL).
+        allowedHosts: ['node'],
+        hmr: {
+            host: 'localhost',
+        },
         watch: {
             ignored: [
                 '**/.agents/**',
