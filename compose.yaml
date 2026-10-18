@@ -6,6 +6,14 @@ x-logging: &logging
     max-size: 10m
     max-file: "3"
 
+x-php-build: &php-build
+  context: .
+  dockerfile: docker/php/Dockerfile
+  args:
+    UID: ${UID:-1000}
+    GID: ${GID:-1000}
+    XDEBUG: ${XDEBUG:-false}
+
 # Образ собирает сервис php, остальные PHP-сервисы используют его же.
 x-php-image: &php-image
   image: clinical-compass/php:dev
@@ -38,13 +46,8 @@ services:
   php:
     <<: *php-image
     build:
-      context: .
-      dockerfile: docker/php/Dockerfile
+      <<: *php-build
       target: dev
-      args:
-        UID: ${UID:-1000}
-        GID: ${GID:-1000}
-        XDEBUG: ${XDEBUG:-false}
     environment:
       XDEBUG_MODE: ${XDEBUG_MODE:-off}
       PHP_IDE_CONFIG: serverName=clinical-compass
@@ -130,6 +133,21 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  # Тесты с браузером: make test. В обычный запуск окружения не входит.
+  tests:
+    <<: *php-image
+    image: clinical-compass/php:test
+    build:
+      <<: *php-build
+      target: test
+    profiles: ["test"]
+    restart: "no"
+    init: true
+    command: ["php", "artisan", "test"]
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres:

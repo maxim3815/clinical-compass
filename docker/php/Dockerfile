@@ -51,6 +51,9 @@ RUN set -eux; \
     node --version; \
     npm --version
 
+# npm закреплён версией Node из образа, предложение обновиться только засоряет вывод.
+ENV NPM_CONFIG_UPDATE_NOTIFIER=false
+
 COPY docker/php/conf.d/dev.ini /usr/local/etc/php/conf.d/zz-dev.ini
 COPY docker/php/conf.d/xdebug.ini /usr/local/etc/php/conf.d/zz-xdebug.ini
 
@@ -59,5 +62,31 @@ COPY docker/php/conf.d/xdebug.ini /usr/local/etc/php/conf.d/zz-xdebug.ini
 RUN set -eux; \
     getent group "${GID}" >/dev/null || groupadd --gid "${GID}" app; \
     getent passwd "${UID}" >/dev/null || useradd --no-log-init --uid "${UID}" --gid "${GID}" --create-home --shell /bin/bash app
+
+USER ${UID}:${GID}
+
+# Версия Chromium должна совпадать с пакетом playwright из package-lock.json. Версия
+# вынесена в отдельный файл, чтобы Chromium перекачивался только при смене версии
+# playwright, а не при любом изменении lock-файла.
+FROM node AS playwright-version
+
+RUN --mount=type=bind,source=package-lock.json,target=/tmp/package-lock.json \
+    node -p "require('/tmp/package-lock.json').packages['node_modules/playwright'].version" > /playwright-version
+
+# Браузерные тесты: dev плюс Chromium для Playwright. Отдельный stage, чтобы dev-образ не тяжелел.
+FROM dev AS test
+
+ARG UID=1000
+ARG GID=1000
+
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
+
+USER root
+
+COPY --from=playwright-version /playwright-version /tmp/playwright-version
+
+RUN set -eux; \
+    npx --yes "playwright@$(cat /tmp/playwright-version)" install --with-deps --only-shell chromium; \
+    rm -rf /var/lib/apt/lists/* /root/.npm
 
 USER ${UID}:${GID}
