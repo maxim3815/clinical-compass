@@ -22,7 +22,9 @@ Route::middleware('auth')->group(function () {
 
         Route::get('invitations', [InvitationController::class, 'index'])->name('invitations.index');
         Route::post('invitations', [InvitationController::class, 'store'])->name('invitations.store');
-        Route::post('invitations/{invitation}/revoke', [InvitationController::class, 'revoke'])->name('invitations.revoke');
+        Route::post('invitations/{invitation}/revoke', [InvitationController::class, 'revoke'])
+            ->whereNumber('invitation')
+            ->name('invitations.revoke');
     });
 
     Route::middleware('role:patient')->prefix('patient')->name('patient.')->group(function () {

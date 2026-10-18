@@ -127,3 +127,9 @@ test('used invitation stays used after revoke', function () {
 
     expect($invitation->refresh()->revoked_at)->toBeNull();
 });
+
+test('revoke address with something other than an id is not found', function () {
+    $this->actingAs(User::factory()->doctor()->create())
+        ->post('/doctor/invitations/abc/revoke')
+        ->assertNotFound();
+});
