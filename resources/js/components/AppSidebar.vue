@@ -59,7 +59,7 @@ const mainNavItems = computed<NavItem[]>(() =>
           ]
         : [
               {
-                  title: 'Кабинет',
+                  title: 'Главная',
                   href: patientHome(),
                   icon: House,
               },

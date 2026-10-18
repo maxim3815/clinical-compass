@@ -31,7 +31,7 @@ test('doctor invites a patient who registers by the link and sees the cabinet', 
         ->click('#consent')
         ->press('Зарегистрироваться')
         ->assertPathIs('/patient')
-        ->assertSee('Кабинет пациента')
+        ->assertSee('Здравствуйте, Артём Сергеевич!')
         ->assertNoJavaScriptErrors();
 
     $patient = User::query()->where('login', 'novikov')->sole();

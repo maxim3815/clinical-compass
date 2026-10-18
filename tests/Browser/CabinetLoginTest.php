@@ -22,6 +22,6 @@ test('patient logs in and sees the patient cabinet', function () {
         ->fill('password', 'password')
         ->press('Войти')
         ->assertPathIs('/patient')
-        ->assertSee('Кабинет пациента')
+        ->assertSee('Здравствуйте')
         ->assertNoJavaScriptErrors();
 });
