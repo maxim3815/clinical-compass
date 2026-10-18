@@ -65,7 +65,7 @@ test: ## Все тесты, включая браузерные (make test c="--
 	$(RUN) tests php artisan test $(c)
 
 test-fast: ## Тесты без браузерных (make test-fast c="--filter=Login")
-	$(ARTISAN) test --testsuite=Unit,Feature $(c)
+	$(ARTISAN) test --testsuite=Unit,Feature,Concurrency $(c)
 
 lint: ## Проверки стиля, типов и статический анализ
 	$(PHP_ONLY) vendor/bin/pint --parallel --test

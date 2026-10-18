@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -22,6 +23,14 @@ pest()->extend(TestCase::class)
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
     ->in('Browser');
+
+// Тесты с несколькими процессами: данные должны быть закоммичены, поэтому вместо
+// транзакции RefreshDatabase таблицы очищаются до и после каждого теста.
+pest()->extend(TestCase::class)
+    ->use(DatabaseTruncation::class)
+    ->beforeEach(fn () => $this->withoutVite())
+    ->afterEach(fn () => $this->truncateTablesForAllConnections())
+    ->in('Concurrency');
 
 /*
 |--------------------------------------------------------------------------
