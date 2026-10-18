@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes, Ref } from "vue"
-import { defaultDocument, useEventListener, useMediaQuery, useVModel } from "@vueuse/core"
+import { defaultDocument, useEventListener, useMediaQuery, useMounted, useVModel } from "@vueuse/core"
 import { TooltipProvider } from "reka-ui"
 import { computed, ref } from "vue"
 import { cn } from "@/lib/utils"
@@ -19,7 +19,11 @@ const emits = defineEmits<{
   "update:open": [open: boolean]
 }>()
 
-const isMobile = useMediaQuery("(max-width: 768px)")
+// На сервере ширины экрана нет, и он рисует десктопную панель. До монтирования считаем
+// экран десктопным и на клиенте, иначе на телефоне гидратация не совпадёт с разметкой сервера.
+const matchesMobile = useMediaQuery("(max-width: 768px)")
+const mounted = useMounted()
+const isMobile = computed(() => mounted.value && matchesMobile.value)
 const openMobile = ref(false)
 
 const open = useVModel(props, "open", emits, {
