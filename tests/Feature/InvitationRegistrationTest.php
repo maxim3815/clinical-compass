@@ -80,6 +80,7 @@ test('invitation works only once', function () {
 
 test('unusable invitations look the same as a missing one', function (Closure $makeInvitation) {
     $makeInvitation();
+    $patients = User::query()->where('role', UserRole::Patient)->count();
 
     $this->get(route('invitation.show', INVITATION_TOKEN))
         ->assertNotFound()
@@ -93,13 +94,13 @@ test('unusable invitations look the same as a missing one', function (Closure $m
         ->assertRedirect(route('invitation.show', INVITATION_TOKEN))
         ->assertSessionHasNoErrors();
 
-    expect(User::query()->where('role', UserRole::Patient)->exists())->toBeFalse();
+    expect(User::query()->where('role', UserRole::Patient)->count())->toBe($patients);
 })->with([
-    'missing' => fn () => fn () => null,
-    'expired' => fn () => fn () => AccessLink::factory()->withToken(INVITATION_TOKEN)->expired()->create(),
-    'revoked' => fn () => fn () => AccessLink::factory()->withToken(INVITATION_TOKEN)->revoked()->create(),
-    'used' => fn () => fn () => AccessLink::factory()->withToken(INVITATION_TOKEN)->used()->create(),
-    'password reset link' => fn () => fn () => AccessLink::factory()->withToken(INVITATION_TOKEN)->create([
+    'missing' => fn () => null,
+    'expired' => fn () => AccessLink::factory()->withToken(INVITATION_TOKEN)->expired()->create(),
+    'revoked' => fn () => AccessLink::factory()->withToken(INVITATION_TOKEN)->revoked()->create(),
+    'used' => fn () => AccessLink::factory()->withToken(INVITATION_TOKEN)->used()->create(),
+    'password reset link' => fn () => AccessLink::factory()->withToken(INVITATION_TOKEN)->create([
         'purpose' => AccessLinkPurpose::PasswordReset,
     ]),
 ]);
