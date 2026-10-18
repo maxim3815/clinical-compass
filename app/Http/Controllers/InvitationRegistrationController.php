@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Actions\RegisterInvitedPatient;
 use App\Enums\AccessLinkPurpose;
 use App\Exceptions\AccessLinkUnavailable;
+use App\Http\Controllers\Concerns\RendersAccessLinkPages;
 use App\Http\Requests\InvitationRegistrationRequest;
 use App\Models\AccessLink;
 use Carbon\CarbonImmutable;
@@ -19,17 +20,18 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class InvitationRegistrationController extends Controller
 {
+    use RendersAccessLinkPages;
+
     public function show(Request $request, string $token): Response
     {
-        // Вошедшему пользователю форму не показываем и ссылку не проверяем.
         if ($request->user() !== null) {
-            return Inertia::render('invitation/SignedIn')->toResponse($request);
+            return $this->signedIn($request);
         }
 
         $invitation = AccessLink::findActive(AccessLinkPurpose::Invitation, $token);
 
         if ($invitation === null) {
-            return $this->invalid($request);
+            return $this->invalidLink($request);
         }
 
         return Inertia::render('invitation/Register', [
@@ -59,15 +61,5 @@ class InvitationRegistrationController extends Controller
         $request->session()->regenerate();
 
         return to_route('patient.home');
-    }
-
-    /**
-     * Один и тот же ответ для несуществующей, истёкшей, использованной и отозванной ссылки.
-     */
-    private function invalid(Request $request): Response
-    {
-        return Inertia::render('invitation/Invalid')
-            ->toResponse($request)
-            ->setStatusCode(Response::HTTP_NOT_FOUND);
     }
 }

@@ -73,7 +73,7 @@ test('invitation works only once', function () {
 
     $this->get(route('invitation.show', INVITATION_TOKEN))
         ->assertNotFound()
-        ->assertInertia(fn (Assert $page) => $page->component('invitation/Invalid'));
+        ->assertInertia(fn (Assert $page) => $page->component('access-link/Invalid'));
 
     expect(User::query()->where('role', UserRole::Patient)->count())->toBe(1);
 });
@@ -85,7 +85,7 @@ test('unusable invitations look the same as a missing one', function (Closure $m
     $this->get(route('invitation.show', INVITATION_TOKEN))
         ->assertNotFound()
         ->assertInertia(fn (Assert $page) => $page
-            ->component('invitation/Invalid')
+            ->component('access-link/Invalid')
             ->missing('token')
             ->missing('patientName'),
         );
@@ -141,7 +141,7 @@ test('signed in user is offered to log out instead of the form', function (bool 
     $this->actingAs(User::factory()->patient()->create())
         ->get(route('invitation.show', INVITATION_TOKEN))
         ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page->component('invitation/SignedIn'));
+        ->assertInertia(fn (Assert $page) => $page->component('access-link/SignedIn'));
 })->with(['valid link' => true, 'invalid link' => false]);
 
 test('signed in user can not register by invitation', function () {

@@ -12,6 +12,7 @@ void createInertiaApp({
     layout: (name) => {
         switch (true) {
             case name.startsWith('auth/'):
+            case name.startsWith('access-link/'):
             case name.startsWith('invitation/'):
             case name === 'Consent':
                 return AuthLayout;

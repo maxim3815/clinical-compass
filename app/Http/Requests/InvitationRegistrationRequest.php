@@ -6,26 +6,12 @@ use App\Concerns\LoginValidationRules;
 use App\Concerns\PasswordValidationRules;
 use App\Concerns\ProfileValidationRules;
 use App\Enums\AccessLinkPurpose;
-use App\Models\AccessLink;
 use Illuminate\Contracts\Validation\ValidationRule;
-use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Str;
 
-class InvitationRegistrationRequest extends FormRequest
+class InvitationRegistrationRequest extends AccessLinkRequest
 {
     use LoginValidationRules, PasswordValidationRules, ProfileValidationRules;
-
-    /**
-     * Форму проверяем только у гостя и только для действующей ссылки, иначе по ошибкам
-     * валидации можно было бы перебирать токены. В остальных случаях страница ссылки
-     * сама покажет, что делать.
-     */
-    public function authorize(): bool
-    {
-        return $this->user() === null
-            && AccessLink::findActive(AccessLinkPurpose::Invitation, $this->token()) !== null;
-    }
 
     /**
      * @return array<string, ValidationRule|array<mixed>|string>
@@ -41,11 +27,14 @@ class InvitationRegistrationRequest extends FormRequest
         ];
     }
 
-    public function token(): string
+    protected function purpose(): AccessLinkPurpose
     {
-        $token = $this->route('token');
+        return AccessLinkPurpose::Invitation;
+    }
 
-        return is_string($token) ? $token : '';
+    protected function pageRoute(): string
+    {
+        return 'invitation.show';
     }
 
     protected function prepareForValidation(): void
@@ -53,10 +42,5 @@ class InvitationRegistrationRequest extends FormRequest
         if (is_string($this->input('login'))) {
             $this->merge(['login' => Str::lower($this->input('login'))]);
         }
-    }
-
-    protected function failedAuthorization(): never
-    {
-        throw new HttpResponseException(to_route('invitation.show', $this->token()));
     }
 }

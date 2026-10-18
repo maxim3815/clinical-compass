@@ -34,7 +34,7 @@ class AppServiceProvider extends ServiceProvider
         // Пользователь как объект проверки прав пока бывает только пациентом.
         Gate::policy(User::class, PatientPolicy::class);
 
-        RateLimiter::for('invitation', fn (Request $request) => Limit::perMinute(10)->by($request->ip()));
+        RateLimiter::for('access-link', fn (Request $request) => Limit::perMinute(10)->by($request->ip()));
     }
 
     /**

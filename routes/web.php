@@ -9,7 +9,8 @@ Route::get('/', HomeController::class)->name('home');
 
 Route::inertia('consent', 'Consent')->name('consent');
 
-Route::middleware('throttle:invitation')->group(function () {
+// Страницы одноразовых ссылок от врача: общий лимит, чтобы токены нельзя было перебирать.
+Route::middleware('throttle:access-link')->group(function () {
     Route::get('invite/{token}', [InvitationRegistrationController::class, 'show'])->name('invitation.show');
     Route::post('invite/{token}', [InvitationRegistrationController::class, 'store'])->name('invitation.store');
 });

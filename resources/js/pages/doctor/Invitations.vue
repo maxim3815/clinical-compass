@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { Form, Head, Link, usePage } from '@inertiajs/vue3';
-import { Check, Copy } from '@lucide/vue';
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import InvitationController from '@/actions/App/Http/Controllers/Doctor/InvitationController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import OneTimeLink from '@/components/OneTimeLink.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,32 +38,6 @@ defineOptions({
 
 const page = usePage();
 const invitationUrl = computed(() => page.flash.invitationUrl);
-const copied = ref(false);
-const selected = ref(false);
-
-function resetCopyState(): void {
-    copied.value = false;
-    selected.value = false;
-}
-
-async function copyLink(): Promise<void> {
-    if (!invitationUrl.value) {
-        return;
-    }
-
-    try {
-        await navigator.clipboard.writeText(invitationUrl.value);
-        copied.value = true;
-    } catch {
-        // Буфер обмена недоступен (например, по http не с localhost): выделяем ссылку для ручного копирования.
-        const input = document.getElementById('invitation-link-input');
-
-        if (input instanceof HTMLInputElement) {
-            input.select();
-            selected.value = true;
-        }
-    }
-}
 </script>
 
 <template>
@@ -80,7 +54,6 @@ async function copyLink(): Promise<void> {
             reset-on-success
             class="flex flex-col gap-4 sm:flex-row sm:items-end"
             v-slot="{ errors, processing }"
-            @success="resetCopyState"
         >
             <div class="grid flex-1 gap-2">
                 <Label for="patient_name">ФИО пациента (необязательно)</Label>
@@ -96,33 +69,15 @@ async function copyLink(): Promise<void> {
             </Button>
         </Form>
 
-        <div
+        <OneTimeLink
             v-if="invitationUrl"
-            class="flex flex-col gap-3 rounded-lg border border-green-600/40 bg-green-50 p-4 dark:bg-green-950/30"
+            :url="invitationUrl"
+            label="Ссылка-приглашение"
             data-test="invitation-link"
         >
-            <p class="text-sm font-medium">
-                Отправьте ссылку пациенту. Больше она не покажется: если
-                потеряете, создайте новое приглашение.
-            </p>
-            <div class="flex gap-2">
-                <Input
-                    id="invitation-link-input"
-                    :model-value="invitationUrl"
-                    readonly
-                    aria-label="Ссылка-приглашение"
-                    @focus="($event.target as HTMLInputElement).select()"
-                />
-                <Button type="button" variant="outline" @click="copyLink">
-                    <Check v-if="copied" class="size-4" />
-                    <Copy v-else class="size-4" />
-                    {{ copied ? 'Скопировано' : 'Скопировать' }}
-                </Button>
-            </div>
-            <p v-if="selected" class="text-sm text-muted-foreground">
-                Ссылка выделена, скопируйте её вручную (Ctrl+C или ⌘C).
-            </p>
-        </div>
+            Отправьте ссылку пациенту. Больше она не покажется: если потеряете,
+            создайте новое приглашение.
+        </OneTimeLink>
 
         <section class="flex flex-col gap-3">
             <h2 class="text-base font-medium">Мои приглашения</h2>
