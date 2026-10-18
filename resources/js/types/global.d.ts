@@ -26,6 +26,7 @@ declare module '@inertiajs/core' {
         flashDataType: {
             toast?: FlashToast;
             invitationUrl?: string;
+            passwordResetUrl?: string;
         };
     }
 }

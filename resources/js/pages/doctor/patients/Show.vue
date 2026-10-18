@@ -1,7 +1,11 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
+import { Form, Head, usePage } from '@inertiajs/vue3';
+import { KeyRound } from '@lucide/vue';
 import { computed } from 'vue';
+import PasswordResetLinkController from '@/actions/App/Http/Controllers/Doctor/PasswordResetLinkController';
 import Heading from '@/components/Heading.vue';
+import OneTimeLink from '@/components/OneTimeLink.vue';
+import { Button } from '@/components/ui/button';
 import { formatAge } from '@/lib/plural';
 import { index, show } from '@/routes/doctor/patients';
 
@@ -34,6 +38,9 @@ defineOptions({
     }),
 });
 
+const page = usePage();
+const passwordResetUrl = computed(() => page.flash.passwordResetUrl);
+
 const details = computed(() => [
     {
         label: 'Дата рождения',
@@ -65,5 +72,38 @@ const details = computed(() => [
                 <dd class="-mt-2 font-medium sm:mt-0">{{ item.value }}</dd>
             </template>
         </dl>
+
+        <section class="flex flex-col gap-3">
+            <Heading
+                variant="small"
+                title="Забыл пароль"
+                description="Пациент откроет ссылку и сам задаст новый пароль. Ссылка действует 24 часа и срабатывает один раз, новая ссылка отменяет прежнюю."
+            />
+
+            <Form
+                v-bind="PasswordResetLinkController.store.form(patient.id)"
+                :options="{ preserveScroll: true }"
+                v-slot="{ processing }"
+            >
+                <Button
+                    variant="outline"
+                    :disabled="processing"
+                    data-test="password-reset-link-button"
+                >
+                    <KeyRound />
+                    Ссылка для смены пароля
+                </Button>
+            </Form>
+
+            <OneTimeLink
+                v-if="passwordResetUrl"
+                :url="passwordResetUrl"
+                label="Ссылка для смены пароля"
+                data-test="password-reset-link"
+            >
+                Отправьте ссылку пациенту. Больше она не покажется: если
+                потеряете, создайте новую.
+            </OneTimeLink>
+        </section>
     </div>
 </template>

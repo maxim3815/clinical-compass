@@ -1,9 +1,11 @@
 <?php
 
 use App\Http\Controllers\Doctor\InvitationController;
+use App\Http\Controllers\Doctor\PasswordResetLinkController;
 use App\Http\Controllers\Doctor\PatientController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InvitationRegistrationController;
+use App\Http\Controllers\PasswordResetByLinkController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->name('home');
@@ -14,6 +16,9 @@ Route::inertia('consent', 'Consent')->name('consent');
 Route::middleware('throttle:access-link')->group(function () {
     Route::get('invite/{token}', [InvitationRegistrationController::class, 'show'])->name('invitation.show');
     Route::post('invite/{token}', [InvitationRegistrationController::class, 'store'])->name('invitation.store');
+
+    Route::get('password-reset/{token}', [PasswordResetByLinkController::class, 'show'])->name('password-reset.show');
+    Route::post('password-reset/{token}', [PasswordResetByLinkController::class, 'store'])->name('password-reset.store');
 });
 
 Route::middleware('auth')->group(function () {
@@ -24,6 +29,9 @@ Route::middleware('auth')->group(function () {
 
         Route::get('patients', [PatientController::class, 'index'])->name('patients.index');
         Route::get('patients/{patient}', [PatientController::class, 'show'])->whereNumber('patient')->name('patients.show');
+        Route::post('patients/{patient}/password-reset-link', [PasswordResetLinkController::class, 'store'])
+            ->whereNumber('patient')
+            ->name('patients.password-reset-link.store');
 
         Route::get('invitations', [InvitationController::class, 'index'])->name('invitations.index');
         Route::post('invitations', [InvitationController::class, 'store'])->name('invitations.store');

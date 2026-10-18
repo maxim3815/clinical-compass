@@ -2,11 +2,11 @@
 
 namespace App\Console\Commands;
 
+use App\Actions\SetNewPassword;
 use App\Concerns\PasswordValidationRules;
 use App\Enums\UserRole;
 use App\Models\User;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
@@ -26,7 +26,7 @@ class ResetDoctorPasswordCommand extends Command
      */
     protected $description = 'Задать врачу новый пароль';
 
-    public function handle(): int
+    public function handle(SetNewPassword $setNewPassword): int
     {
         $login = $this->argument('login');
         $login = Str::lower(is_string($login) ? $login : '');
@@ -57,15 +57,7 @@ class ResetDoctorPasswordCommand extends Command
             return self::FAILURE;
         }
 
-        DB::transaction(function () use ($doctor, $validator): void {
-            $doctor->forceFill([
-                'password' => $validator->validated()['password'],
-                'remember_token' => Str::random(60),
-            ])->save();
-
-            // Старый пароль мог утечь: завершаем все сессии врача.
-            DB::table(config('session.table', 'sessions'))->where('user_id', $doctor->id)->delete();
-        });
+        $setNewPassword->handle($doctor, $validator->validated()['password']);
 
         $this->components->info("Пароль врача {$doctor->login} изменён, его сессии завершены.");
 
