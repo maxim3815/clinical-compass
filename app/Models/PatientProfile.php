@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\RussianTimezone;
+use App\Support\DisplayTime;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Table;
@@ -11,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * @property int $user_id
  * @property CarbonImmutable|null $birth_date
- * @property string $timezone
+ * @property RussianTimezone $timezone
  * @property CarbonImmutable|null $consented_at
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
@@ -21,11 +23,32 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class PatientProfile extends Model
 {
     /**
+     * Как значение по умолчанию в БД, чтобы оно было у модели и до перечитывания.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'timezone' => 'Europe/Moscow',
+    ];
+
+    /**
      * @return BelongsTo<User, $this>
      */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Полных лет на сегодня или null, если дата рождения неизвестна.
+     */
+    public function age(): ?int
+    {
+        if ($this->birth_date === null) {
+            return null;
+        }
+
+        return (int) $this->birth_date->diffInYears(DisplayTime::today());
     }
 
     /**
@@ -37,6 +60,7 @@ class PatientProfile extends Model
     {
         return [
             'birth_date' => 'date',
+            'timezone' => RussianTimezone::class,
             'consented_at' => 'datetime',
         ];
     }

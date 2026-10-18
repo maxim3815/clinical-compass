@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\CreatePatient;
+use App\Enums\RussianTimezone;
 use App\Enums\UserRole;
 use App\Models\User;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -22,7 +23,7 @@ test('patient is created with a profile and attached to the doctor', function ()
 
     expect($patient->role)->toBe(UserRole::Patient)
         ->and($patient->patientProfile?->birth_date?->toDateString())->toBe('1984-03-12')
-        ->and($patient->patientProfile?->timezone)->toBe('Europe/Moscow')
+        ->and($patient->patientProfile?->timezone)->toBe(RussianTimezone::Moscow)
         ->and($patient->patientProfile?->consented_at?->equalTo($consentedAt))->toBeTrue()
         ->and($patient->currentDoctor?->is($doctor))->toBeTrue()
         ->and($doctor->can('view', $patient))->toBeTrue();
