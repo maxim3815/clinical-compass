@@ -2,6 +2,6 @@
 
 test('login page renders without javascript errors', function () {
     visit(route('login'))
-        ->assertSee('Log in to your account')
+        ->assertSee('Вход в Клинический компас')
         ->assertNoJavaScriptErrors();
 });

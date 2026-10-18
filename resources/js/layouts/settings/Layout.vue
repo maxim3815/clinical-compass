@@ -6,21 +6,21 @@ import { Separator } from '@/components/ui/separator';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
 import { toUrl } from '@/lib/utils';
 import { edit as editAppearance } from '@/routes/appearance';
+import { edit as editPassword } from '@/routes/password';
 import { edit as editProfile } from '@/routes/profile';
-import { edit as editSecurity } from '@/routes/security';
 import type { NavItem } from '@/types';
 
 const sidebarNavItems: NavItem[] = [
     {
-        title: 'Profile',
+        title: 'Профиль',
         href: editProfile(),
     },
     {
-        title: 'Security',
-        href: editSecurity(),
+        title: 'Пароль',
+        href: editPassword(),
     },
     {
-        title: 'Appearance',
+        title: 'Оформление',
         href: editAppearance(),
     },
 ];
@@ -30,16 +30,13 @@ const { isCurrentOrParentUrl } = useCurrentUrl();
 
 <template>
     <div class="px-4 py-6">
-        <Heading
-            title="Settings"
-            description="Manage your profile and account settings"
-        />
+        <Heading title="Настройки" description="Профиль, пароль и оформление" />
 
         <div class="flex flex-col lg:flex-row lg:space-x-12">
             <aside class="w-full max-w-xl lg:w-48">
                 <nav
                     class="flex flex-col space-y-1 space-x-0"
-                    aria-label="Settings"
+                    aria-label="Настройки"
                 >
                     <Button
                         v-for="item in sidebarNavItems"

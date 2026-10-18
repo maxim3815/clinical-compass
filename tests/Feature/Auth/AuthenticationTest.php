@@ -1,54 +1,74 @@
 <?php
 
 use App\Models\User;
-use Illuminate\Support\Facades\RateLimiter;
-use Laravel\Fortify\Features;
+use Inertia\Testing\AssertableInertia as Assert;
 
 test('login screen can be rendered', function () {
-    $response = $this->get(route('login'));
-
-    $response->assertOk();
+    $this->get(route('login'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('auth/Login'));
 });
 
-test('users can authenticate using the login screen', function () {
-    $user = User::factory()->create();
+test('doctor is redirected to the doctor cabinet after login', function () {
+    $doctor = User::factory()->doctor()->create();
 
     $response = $this->post(route('login.store'), [
-        'email' => $user->email,
+        'login' => $doctor->login,
         'password' => 'password',
     ]);
 
-    $this->assertAuthenticated();
-    $response->assertRedirect(route('dashboard', absolute: false));
+    $this->assertAuthenticatedAs($doctor);
+    $response->assertRedirect(route('doctor.home'));
 });
 
-test('users with two factor enabled are redirected to two factor challenge', function () {
-    $this->skipUnlessFortifyHas(Features::twoFactorAuthentication());
+test('patient is redirected to the patient cabinet after login', function () {
+    $patient = User::factory()->patient()->create();
 
-    Features::twoFactorAuthentication([
-        'confirm' => true,
-        'confirmPassword' => true,
-    ]);
-
-    $user = User::factory()->withTwoFactor()->create();
-
-    $response = $this->post(route('login'), [
-        'email' => $user->email,
+    $response = $this->post(route('login.store'), [
+        'login' => $patient->login,
         'password' => 'password',
     ]);
 
-    $response->assertRedirect(route('two-factor.login'));
-    $response->assertSessionHas('login.id', $user->id);
-    $this->assertGuest();
+    $this->assertAuthenticatedAs($patient);
+    $response->assertRedirect(route('patient.home'));
 });
 
-test('users can not authenticate with invalid password', function () {
+test('login is accepted in any case', function () {
+    $doctor = User::factory()->doctor()->create(['login' => 'doctor.smirnova']);
+
+    $this->post(route('login.store'), [
+        'login' => 'Doctor.SMIRNOVA',
+        'password' => 'password',
+    ]);
+
+    $this->assertAuthenticatedAs($doctor);
+});
+
+test('wrong password gives an error in russian', function () {
     $user = User::factory()->create();
 
     $this->post(route('login.store'), [
-        'email' => $user->email,
+        'login' => $user->login,
         'password' => 'wrong-password',
-    ]);
+    ])->assertSessionHasErrors(['login' => 'Неверный логин или пароль.']);
+
+    $this->assertGuest();
+});
+
+test('login is rate limited after five attempts per minute', function () {
+    $user = User::factory()->create();
+
+    foreach (range(1, 5) as $attempt) {
+        $this->post(route('login.store'), [
+            'login' => $user->login,
+            'password' => 'wrong-password',
+        ])->assertSessionHasErrors('login');
+    }
+
+    $this->post(route('login.store'), [
+        'login' => $user->login,
+        'password' => 'password',
+    ])->assertTooManyRequests();
 
     $this->assertGuest();
 });
@@ -61,17 +81,4 @@ test('users can logout', function () {
     $response->assertRedirect(route('home'));
 
     $this->assertGuest();
-});
-
-test('users are rate limited', function () {
-    $user = User::factory()->create();
-
-    RateLimiter::increment(md5('login'.implode('|', [$user->email, '127.0.0.1'])), amount: 5);
-
-    $response = $this->post(route('login.store'), [
-        'email' => $user->email,
-        'password' => 'wrong-password',
-    ]);
-
-    $response->assertTooManyRequests();
 });

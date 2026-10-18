@@ -21,7 +21,8 @@ export function getInitials(fullName?: string): string {
         return getInitial(names[0]).toUpperCase();
     }
 
-    return `${getInitial(names[0])}${getInitial(names[names.length - 1])}`.toUpperCase();
+    // ФИО записывается как «Фамилия Имя Отчество»: берём фамилию и имя.
+    return `${getInitial(names[0])}${getInitial(names[1])}`.toUpperCase();
 }
 
 export function useInitials(): UseInitialsReturn {
