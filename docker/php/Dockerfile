@@ -32,10 +32,13 @@ ARG UID=1000
 ARG GID=1000
 ARG XDEBUG=false
 
+# safe.directory: в Docker Desktop корень смонтированного кода виден как принадлежащий root,
+# и без исключения git (а за ним composer) отказывается работать с репозиторием.
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends git; \
     rm -rf /var/lib/apt/lists/*; \
+    git config --system --add safe.directory /var/www/html; \
     if [ "${XDEBUG}" = "true" ]; then install-php-extensions xdebug; fi; \
     cp "${PHP_INI_DIR}/php.ini-development" "${PHP_INI_DIR}/php.ini"
 
