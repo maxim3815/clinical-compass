@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
-import { House, Settings } from '@lucide/vue';
+import { House, Settings, UserPlus } from '@lucide/vue';
 import { computed } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavMain from '@/components/NavMain.vue';
@@ -15,15 +15,16 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { home as doctorHome } from '@/routes/doctor';
+import { index as invitations } from '@/routes/doctor/invitations';
 import { home as patientHome } from '@/routes/patient';
 import { edit as editProfile } from '@/routes/profile';
 import type { NavItem } from '@/types';
 
 const page = usePage();
 
-const cabinet = computed(() =>
-    page.props.auth.user.role === 'doctor' ? doctorHome() : patientHome(),
-);
+const isDoctor = computed(() => page.props.auth.user.role === 'doctor');
+
+const cabinet = computed(() => (isDoctor.value ? doctorHome() : patientHome()));
 
 const mainNavItems = computed<NavItem[]>(() => [
     {
@@ -31,6 +32,15 @@ const mainNavItems = computed<NavItem[]>(() => [
         href: cabinet.value,
         icon: House,
     },
+    ...(isDoctor.value
+        ? [
+              {
+                  title: 'Приглашения',
+                  href: invitations(),
+                  icon: UserPlus,
+              },
+          ]
+        : []),
     {
         title: 'Настройки',
         href: editProfile(),
