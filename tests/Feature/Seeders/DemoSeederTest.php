@@ -1,9 +1,11 @@
 <?php
 
 use App\Enums\UserRole;
+use App\Models\AccessLink;
 use App\Models\User;
 use Database\Seeders\DemoSeeder;
 use Illuminate\Support\Facades\Hash;
+use Inertia\Testing\AssertableInertia as Assert;
 
 test('demo seeder creates two doctors with their patients', function () {
     $this->seed(DemoSeeder::class);
@@ -28,11 +30,25 @@ test('demo data shows isolation between doctors', function () {
     expect($doctor2->can('view', $patient))->toBeFalse();
 });
 
+test('demo invitation from the readme opens the registration form', function () {
+    $this->seed(DemoSeeder::class);
+
+    $this->get(route('invitation.show', DemoSeeder::INVITATION_TOKEN))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('invitation/Register')
+            ->where('patientName', 'Новиков Артём Сергеевич'),
+        );
+
+    expect(AccessLink::query()->sole()->doctor->login)->toBe('doctor');
+});
+
 test('demo seeder can be run again', function () {
     $this->seed(DemoSeeder::class);
     $this->seed(DemoSeeder::class);
 
-    expect(User::query()->count())->toBe(6);
+    expect(User::query()->count())->toBe(6)
+        ->and(AccessLink::query()->count())->toBe(1);
 });
 
 test('database seeder adds demo users only in the local environment', function () {
