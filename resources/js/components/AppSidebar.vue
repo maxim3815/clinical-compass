@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Link, usePage } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import { House, Settings, UserPlus, Users } from '@lucide/vue';
-import { computed } from 'vue';
+import { computed, onUnmounted } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
@@ -13,6 +13,7 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
+    useSidebar,
 } from '@/components/ui/sidebar';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
 import { home as doctorHome } from '@/routes/doctor';
@@ -24,6 +25,10 @@ import type { NavItem } from '@/types';
 
 const page = usePage();
 const { isCurrentOrParentUrl } = useCurrentUrl();
+const { setOpenMobile } = useSidebar();
+
+// На телефоне меню открывается поверх страницы: после перехода его нужно закрыть.
+onUnmounted(router.on('navigate', () => setOpenMobile(false)));
 
 const isDoctor = computed(() => page.props.auth.user.role === 'doctor');
 
