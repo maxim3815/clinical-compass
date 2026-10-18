@@ -86,5 +86,15 @@ export default defineConfig({
             functions: ['clsx', 'cn', 'cva'],
             stylesheet: 'resources/css/app.css',
         },
+        overrides: [
+            {
+                files: ['*.yaml', '*.yml'],
+                options: {
+                    tabWidth: 2,
+                    singleQuote: false,
+                    printWidth: 120,
+                },
+            },
+        ],
     },
 });
