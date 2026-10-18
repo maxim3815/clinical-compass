@@ -7,9 +7,12 @@ export GID := $(shell id -g)
 COMPOSE := docker compose
 RUN := $(COMPOSE) run --rm
 PHP := $(RUN) php
+# Команды, которым не нужна база: без запуска postgres.
+PHP_ONLY := $(RUN) --no-deps php
+NODE := $(RUN) --no-deps node
 ARTISAN := $(PHP) php artisan
 
-.PHONY: help init up down build logs ps shell artisan composer npm migrate fresh test lint fix psql
+.PHONY: help init up down build logs ps shell artisan composer npm migrate fresh test test-fast lint fix psql
 
 help: ## Список команд
 	@grep -E '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  make %-10s %s\n", $$1, $$2}'
@@ -17,9 +20,9 @@ help: ## Список команд
 init: ## Первый запуск: .env, образы, зависимости, ключ, миграции с сидами, запуск
 	@[ -f .env ] || cp .env.example .env
 	$(COMPOSE) build
-	$(RUN) --no-deps php composer install
-	$(RUN) --no-deps node npm ci
-	@grep -q '^APP_KEY=.' .env || $(RUN) --no-deps php php artisan key:generate
+	$(PHP_ONLY) composer install
+	$(NODE) npm ci
+	@grep -q '^APP_KEY=.' .env || $(PHP_ONLY) php artisan key:generate
 	$(ARTISAN) migrate --seed
 	$(COMPOSE) up -d --wait
 
@@ -45,10 +48,10 @@ artisan: ## Команда artisan: make artisan c="route:list"
 	$(ARTISAN) $(c)
 
 composer: ## Команда composer: make composer c="require vendor/package"
-	$(RUN) --no-deps php composer $(c)
+	$(PHP_ONLY) composer $(c)
 
 npm: ## Команда npm: make npm c="install package"
-	$(RUN) --no-deps node npm $(c)
+	$(NODE) npm $(c)
 
 migrate: ## Применить миграции
 	$(ARTISAN) migrate
@@ -56,14 +59,23 @@ migrate: ## Применить миграции
 fresh: ## Пересоздать БД и заполнить демо-данными
 	$(ARTISAN) migrate:fresh --seed
 
-test: ## Тесты (make test c="--filter=Login")
-	$(ARTISAN) test $(c)
+test: ## Все тесты, включая браузерные (make test c="--filter=Login")
+	$(NODE) npm run build
+	$(COMPOSE) build tests
+	$(RUN) tests php artisan test $(c)
 
-lint: ## Проверки стиля и статический анализ
-	@echo "Линтеры ещё не настроены."
+test-fast: ## Тесты без браузерных (make test-fast c="--filter=Login")
+	$(ARTISAN) test --testsuite=Unit,Feature $(c)
+
+lint: ## Проверки стиля, типов и статический анализ
+	$(PHP_ONLY) vendor/bin/pint --parallel --test
+	$(PHP_ONLY) vendor/bin/phpstan analyse --memory-limit=1G
+	$(NODE) npm run check
+	$(NODE) npm run types:check
 
 fix: ## Автоисправление стиля
-	@echo "Автоисправление ещё не настроено."
+	$(PHP_ONLY) vendor/bin/pint --parallel
+	$(NODE) npm run check:fix
 
 psql: ## Консоль PostgreSQL
 	$(COMPOSE) exec postgres sh -c 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
