@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
-import { House, Settings, UserPlus } from '@lucide/vue';
+import { House, Settings, UserPlus, Users } from '@lucide/vue';
 import { computed } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavMain from '@/components/NavMain.vue';
@@ -14,39 +14,53 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
+import { useCurrentUrl } from '@/composables/useCurrentUrl';
 import { home as doctorHome } from '@/routes/doctor';
 import { index as invitations } from '@/routes/doctor/invitations';
+import { index as patients } from '@/routes/doctor/patients';
 import { home as patientHome } from '@/routes/patient';
 import { edit as editProfile } from '@/routes/profile';
 import type { NavItem } from '@/types';
 
 const page = usePage();
+const { isCurrentOrParentUrl } = useCurrentUrl();
 
 const isDoctor = computed(() => page.props.auth.user.role === 'doctor');
 
 const cabinet = computed(() => (isDoctor.value ? doctorHome() : patientHome()));
 
-const mainNavItems = computed<NavItem[]>(() => [
-    {
-        title: 'Кабинет',
-        href: cabinet.value,
-        icon: House,
-    },
-    ...(isDoctor.value
+const settings: NavItem = {
+    title: 'Настройки',
+    href: editProfile(),
+    icon: Settings,
+};
+
+const mainNavItems = computed<NavItem[]>(() =>
+    isDoctor.value
         ? [
+              {
+                  title: 'Пациенты',
+                  href: patients(),
+                  icon: Users,
+                  // Карточка пациента тоже относится к разделу.
+                  isActive: isCurrentOrParentUrl(patients()),
+              },
               {
                   title: 'Приглашения',
                   href: invitations(),
                   icon: UserPlus,
               },
+              settings,
           ]
-        : []),
-    {
-        title: 'Настройки',
-        href: editProfile(),
-        icon: Settings,
-    },
-]);
+        : [
+              {
+                  title: 'Кабинет',
+                  href: patientHome(),
+                  icon: House,
+              },
+              settings,
+          ],
+);
 </script>
 
 <template>

@@ -5,9 +5,10 @@ use Inertia\Testing\AssertableInertia as Assert;
 
 test('doctor sees the doctor cabinet', function () {
     $this->actingAs(User::factory()->doctor()->create())
+        ->followingRedirects()
         ->get(route('doctor.home'))
         ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page->component('doctor/Home'));
+        ->assertInertia(fn (Assert $page) => $page->component('doctor/patients/Index'));
 });
 
 test('patient sees the patient cabinet', function () {
@@ -37,7 +38,7 @@ test('shared user data has only public fields', function () {
     $doctor = User::factory()->doctor()->create();
 
     $this->actingAs($doctor)
-        ->get(route('doctor.home'))
+        ->get(route('doctor.patients.index'))
         ->assertInertia(fn (Assert $page) => $page
             ->where('auth.user', [
                 'id' => $doctor->id,

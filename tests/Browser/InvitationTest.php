@@ -9,7 +9,7 @@ test('doctor invites a patient who registers by the link and sees the cabinet', 
         ->fill('login', 'doctor')
         ->fill('password', 'password')
         ->press('Войти')
-        ->assertPathIs('/doctor')
+        ->assertPathIs('/doctor/patients')
         ->click('Приглашения')
         ->assertPathIs('/doctor/invitations')
         ->fill('patient_name', 'Новиков Артём Сергеевич')
