@@ -22,6 +22,14 @@ void createInertiaApp({
         }
     },
     withApp: (app) => {
+        // Vue перехватывает ошибки компонентов и только пишет их в консоль. Передаём их
+        // в window как необработанные, иначе браузерные тесты их не видят.
+        if (!import.meta.env.SSR) {
+            app.config.errorHandler = (error) => {
+                window.reportError(error);
+            };
+        }
+
         app.directive('focus', {
             mounted: (el: HTMLElement, shouldFocus) => {
                 if (shouldFocus.value !== false) {
