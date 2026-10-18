@@ -58,6 +58,6 @@ COPY docker/php/conf.d/xdebug.ini /usr/local/etc/php/conf.d/zz-xdebug.ini
 # Группа или пользователь с таким ID уже могут быть в образе (например, GID 20 на macOS).
 RUN set -eux; \
     getent group "${GID}" >/dev/null || groupadd --gid "${GID}" app; \
-    getent passwd "${UID}" >/dev/null || useradd --uid "${UID}" --gid "${GID}" --create-home --shell /bin/bash app
+    getent passwd "${UID}" >/dev/null || useradd --no-log-init --uid "${UID}" --gid "${GID}" --create-home --shell /bin/bash app
 
 USER ${UID}:${GID}
