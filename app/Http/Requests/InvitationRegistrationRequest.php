@@ -22,7 +22,7 @@ class InvitationRegistrationRequest extends AccessLinkRequest
             'name' => $this->nameRules(),
             'login' => $this->loginRules(),
             'password' => $this->passwordRules(),
-            'birth_date' => ['nullable', 'date', 'after:1900-01-01', 'before:today'],
+            'birth_date' => $this->birthDateRules(),
             'consent' => ['accepted'],
         ];
     }

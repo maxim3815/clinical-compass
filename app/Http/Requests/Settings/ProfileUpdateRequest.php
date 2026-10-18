@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Settings;
 
 use App\Concerns\ProfileValidationRules;
+use App\Enums\UserRole;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -17,6 +18,15 @@ class ProfileUpdateRequest extends FormRequest
      */
     public function rules(): array
     {
-        return $this->profileRules();
+        if ($this->user()?->role !== UserRole::Patient) {
+            return $this->profileRules();
+        }
+
+        // Не присланное поле пациента остаётся прежним, присланное проверяется.
+        return [
+            ...$this->profileRules(),
+            'birth_date' => ['sometimes', ...$this->birthDateRules()],
+            'timezone' => ['sometimes', ...$this->timezoneRules()],
+        ];
     }
 }
