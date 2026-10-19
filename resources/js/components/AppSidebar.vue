@@ -20,7 +20,7 @@ import { home as doctorHome } from '@/routes/doctor';
 import { index as drugs } from '@/routes/doctor/drugs';
 import { index as invitations } from '@/routes/doctor/invitations';
 import { index as patients } from '@/routes/doctor/patients';
-import { home as patientHome } from '@/routes/patient';
+import { home as patientHome, medications } from '@/routes/patient';
 import { edit as editProfile } from '@/routes/profile';
 import type { NavItem } from '@/types';
 
@@ -70,6 +70,11 @@ const mainNavItems = computed<NavItem[]>(() =>
                   title: 'Главная',
                   href: patientHome(),
                   icon: House,
+              },
+              {
+                  title: 'Мои препараты',
+                  href: medications(),
+                  icon: Pill,
               },
               settings,
           ],
