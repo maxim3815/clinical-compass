@@ -48,13 +48,15 @@ defineOptions({
             <table class="w-full text-left text-sm">
                 <thead class="bg-muted/50 text-muted-foreground">
                     <tr>
-                        <th class="px-3 py-2 font-medium">Название</th>
-                        <th class="px-3 py-2 font-medium">МНН</th>
+                        <th class="px-2 py-2 font-medium md:px-3">Название</th>
+                        <th class="px-2 py-2 font-medium md:px-3">МНН</th>
                         <!-- На телефоне форма уступает место дозировкам. -->
-                        <th class="hidden px-3 py-2 font-medium md:table-cell">
+                        <th
+                            class="hidden px-2 py-2 font-medium md:table-cell md:px-3"
+                        >
                             Форма
                         </th>
-                        <th class="px-3 py-2 font-medium">Дозировки</th>
+                        <th class="px-2 py-2 font-medium md:px-3">Дозировки</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -64,7 +66,7 @@ defineOptions({
                         class="border-t"
                         data-test="drug-row"
                     >
-                        <td class="px-3 py-2">
+                        <td class="px-2 py-2 md:px-3">
                             <Link
                                 :href="show(drug.code)"
                                 class="font-medium underline-offset-4 hover:underline"
@@ -72,12 +74,23 @@ defineOptions({
                                 {{ drug.name }}
                             </Link>
                         </td>
-                        <td class="px-3 py-2">{{ drug.inn }}</td>
-                        <td class="hidden px-3 py-2 md:table-cell">
+                        <td class="px-2 py-2 md:px-3">{{ drug.inn }}</td>
+                        <td class="hidden px-2 py-2 md:table-cell md:px-3">
                             {{ drug.dosage_form }}
                         </td>
-                        <td class="px-3 py-2 whitespace-nowrap">
-                            {{ drug.strengths.join(', ') }}
+                        <!-- Дозировка не разрывается, строка переносится только между дозировками. -->
+                        <td class="px-2 py-2 md:px-3">
+                            <template
+                                v-for="(strength, i) in drug.strengths"
+                                :key="strength"
+                            >
+                                <span class="whitespace-nowrap"
+                                    >{{ strength
+                                    }}{{
+                                        i < drug.strengths.length - 1 ? ',' : ''
+                                    }}</span
+                                >{{ ' ' }}
+                            </template>
                         </td>
                     </tr>
                 </tbody>
