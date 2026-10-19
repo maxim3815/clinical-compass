@@ -154,3 +154,15 @@ function doseSchedule(User $patient): array
         ->values()
         ->all();
 }
+
+/**
+ * Плановый приём пациента на местную дату и время суток.
+ */
+function doseOn(User $patient, string $date, string $timeOfDay, ?Prescription $prescription = null): DoseEvent
+{
+    return $patient->doseEvents()
+        ->where('local_date', $date)
+        ->where('time_of_day', $timeOfDay)
+        ->when($prescription !== null, fn ($query) => $query->where('prescription_id', $prescription?->id))
+        ->sole();
+}

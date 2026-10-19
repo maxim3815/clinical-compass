@@ -51,6 +51,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read DrugStrength $strength
  * @property-read Collection<int, PrescriptionIntake> $intakes
  * @property-read Collection<int, DoseEvent> $doseEvents
+ * @property-read Collection<int, AsNeededDose> $asNeededDoses
  */
 #[Fillable([
     'patient_id',
@@ -150,6 +151,16 @@ class Prescription extends Model
     }
 
     /**
+     * Записанные приёмы назначения «по необходимости».
+     *
+     * @return HasMany<AsNeededDose, $this>
+     */
+    public function asNeededDoses(): HasMany
+    {
+        return $this->hasMany(AsNeededDose::class);
+    }
+
+    /**
      * Состояние назначения на дату пациента.
      */
     public function status(CarbonImmutable $today): PrescriptionStatus
@@ -179,6 +190,16 @@ class Prescription extends Model
         return $this->source === PrescriptionSource::Doctor
             && $this->kind === PrescriptionKind::Regular
             && $this->status($today)->isCurrent();
+    }
+
+    /**
+     * Пациент записывает приёмы назначения врача «по необходимости», пока оно действует.
+     */
+    public function acceptsAsNeededDoses(CarbonImmutable $today): bool
+    {
+        return $this->source === PrescriptionSource::Doctor
+            && $this->kind === PrescriptionKind::AsNeeded
+            && $this->status($today) === PrescriptionStatus::Active;
     }
 
     /**

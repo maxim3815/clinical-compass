@@ -163,7 +163,7 @@ test('future unmarked dose events move when the time changes and past or marked 
     ($this->sync)();
     $past = DoseEvent::query()->where('local_date', '2026-10-19')->where('time_of_day', 'morning')->sole();
     $marked = DoseEvent::query()->where('local_date', '2026-10-19')->where('time_of_day', 'afternoon')->sole();
-    $marked->update(['status' => DoseEventStatus::Taken]);
+    $marked->update(['status' => DoseEventStatus::Taken, 'taken_at' => now(), 'marked_at' => now()]);
 
     $prescription->intakes->each(fn (PrescriptionIntake $intake) => $intake->update([
         'time' => ['morning' => '09:00', 'afternoon' => '14:00', 'evening' => '21:00'][$intake->time_of_day->value],
@@ -199,12 +199,11 @@ test('a future dose event moved to an earlier time stays for the day even if the
 
 test('a dose of the same drug and time of day is not planned twice a day', function () {
     $previous = timedPrescription($this->patient, $this->strength, ['evening' => '20:00'], [...$this->weekAgo, 'closed_at' => now(), 'close_reason' => PrescriptionCloseReason::Changed]);
-    DoseEvent::factory()->for($previous)->create([
+    DoseEvent::factory()->for($previous)->taken()->create([
         'time_of_day' => 'evening',
         'local_date' => '2026-10-19',
         'scheduled_at' => CarbonImmutable::parse('2026-10-19 17:00', 'UTC'),
         'window_closes_at' => CarbonImmutable::parse('2026-10-19 23:00', 'UTC'),
-        'status' => DoseEventStatus::Taken,
     ]);
     // Новая версия с тем же временем: сегодняшний вечерний приём уже отмечен у прежней.
     timedPrescription($this->patient, $this->strength, ['evening' => '20:00'], ['previous_id' => $previous->id, 'starts_on' => '2026-10-19']);

@@ -1,5 +1,8 @@
 <?php
 
+use App\Enums\DoseEventStatus;
+use App\Enums\DoseSkipReason;
+use App\Models\AsNeededDose;
 use App\Models\DoseEvent;
 use App\Models\Prescription;
 use App\Models\PrescriptionIntake;
@@ -17,6 +20,27 @@ test('database keeps one dose event of an intake a day with an open window', fun
         ->toThrow(QueryException::class, 'dose_events_window_check')
         ->and(fn () => DB::transaction(fn () => DoseEvent::factory()->for($prescription)->create(['local_date' => '2026-10-21', 'tablets' => '0.3'])))
         ->toThrow(QueryException::class, 'dose_events_tablets_check');
+});
+
+test('database keeps the mark of a dose event consistent with its status', function (array $attributes) {
+    $prescription = Prescription::factory()->for(catalogDrug('Гидроксизин')->strengths()->sole(), 'strength')->create();
+
+    expect(fn () => DB::transaction(fn () => DoseEvent::factory()->for($prescription)->create($attributes)))
+        ->toThrow(QueryException::class, 'dose_events_mark_check');
+})->with([
+    'taken without the time of the intake' => [['status' => DoseEventStatus::Taken, 'marked_at' => now()]],
+    'taken without the time of the mark' => [['status' => DoseEventStatus::Taken, 'taken_at' => now()]],
+    'skipped without a reason' => [['status' => DoseEventStatus::Skipped, 'marked_at' => now()]],
+    'skipped for another reason without a comment' => [['status' => DoseEventStatus::Skipped, 'marked_at' => now(), 'skip_reason' => DoseSkipReason::Other]],
+    'scheduled with a mark' => [['marked_at' => now()]],
+    'missed with a time of the intake' => [['status' => DoseEventStatus::Missed, 'taken_at' => now()]],
+    'taken with a reason' => [['status' => DoseEventStatus::Taken, 'taken_at' => now(), 'marked_at' => now(), 'skip_reason' => DoseSkipReason::Forgot]],
+    'comment without a reason' => [['skip_comment' => 'Был в дороге']],
+]);
+
+test('database keeps whole and half tablets of as-needed doses', function () {
+    expect(fn () => DB::transaction(fn () => AsNeededDose::factory()->create(['tablets' => '0.3'])))
+        ->toThrow(QueryException::class, 'as_needed_doses_tablets_check');
 });
 
 test('database keeps the time of an intake together with the moment it was chosen', function () {

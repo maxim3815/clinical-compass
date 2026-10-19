@@ -33,4 +33,16 @@ class DoseEventFactory extends Factory
             'status' => DoseEventStatus::Scheduled,
         ];
     }
+
+    /**
+     * Принят в плановое время и отмечен тогда же.
+     */
+    public function taken(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => DoseEventStatus::Taken,
+            'taken_at' => $attributes['scheduled_at'],
+            'marked_at' => $attributes['scheduled_at'],
+        ]);
+    }
 }

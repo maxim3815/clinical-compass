@@ -85,7 +85,7 @@ test('a dose marked in advance is not planned again after a change', function ()
     $this->travelTo(CarbonImmutable::parse('2026-10-19 16:30', 'UTC'));
     $old = timedPrescription($this->patient, $this->strength, ['evening' => '20:00'], $this->weekAgo);
     app(SyncDoseEvents::class)->handle($this->patient);
-    $old->doseEvents()->where('local_date', '2026-10-19')->update(['status' => DoseEventStatus::Taken]);
+    $old->doseEvents()->where('local_date', '2026-10-19')->update(['status' => DoseEventStatus::Taken, 'taken_at' => now(), 'marked_at' => now()]);
 
     $this->actingAs($this->doctor)
         ->put(route('doctor.patients.prescriptions.update', [$this->patient, $old]), prescriptionPayload($this->hydroxyzine, [
@@ -138,7 +138,7 @@ test('a prescription moved to start today gets no dose events before the edit', 
 test('cancelling a prescription deletes its future unmarked dose events', function () {
     $prescription = timedPrescription($this->patient, $this->strength, ['morning' => '08:00', 'afternoon' => '13:00', 'evening' => '20:00'], $this->weekAgo);
     app(SyncDoseEvents::class)->handle($this->patient);
-    $prescription->doseEvents()->where('local_date', '2026-10-19')->where('time_of_day', 'afternoon')->update(['status' => DoseEventStatus::Taken]);
+    $prescription->doseEvents()->where('local_date', '2026-10-19')->where('time_of_day', 'afternoon')->update(['status' => DoseEventStatus::Taken, 'taken_at' => now(), 'marked_at' => now()]);
 
     $this->actingAs($this->doctor)
         ->post(route('doctor.patients.prescriptions.cancel', [$this->patient, $prescription]))

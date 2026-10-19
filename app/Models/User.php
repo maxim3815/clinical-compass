@@ -99,6 +99,16 @@ class User extends Authenticatable
     }
 
     /**
+     * Приёмы «по необходимости», которые записал пациент.
+     *
+     * @return HasMany<AsNeededDose, $this>
+     */
+    public function asNeededDoses(): HasMany
+    {
+        return $this->hasMany(AsNeededDose::class, 'patient_id');
+    }
+
+    /**
      * Часовой пояс пациента, у врача — пояс интерфейса.
      */
     public function localTimezone(): string

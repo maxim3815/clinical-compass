@@ -21,4 +21,12 @@ enum DoseEventStatus: string
             self::Missed => 'Пропущен',
         };
     }
+
+    /**
+     * Пациент отметил приём: принял или не принял.
+     */
+    public function isMarked(): bool
+    {
+        return $this === self::Taken || $this === self::Skipped;
+    }
 }

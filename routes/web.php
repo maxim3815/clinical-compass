@@ -8,6 +8,8 @@ use App\Http\Controllers\Doctor\PrescriptionController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InvitationRegistrationController;
 use App\Http\Controllers\PasswordResetByLinkController;
+use App\Http\Controllers\Patient\AsNeededDoseController;
+use App\Http\Controllers\Patient\DoseController;
 use App\Http\Controllers\Patient\HomeController as PatientHomeController;
 use App\Http\Controllers\Patient\IntakeTimeController;
 use App\Http\Controllers\Patient\MedicationController;
@@ -74,6 +76,17 @@ Route::middleware('auth')->group(function () {
         Route::put('medications/{prescription}/times', [IntakeTimeController::class, 'update'])
             ->whereNumber('prescription')
             ->name('intake-times.update');
+
+        Route::put('doses/{doseEvent}', [DoseController::class, 'update'])->whereNumber('doseEvent')->name('doses.update');
+        Route::delete('doses/{doseEvent}/mark', [DoseController::class, 'cancel'])->whereNumber('doseEvent')->name('doses.cancel');
+        Route::post('doses/taken', [DoseController::class, 'takeAll'])->name('doses.take-all');
+
+        Route::post('medications/{prescription}/as-needed-doses', [AsNeededDoseController::class, 'store'])
+            ->whereNumber('prescription')
+            ->name('as-needed-doses.store');
+        Route::delete('as-needed-doses/{asNeededDose}', [AsNeededDoseController::class, 'destroy'])
+            ->whereNumber('asNeededDose')
+            ->name('as-needed-doses.destroy');
     });
 });
 

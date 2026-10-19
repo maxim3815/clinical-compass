@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import { Clock, Stethoscope } from '@lucide/vue';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import IntakeTimeController from '@/actions/App/Http/Controllers/Patient/IntakeTimeController';
+import AsNeededCard from '@/components/AsNeededCard.vue';
+import DoseGroupCard from '@/components/DoseGroupCard.vue';
+import DoseMarkDialog from '@/components/DoseMarkDialog.vue';
 import { Button } from '@/components/ui/button';
 import { home } from '@/routes/patient';
+import type { AsNeeded, Dose, DoseGroup, SelectOption } from '@/types';
 
 type Doctor = {
     name: string;
@@ -20,13 +24,23 @@ type TimeSetup = {
 defineProps<{
     doctor: Doctor | null;
     timeSetup: TimeSetup[];
+    hasPrescriptions: boolean;
+    today: {
+        date: string;
+        groups: DoseGroup[];
+    };
+    yesterday: {
+        groups: DoseGroup[];
+    };
+    asNeeded: AsNeeded[];
+    skipReasons: SelectOption[];
 }>();
 
 defineOptions({
     layout: {
         breadcrumbs: [
             {
-                title: 'Главная',
+                title: 'Сегодня',
                 href: home(),
             },
         ],
@@ -41,10 +55,19 @@ const greetingName = computed(() => {
 
     return parts.length > 1 ? parts.slice(1).join(' ') : parts[0];
 });
+
+// Приём, который пациент отмечает в диалоге, и с какой отметки диалог открыт.
+const markedDose = ref<Dose | null>(null);
+const markStatus = ref<'taken' | 'skipped'>('taken');
+
+function openMark(dose: Dose, status: 'taken' | 'skipped'): void {
+    markStatus.value = status;
+    markedDose.value = dose;
+}
 </script>
 
 <template>
-    <Head title="Главная" />
+    <Head title="Сегодня" />
 
     <div class="flex max-w-xl flex-col gap-6 p-4">
         <h1 class="text-xl font-semibold">Здравствуйте, {{ greetingName }}!</h1>
@@ -72,6 +95,66 @@ const greetingName = computed(() => {
                     </Link>
                 </Button>
             </div>
+        </section>
+
+        <section class="flex flex-col gap-3" data-test="today">
+            <h2 class="font-semibold">Сегодня, {{ today.date }}</h2>
+
+            <p
+                v-if="!hasPrescriptions"
+                class="rounded-lg border border-dashed p-4 text-sm text-muted-foreground"
+                data-test="no-prescriptions"
+            >
+                Врач пока не назначил препараты.
+            </p>
+            <p
+                v-else-if="today.groups.length === 0"
+                class="rounded-lg border border-dashed p-4 text-sm text-muted-foreground"
+            >
+                На сегодня приёмов по расписанию нет.
+            </p>
+
+            <DoseGroupCard
+                v-for="group in today.groups"
+                :key="group.time"
+                :group="group"
+                @mark="openMark"
+            />
+        </section>
+
+        <section
+            v-if="yesterday.groups.length"
+            class="flex flex-col gap-3"
+            data-test="yesterday"
+        >
+            <div>
+                <h2 class="font-semibold">Вчера</h2>
+                <p class="text-sm text-muted-foreground">
+                    Приёмы без отметки. Если вы принимали препарат, отметьте
+                    это.
+                </p>
+            </div>
+
+            <DoseGroupCard
+                v-for="group in yesterday.groups"
+                :key="group.time"
+                :group="group"
+                @mark="openMark"
+            />
+        </section>
+
+        <section
+            v-if="asNeeded.length"
+            class="flex flex-col gap-3"
+            data-test="as-needed-list"
+        >
+            <h2 class="font-semibold">По необходимости</h2>
+
+            <AsNeededCard
+                v-for="prescription in asNeeded"
+                :key="prescription.id"
+                :prescription="prescription"
+            />
         </section>
 
         <section
@@ -104,5 +187,11 @@ const greetingName = computed(() => {
             Вы сейчас не прикреплены к врачу. Обратитесь к своему врачу за новым
             приглашением.
         </p>
+
+        <DoseMarkDialog
+            v-model:dose="markedDose"
+            v-model:status="markStatus"
+            :reasons="skipReasons"
+        />
     </div>
 </template>

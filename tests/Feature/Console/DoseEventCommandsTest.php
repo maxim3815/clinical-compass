@@ -58,12 +58,11 @@ test('dose events become missed when the window closes without a mark', function
         'effective_at' => now()->subWeek(),
     ]);
     $this->artisan('app:dose-events:sync')->assertSuccessful();
-    $taken = DoseEvent::factory()->for($prescription)->create([
+    $taken = DoseEvent::factory()->for($prescription)->taken()->create([
         'time_of_day' => 'morning',
         'local_date' => '2026-10-18',
         'scheduled_at' => now()->subDay()->subHours(4),
         'window_closes_at' => now()->subDay()->subHours(2),
-        'status' => DoseEventStatus::Taken,
     ]);
 
     // Окно утреннего приёма (8:00 по Москве) закрывается в 14:00.

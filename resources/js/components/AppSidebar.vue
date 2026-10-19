@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { House, Pill, Settings, UserPlus, Users } from '@lucide/vue';
+import { CalendarCheck, Pill, Settings, UserPlus, Users } from '@lucide/vue';
 import { computed, onUnmounted } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavMain from '@/components/NavMain.vue';
@@ -67,9 +67,9 @@ const mainNavItems = computed<NavItem[]>(() =>
           ]
         : [
               {
-                  title: 'Главная',
+                  title: 'Сегодня',
                   href: patientHome(),
-                  icon: House,
+                  icon: CalendarCheck,
               },
               {
                   title: 'Мои препараты',

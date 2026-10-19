@@ -35,7 +35,7 @@ test('patient on a phone chooses the time of intakes from the home page', functi
         ->assertNoJavaScriptErrors();
 
     $page->click('[data-sidebar="trigger"]')
-        ->click('Главная')
+        ->click('Сегодня')
         ->assertPathIs('/patient')
         ->assertDontSee('Настройте время приёма')
         ->assertNoJavaScriptErrors();
