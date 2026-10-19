@@ -1,5 +1,11 @@
 <?php
 
+use App\Models\Drug;
+use App\Models\DrugStrength;
+use App\Models\Prescription;
+use App\Models\PrescriptionIntake;
+use App\Models\User;
+use App\Support\DisplayTime;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -58,7 +64,59 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+/**
+ * Препарат справочника с дозировками: миллиграммы => можно ли делить таблетку.
+ *
+ * @param  array<int|string, bool>  $strengths
+ * @param  array<string, mixed>  $attributes
+ */
+function catalogDrug(string $name, array $strengths = [25 => true], array $attributes = []): Drug
 {
-    // ..
+    $drug = Drug::factory()->create(['name' => $name, ...$attributes]);
+
+    foreach ($strengths as $mg => $divisible) {
+        DrugStrength::factory()->for($drug)->create(['mg' => $mg, 'divisible' => $divisible]);
+    }
+
+    return $drug;
+}
+
+/**
+ * Данные формы назначения: самая малая дозировка препарата, регулярно, утром одна таблетка,
+ * с сегодняшнего дня по Москве.
+ *
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function prescriptionPayload(Drug $drug, array $overrides = []): array
+{
+    return [
+        'drug_id' => $drug->id,
+        'drug_strength_id' => $drug->strengths()->orderBy('mg')->value('id'),
+        'kind' => 'regular',
+        'intakes' => [['time_of_day' => 'morning', 'tablets' => 1]],
+        'tablets' => null,
+        'max_daily_doses' => null,
+        'instruction' => $drug->patient_instruction,
+        'starts_on' => DisplayTime::today()->toDateString(),
+        'ends_on' => null,
+        ...$overrides,
+    ];
+}
+
+/**
+ * Регулярное назначение врача с приёмами: время суток => таблеток.
+ *
+ * @param  array<string, string>  $intakes
+ * @param  array<string, mixed>  $attributes
+ */
+function regularPrescription(User $patient, DrugStrength $strength, array $intakes = ['morning' => '1'], array $attributes = []): Prescription
+{
+    $prescription = Prescription::factory()->for($patient, 'patient')->for($strength, 'strength')->create($attributes);
+
+    foreach ($intakes as $timeOfDay => $tablets) {
+        PrescriptionIntake::factory()->for($prescription)->create(['time_of_day' => $timeOfDay, 'tablets' => $tablets]);
+    }
+
+    return $prescription;
 }

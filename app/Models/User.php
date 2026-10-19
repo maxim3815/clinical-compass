@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\UserRole;
+use App\Support\DisplayTime;
 use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -10,6 +11,7 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -74,6 +76,25 @@ class User extends Authenticatable
     {
         return $this->hasOneThrough(User::class, CareRelationship::class, 'patient_id', 'id', 'id', 'doctor_id')
             ->whereNull('care_relationships.ended_at');
+    }
+
+    /**
+     * Назначения пациента, все версии.
+     *
+     * @return HasMany<Prescription, $this>
+     */
+    public function prescriptions(): HasMany
+    {
+        return $this->hasMany(Prescription::class, 'patient_id');
+    }
+
+    /**
+     * Сегодняшняя дата по часовому поясу пациента (у врача — по поясу интерфейса) как полночь UTC,
+     * см. DisplayTime::today(). По ней считаются даты назначений.
+     */
+    public function localToday(): CarbonImmutable
+    {
+        return DisplayTime::today($this->patientProfile->timezone->value ?? DisplayTime::TIMEZONE);
     }
 
     /**

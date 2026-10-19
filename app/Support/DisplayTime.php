@@ -24,11 +24,11 @@ final class DisplayTime
     }
 
     /**
-     * Сегодняшняя дата в часовом поясе интерфейса как полночь UTC. Так её можно сравнивать
-     * с датами без времени, например с датой рождения.
+     * Сегодняшняя дата в часовом поясе (по умолчанию в поясе интерфейса) как полночь UTC.
+     * Так её можно сравнивать с датами без времени, например с датой рождения.
      */
-    public static function today(): CarbonImmutable
+    public static function today(string $timezone = self::TIMEZONE): CarbonImmutable
     {
-        return CarbonImmutable::parse(CarbonImmutable::now(self::TIMEZONE)->toDateString(), 'UTC');
+        return CarbonImmutable::parse(CarbonImmutable::now($timezone)->toDateString(), 'UTC');
     }
 }
