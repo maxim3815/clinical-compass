@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ChevronLeft, ChevronRight, Search, UserPlus } from '@lucide/vue';
+import { Search, UserPlus } from '@lucide/vue';
 import { ref } from 'vue';
 import Heading from '@/components/Heading.vue';
+import ListPagination from '@/components/ListPagination.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatAge } from '@/lib/plural';
@@ -140,42 +141,7 @@ function submit(): void {
                 </table>
             </div>
 
-            <nav
-                v-if="patients.last_page > 1"
-                class="flex items-center justify-between gap-2"
-                aria-label="Страницы списка"
-            >
-                <Button
-                    v-if="patients.prev_page_url"
-                    variant="outline"
-                    size="sm"
-                    as-child
-                >
-                    <Link :href="patients.prev_page_url" preserve-scroll>
-                        <ChevronLeft />
-                        Назад
-                    </Link>
-                </Button>
-                <span v-else />
-
-                <span class="text-sm text-muted-foreground">
-                    Страница {{ patients.current_page }} из
-                    {{ patients.last_page }}
-                </span>
-
-                <Button
-                    v-if="patients.next_page_url"
-                    variant="outline"
-                    size="sm"
-                    as-child
-                >
-                    <Link :href="patients.next_page_url" preserve-scroll>
-                        Вперёд
-                        <ChevronRight />
-                    </Link>
-                </Button>
-                <span v-else />
-            </nav>
+            <ListPagination :page="patients" />
         </template>
     </div>
 </template>
