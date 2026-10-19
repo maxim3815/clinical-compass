@@ -13,6 +13,8 @@ export type Prescription = {
     intakes: {
         time_of_day: string;
         dose: string;
+        // Время, выбранное пациентом («8:00»), или null.
+        time: string | null;
     }[];
     as_needed: {
         dose: string;

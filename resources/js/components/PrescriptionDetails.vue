@@ -5,7 +5,7 @@ import type { Prescription } from '@/types';
 
 const props = defineProps<{
     prescription: Prescription;
-    // Врачу у действующего назначения показываем, выбрал ли пациент время приёма.
+    // Врачу у действующего назначения показываем, что пациент ещё не выбрал время приёма.
     forDoctor?: boolean;
 }>();
 
@@ -64,10 +64,14 @@ const closing = computed(() => {
                 :key="intake.time_of_day"
                 data-test="prescription-intake"
             >
-                <span class="font-medium">{{ intake.time_of_day }}:</span>
+                <span class="font-medium"
+                    >{{ intake.time_of_day
+                    }}<template v-if="intake.time">, {{ intake.time }}</template
+                    >:</span
+                >
                 {{ intake.dose }}
                 <span
-                    v-if="forDoctor && isCurrent"
+                    v-if="forDoctor && isCurrent && intake.time === null"
                     class="text-muted-foreground"
                 >
                     · пациент ещё не выбрал время

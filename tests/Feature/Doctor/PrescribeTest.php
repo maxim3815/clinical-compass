@@ -88,8 +88,8 @@ test('doctor prescribes a regular intake with a different dose for each intake',
             ->where('prescriptions.0.kind', 'regular')
             ->where('prescriptions.0.kind_label', 'Регулярно')
             ->where('prescriptions.0.intakes', [
-                ['time_of_day' => 'Утром', 'dose' => '½ таблетки, 12,5 мг'],
-                ['time_of_day' => 'Вечером', 'dose' => '1 таблетка, 25 мг'],
+                ['time_of_day' => 'Утром', 'dose' => '½ таблетки, 12,5 мг', 'time' => null],
+                ['time_of_day' => 'Вечером', 'dose' => '1 таблетка, 25 мг', 'time' => null],
             ])
             ->where('prescriptions.0.as_needed', null)
             ->where('prescriptions.0.instruction', 'Может вызывать сонливость.')

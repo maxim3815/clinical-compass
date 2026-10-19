@@ -33,6 +33,7 @@ final class PrescriptionPresenter
                 ->map(fn (PrescriptionIntake $intake): array => [
                     'time_of_day' => $intake->time_of_day->label(),
                     'dose' => Dose::label($intake->tablets, $mg),
+                    'time' => $intake->time === null ? null : self::clock($intake->time),
                 ])
                 ->all(),
             'as_needed' => $prescription->kind === PrescriptionKind::AsNeeded ? [
@@ -50,6 +51,14 @@ final class PrescriptionPresenter
             'cancel_comment' => $prescription->cancel_comment,
             'can_change' => $prescription->isChangeableByDoctor($today),
         ];
+    }
+
+    /**
+     * Время приёма без ведущего нуля: «8:00».
+     */
+    private static function clock(string $time): string
+    {
+        return (int) substr($time, 0, 2).substr($time, 2);
     }
 
     /**

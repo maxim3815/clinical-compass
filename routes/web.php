@@ -9,6 +9,7 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InvitationRegistrationController;
 use App\Http\Controllers\PasswordResetByLinkController;
 use App\Http\Controllers\Patient\HomeController as PatientHomeController;
+use App\Http\Controllers\Patient\IntakeTimeController;
 use App\Http\Controllers\Patient\MedicationController;
 use App\Models\Drug;
 use Illuminate\Support\Facades\Route;
@@ -67,6 +68,12 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:patient')->prefix('patient')->name('patient.')->group(function () {
         Route::get('/', PatientHomeController::class)->name('home');
         Route::get('medications', MedicationController::class)->name('medications');
+        Route::get('medications/{prescription}/times', [IntakeTimeController::class, 'edit'])
+            ->whereNumber('prescription')
+            ->name('intake-times.edit');
+        Route::put('medications/{prescription}/times', [IntakeTimeController::class, 'update'])
+            ->whereNumber('prescription')
+            ->name('intake-times.update');
     });
 });
 

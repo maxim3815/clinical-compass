@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { Head, usePage } from '@inertiajs/vue3';
-import { Stethoscope } from '@lucide/vue';
+import { Head, Link, usePage } from '@inertiajs/vue3';
+import { Clock, Stethoscope } from '@lucide/vue';
 import { computed } from 'vue';
+import IntakeTimeController from '@/actions/App/Http/Controllers/Patient/IntakeTimeController';
+import { Button } from '@/components/ui/button';
 import { home } from '@/routes/patient';
 
 type Doctor = {
@@ -9,8 +11,15 @@ type Doctor = {
     specialty: string | null;
 };
 
+// Назначение, у которого есть приём без выбранного времени.
+type TimeSetup = {
+    id: number;
+    title: string;
+};
+
 defineProps<{
     doctor: Doctor | null;
+    timeSetup: TimeSetup[];
 }>();
 
 defineOptions({
@@ -39,6 +48,31 @@ const greetingName = computed(() => {
 
     <div class="flex max-w-xl flex-col gap-6 p-4">
         <h1 class="text-xl font-semibold">Здравствуйте, {{ greetingName }}!</h1>
+
+        <section
+            v-for="prescription in timeSetup"
+            :key="prescription.id"
+            class="flex items-start gap-4 rounded-lg border border-primary/40 p-4"
+            data-test="time-setup"
+        >
+            <div
+                class="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted"
+            >
+                <Clock class="size-5 text-muted-foreground" />
+            </div>
+            <div class="flex min-w-0 flex-col items-start gap-2">
+                <h2 class="font-medium">Настройте время приёма</h2>
+                <p class="text-sm break-words">
+                    {{ prescription.title }}: выберите, во сколько вы будете
+                    принимать препарат.
+                </p>
+                <Button size="sm" as-child>
+                    <Link :href="IntakeTimeController.edit(prescription.id)">
+                        Выбрать время
+                    </Link>
+                </Button>
+            </div>
+        </section>
 
         <section
             v-if="doctor"

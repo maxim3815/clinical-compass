@@ -111,7 +111,7 @@ test('changing an active prescription closes it and creates a new version', func
             ->where('prescriptionHistory.0.status_label', 'Изменено')
             ->where('prescriptionHistory.0.starts_on', '10.10.2026')
             ->where('prescriptionHistory.0.closed_at', '19.10.2026 12:00')
-            ->where('prescriptionHistory.0.intakes', [['time_of_day' => 'Утром', 'dose' => '1 таблетка, 25 мг']])
+            ->where('prescriptionHistory.0.intakes', [['time_of_day' => 'Утром', 'dose' => '1 таблетка, 25 мг', 'time' => null]])
             ->where('prescriptionHistory.0.can_change', false),
         );
 });

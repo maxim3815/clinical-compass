@@ -3,6 +3,7 @@
 use App\Enums\PrescriptionCloseReason;
 use App\Enums\PrescriptionSource;
 use App\Models\Prescription;
+use App\Models\PrescriptionIntake;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -48,8 +49,8 @@ test('patient sees current and upcoming prescriptions of the doctor', function (
             ->where('prescriptions.1.drug.name', 'Гидроксизин')
             ->where('prescriptions.1.strength', '25 мг')
             ->where('prescriptions.1.intakes', [
-                ['time_of_day' => 'Утром', 'dose' => '½ таблетки, 12,5 мг'],
-                ['time_of_day' => 'Вечером', 'dose' => '1 таблетка, 25 мг'],
+                ['time_of_day' => 'Утром', 'dose' => '½ таблетки, 12,5 мг', 'time' => null],
+                ['time_of_day' => 'Вечером', 'dose' => '1 таблетка, 25 мг', 'time' => null],
             ])
             ->where('prescriptions.1.instruction', 'Может вызывать сонливость.')
             ->where('prescriptions.1.starts_on', '10.10.2026')
@@ -58,6 +59,19 @@ test('patient sees current and upcoming prescriptions of the doctor', function (
             ->where('prescriptions.2.id', $asNeeded->id)
             ->where('prescriptions.2.as_needed', ['dose' => '1 таблетка, 25 мг', 'limit' => 'Не больше 2 раз в сутки']),
         );
+});
+
+test('patient sees the chosen time of intakes', function () {
+    $prescription = timedPrescription($this->patient, catalogDrug('Гидроксизин')->strengths()->sole(), ['morning' => '07:05', 'evening' => '21:30']);
+    PrescriptionIntake::factory()->for($prescription)->create(['time_of_day' => 'bedtime']);
+
+    $this->actingAs($this->patient)
+        ->get(route('patient.medications'))
+        ->assertInertia(fn (Assert $page) => $page->where('prescriptions.0.intakes', [
+            ['time_of_day' => 'Утром', 'dose' => '1 таблетка, 25 мг', 'time' => '7:05'],
+            ['time_of_day' => 'Вечером', 'dose' => '1 таблетка, 25 мг', 'time' => '21:30'],
+            ['time_of_day' => 'Перед сном', 'dose' => '1 таблетка, 25 мг', 'time' => null],
+        ]));
 });
 
 test('patient prescription ending today is still shown', function () {
