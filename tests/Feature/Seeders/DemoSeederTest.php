@@ -2,6 +2,7 @@
 
 use App\Enums\UserRole;
 use App\Models\AccessLink;
+use App\Models\Drug;
 use App\Models\User;
 use Database\Seeders\DemoSeeder;
 use Illuminate\Support\Facades\Hash;
@@ -43,16 +44,24 @@ test('demo invitation from the readme opens the registration form', function () 
     expect(AccessLink::query()->sole()->doctor->login)->toBe('doctor');
 });
 
+test('demo seeder loads the drug catalog', function () {
+    $this->seed(DemoSeeder::class);
+
+    expect(Drug::query()->active()->count())->toBe(5);
+});
+
 test('demo seeder can be run again', function () {
     $this->seed(DemoSeeder::class);
     $this->seed(DemoSeeder::class);
 
     expect(User::query()->count())->toBe(6)
-        ->and(AccessLink::query()->count())->toBe(1);
+        ->and(AccessLink::query()->count())->toBe(1)
+        ->and(Drug::query()->count())->toBe(5);
 });
 
-test('database seeder adds demo users only in the local environment', function () {
+test('database seeder adds demo data only in the local environment', function () {
     $this->seed();
 
-    expect(User::query()->count())->toBe(0);
+    expect(User::query()->count())->toBe(0)
+        ->and(Drug::query()->count())->toBe(0);
 });

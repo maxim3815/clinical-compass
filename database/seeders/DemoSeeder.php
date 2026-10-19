@@ -10,11 +10,14 @@ use App\Models\AccessLink;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use DateInterval;
+use Illuminate\Console\Command;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use RuntimeException;
 
 /**
- * Демо-данные для локальной разработки и показа. У всех пользователей пароль `password`.
+ * Демо-данные для локальной разработки и показа: справочник препаратов, врачи и пациенты.
+ * У всех пользователей пароль `password`.
  * Второй врач со своим пациентом нужен, чтобы показать изоляцию данных.
  * Повторный запуск не создаёт дубликатов.
  */
@@ -31,6 +34,11 @@ class DemoSeeder extends Seeder
 
     public function run(CreateDoctor $createDoctor, CreatePatient $createPatient): void
     {
+        // Справочник препаратов загружается той же командой, что и вне локального окружения.
+        if ($this->command->call('app:drugs:import') !== Command::SUCCESS) {
+            throw new RuntimeException('Справочник препаратов не загружен, ошибки выше.');
+        }
+
         $doctor = $this->doctor($createDoctor, 'doctor', 'Смирнова Анна Сергеевна');
         $doctor2 = $this->doctor($createDoctor, 'doctor2', 'Волков Дмитрий Андреевич');
 
