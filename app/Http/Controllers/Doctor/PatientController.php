@@ -2,10 +2,15 @@
 
 namespace App\Http\Controllers\Doctor;
 
+use App\Enums\PrescriptionCancelReason;
+use App\Enums\PrescriptionKind;
+use App\Enums\PrescriptionSource;
 use App\Http\Controllers\Controller;
 use App\Models\CareRelationship;
+use App\Models\Prescription;
 use App\Models\User;
 use App\Support\DisplayTime;
+use App\Support\PrescriptionPresenter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -57,6 +62,13 @@ class PatientController extends Controller
             ->sole();
 
         $profile = $patient->patientProfile;
+        $today = $patient->localToday();
+
+        [$current, $history] = $patient->prescriptions()
+            ->where('source', PrescriptionSource::Doctor)
+            ->with(['drug', 'strength', 'intakes', 'prescriber'])
+            ->get()
+            ->partition(fn (Prescription $prescription): bool => $prescription->status($today)->isCurrent());
 
         return Inertia::render('doctor/patients/Show', [
             'patient' => [
@@ -68,6 +80,23 @@ class PatientController extends Controller
                 'started_at' => DisplayTime::formatDate($care->started_at),
                 'timezone' => $profile?->timezone->label(),
             ],
+            'prescriptions' => $current
+                ->sortBy(fn (Prescription $prescription): array => [
+                    $prescription->drug->name,
+                    $prescription->kind === PrescriptionKind::Regular ? 0 : 1,
+                    $prescription->starts_on->toDateString(),
+                ])
+                ->map(fn (Prescription $prescription): array => PrescriptionPresenter::present($prescription, $today))
+                ->values(),
+            // Сначала то, что закрыто или завершилось последним.
+            'prescriptionHistory' => $history
+                ->sortByDesc(fn (Prescription $prescription): array => [
+                    ($prescription->closed_at ?? $prescription->ends_on)?->getTimestamp(),
+                    $prescription->id,
+                ])
+                ->map(fn (Prescription $prescription): array => PrescriptionPresenter::present($prescription, $today))
+                ->values(),
+            'cancelReasons' => PrescriptionCancelReason::options(),
         ]);
     }
 

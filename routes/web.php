@@ -4,6 +4,7 @@ use App\Http\Controllers\Doctor\DrugController;
 use App\Http\Controllers\Doctor\InvitationController;
 use App\Http\Controllers\Doctor\PasswordResetLinkController;
 use App\Http\Controllers\Doctor\PatientController;
+use App\Http\Controllers\Doctor\PrescriptionController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InvitationRegistrationController;
 use App\Http\Controllers\PasswordResetByLinkController;
@@ -35,6 +36,20 @@ Route::middleware('auth')->group(function () {
         Route::post('patients/{patient}/password-reset-link', [PasswordResetLinkController::class, 'store'])
             ->whereNumber('patient')
             ->name('patients.password-reset-link.store');
+
+        // Назначение ищется только среди назначений этого пациента.
+        Route::scopeBindings()->whereNumber(['patient', 'prescription'])->group(function () {
+            Route::get('patients/{patient}/prescriptions/create', [PrescriptionController::class, 'create'])
+                ->name('patients.prescriptions.create');
+            Route::post('patients/{patient}/prescriptions', [PrescriptionController::class, 'store'])
+                ->name('patients.prescriptions.store');
+            Route::get('patients/{patient}/prescriptions/{prescription}/edit', [PrescriptionController::class, 'edit'])
+                ->name('patients.prescriptions.edit');
+            Route::put('patients/{patient}/prescriptions/{prescription}', [PrescriptionController::class, 'update'])
+                ->name('patients.prescriptions.update');
+            Route::post('patients/{patient}/prescriptions/{prescription}/cancel', [PrescriptionController::class, 'cancel'])
+                ->name('patients.prescriptions.cancel');
+        });
 
         Route::get('drugs', [DrugController::class, 'index'])->name('drugs.index');
         Route::get('drugs/{drug:code}', [DrugController::class, 'show'])

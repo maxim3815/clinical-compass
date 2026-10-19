@@ -1,13 +1,17 @@
 <script setup lang="ts">
-import { Form, Head, usePage } from '@inertiajs/vue3';
-import { KeyRound } from '@lucide/vue';
-import { computed } from 'vue';
+import { Form, Head, Link, usePage } from '@inertiajs/vue3';
+import { KeyRound, Plus } from '@lucide/vue';
+import { computed, ref } from 'vue';
 import PasswordResetLinkController from '@/actions/App/Http/Controllers/Doctor/PasswordResetLinkController';
+import PrescriptionController from '@/actions/App/Http/Controllers/Doctor/PrescriptionController';
+import CancelPrescriptionDialog from '@/components/CancelPrescriptionDialog.vue';
 import Heading from '@/components/Heading.vue';
 import OneTimeLink from '@/components/OneTimeLink.vue';
+import PrescriptionDetails from '@/components/PrescriptionDetails.vue';
 import { Button } from '@/components/ui/button';
 import { formatAge } from '@/lib/plural';
 import { index, show } from '@/routes/doctor/patients';
+import type { Prescription, SelectOption } from '@/types';
 
 type Patient = {
     id: number;
@@ -21,6 +25,9 @@ type Patient = {
 
 const props = defineProps<{
     patient: Patient;
+    prescriptions: Prescription[];
+    prescriptionHistory: Prescription[];
+    cancelReasons: SelectOption[];
 }>();
 
 defineOptions({
@@ -39,6 +46,7 @@ defineOptions({
 });
 
 const page = usePage();
+const cancelling = ref<Prescription | null>(null);
 const passwordResetUrl = computed(() => page.flash.passwordResetUrl);
 
 const details = computed(() => [
@@ -72,6 +80,83 @@ const details = computed(() => [
                 <dd class="-mt-2 font-medium sm:mt-0">{{ item.value }}</dd>
             </template>
         </dl>
+
+        <section class="flex flex-col gap-3" data-test="prescriptions">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <Heading variant="small" title="Назначения" />
+                <Button size="sm" as-child>
+                    <Link
+                        :href="PrescriptionController.create(patient.id)"
+                        data-test="prescribe-button"
+                    >
+                        <Plus />
+                        Назначить
+                    </Link>
+                </Button>
+            </div>
+
+            <p
+                v-if="prescriptions.length === 0"
+                class="text-sm text-muted-foreground"
+            >
+                Назначений пока нет.
+            </p>
+
+            <PrescriptionDetails
+                v-for="prescription in prescriptions"
+                :key="prescription.id"
+                :prescription="prescription"
+                for-doctor
+            >
+                <template v-if="prescription.can_change" #actions>
+                    <Button variant="outline" size="sm" as-child>
+                        <Link
+                            :href="
+                                PrescriptionController.edit({
+                                    patient: patient.id,
+                                    prescription: prescription.id,
+                                })
+                            "
+                        >
+                            Изменить
+                        </Link>
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        data-test="cancel-prescription-button"
+                        @click="cancelling = prescription"
+                    >
+                        Отменить
+                    </Button>
+                </template>
+            </PrescriptionDetails>
+        </section>
+
+        <section
+            v-if="prescriptionHistory.length > 0"
+            class="flex flex-col gap-3"
+            data-test="prescription-history"
+        >
+            <Heading
+                variant="small"
+                title="История назначений"
+                description="Прежние версии изменённых назначений, отменённые и завершённые назначения."
+            />
+
+            <PrescriptionDetails
+                v-for="prescription in prescriptionHistory"
+                :key="prescription.id"
+                :prescription="prescription"
+                for-doctor
+            />
+        </section>
+
+        <CancelPrescriptionDialog
+            v-model:prescription="cancelling"
+            :patient-id="patient.id"
+            :reasons="cancelReasons"
+        />
 
         <section class="flex flex-col gap-3">
             <Heading
