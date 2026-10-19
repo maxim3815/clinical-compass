@@ -61,7 +61,7 @@ class SyncDoseEvents
             $rows = $planned
                 ->reject(fn (array $plan): bool => $plan['scheduled_at']->lt($plan['not_before']) || $this->isOccupied($kept, $plan))
                 ->map(fn (array $plan): array => [
-                    ...collect($plan)->except(['not_before', 'drug_id'])->all(),
+                    ...collect($plan)->except(['not_before', 'drug'])->all(),
                     'patient_id' => $patient->id,
                     'status' => DoseEventStatus::Scheduled->value,
                     'created_at' => $now,
@@ -84,16 +84,22 @@ class SyncDoseEvents
 
     /**
      * Приём этого препарата в то же время суток в этот день уже есть у прежней версии назначения:
-     * например, пациент отметил его заранее, а врач затем изменил назначение. Второй не нужен.
+     * например, пациент отметил его заранее, а затем назначение изменили. Второй не нужен.
+     * Назначение врача и препарат, добавленный пациентом, друг друга не заменяют.
      *
      * @param  Collection<int, DoseEvent>  $kept
      * @param  array<string, mixed>  $plan
      */
     private function isOccupied(Collection $kept, array $plan): bool
     {
-        return $kept->contains(fn (DoseEvent $event): bool => $event->prescription->drug_id === $plan['drug_id']
+        return $kept->contains(fn (DoseEvent $event): bool => $this->drug($event->prescription) === $plan['drug']
             && $event->time_of_day->value === $plan['time_of_day']
             && $event->local_date->toDateString() === $plan['local_date']);
+    }
+
+    private function drug(Prescription $prescription): string
+    {
+        return $prescription->source->value.'|'.$prescription->drugKey();
     }
 
     /**
@@ -133,7 +139,7 @@ class SyncDoseEvents
 
                     $planned->put($this->key($prescription->id, $intake->time_of_day->value, $date), [
                         'prescription_id' => $prescription->id,
-                        'drug_id' => $prescription->drug_id,
+                        'drug' => $this->drug($prescription),
                         'time_of_day' => $intake->time_of_day->value,
                         'tablets' => $intake->tablets,
                         'local_date' => $date->toDateString(),
@@ -150,7 +156,7 @@ class SyncDoseEvents
     }
 
     /**
-     * Окно по window_hours препарата. Иначе половина интервала до следующего приёма назначения
+     * Окно по window_hours препарата из справочника. Иначе половина интервала до следующего приёма назначения
      * (при одном приёме в сутки — до него же завтра), но не больше максимума из конфига
      * и не меньше интервала «вовремя»: приём не должен стать пропущенным раньше, чем опоздавшим.
      *
@@ -158,7 +164,8 @@ class SyncDoseEvents
      */
     private function windowMinutes(Prescription $prescription, array $dayMinutes, int $minute): int
     {
-        if ($prescription->drug->window_hours !== null) {
+        // У «другого» препарата пациента справочника нет: окно по умолчанию.
+        if ($prescription->drug?->window_hours !== null) {
             return $prescription->drug->window_hours * 60;
         }
 

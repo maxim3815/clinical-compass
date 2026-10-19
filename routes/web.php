@@ -13,6 +13,7 @@ use App\Http\Controllers\Patient\DoseController;
 use App\Http\Controllers\Patient\HomeController as PatientHomeController;
 use App\Http\Controllers\Patient\IntakeTimeController;
 use App\Http\Controllers\Patient\MedicationController;
+use App\Http\Controllers\Patient\OwnMedicationController;
 use App\Models\Drug;
 use Illuminate\Support\Facades\Route;
 
@@ -70,6 +71,16 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:patient')->prefix('patient')->name('patient.')->group(function () {
         Route::get('/', PatientHomeController::class)->name('home');
         Route::get('medications', MedicationController::class)->name('medications');
+
+        // Препараты, которые пациент добавил сам.
+        Route::get('medications/create', [OwnMedicationController::class, 'create'])->name('own-medications.create');
+        Route::post('medications', [OwnMedicationController::class, 'store'])->name('own-medications.store');
+        Route::whereNumber('prescription')->group(function () {
+            Route::get('medications/{prescription}/edit', [OwnMedicationController::class, 'edit'])->name('own-medications.edit');
+            Route::put('medications/{prescription}', [OwnMedicationController::class, 'update'])->name('own-medications.update');
+            Route::post('medications/{prescription}/stop', [OwnMedicationController::class, 'stop'])->name('own-medications.stop');
+        });
+
         Route::get('medications/{prescription}/times', [IntakeTimeController::class, 'edit'])
             ->whereNumber('prescription')
             ->name('intake-times.edit');

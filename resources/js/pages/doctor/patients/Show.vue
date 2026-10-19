@@ -26,6 +26,7 @@ type Patient = {
 const props = defineProps<{
     patient: Patient;
     prescriptions: Prescription[];
+    ownMedications: Prescription[];
     prescriptionHistory: Prescription[];
     cancelReasons: SelectOption[];
 }>();
@@ -131,6 +132,25 @@ const details = computed(() => [
                     </Button>
                 </template>
             </PrescriptionDetails>
+        </section>
+
+        <section
+            v-if="ownMedications.length > 0"
+            class="flex flex-col gap-3"
+            data-test="own-medications"
+        >
+            <Heading
+                variant="small"
+                title="Добавил пациент"
+                description="Препараты от других врачей, которые пациент добавил сам. Изменить их может только пациент."
+            />
+
+            <PrescriptionDetails
+                v-for="prescription in ownMedications"
+                :key="prescription.id"
+                :prescription="prescription"
+                for-doctor
+            />
         </section>
 
         <section

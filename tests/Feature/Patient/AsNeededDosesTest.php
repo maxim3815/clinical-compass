@@ -1,7 +1,6 @@
 <?php
 
 use App\Enums\PrescriptionCloseReason;
-use App\Enums\PrescriptionSource;
 use App\Models\AsNeededDose;
 use App\Models\Prescription;
 use App\Models\User;
@@ -151,13 +150,11 @@ test('a changed, cancelled or upcoming prescription does not take as-needed dose
     'upcoming' => fn (Prescription $prescription) => $prescription->update(['starts_on' => '2026-10-20']),
 ]);
 
-test('regular, patient and foreign prescriptions are not found', function () {
+test('regular and foreign prescriptions are not found', function () {
     $regular = regularPrescription($this->patient, catalogDrug('Сертралин', [50 => true])->strengths()->sole());
-    $own = Prescription::factory()->for($this->patient, 'patient')->asNeeded()->create(['source' => PrescriptionSource::Patient]);
     $this->actingAs($this->patient);
 
     $this->post(route('patient.as-needed-doses.store', $regular), ['day' => 'today'])->assertNotFound();
-    $this->post(route('patient.as-needed-doses.store', $own), ['day' => 'today'])->assertNotFound();
 
     $this->actingAs(User::factory()->patient()->create())
         ->post(route('patient.as-needed-doses.store', $this->prescription), ['day' => 'today'])
@@ -186,4 +183,69 @@ test('patient cancels as-needed doses of today and yesterday only', function () 
         ->assertNotFound();
 
     expect(AsNeededDose::query()->pluck('id')->all())->toBe([$old->id]);
+});
+
+test('patient records doses of an own medication without a daily limit', function () {
+    $own = ownPrescription($this->patient, times: [], attributes: [
+        'kind' => 'as_needed',
+        'dose' => '½ таблетки',
+        'max_daily_doses' => null,
+        'starts_on' => '2026-10-18',
+    ]);
+    $this->actingAs($this->patient);
+
+    foreach (range(1, 4) as $attempt) {
+        $this->post(route('patient.as-needed-doses.store', $own), ['day' => 'today'])->assertSessionHasNoErrors();
+    }
+
+    expect($own->asNeededDoses()->count())->toBe(4)
+        ->and($own->asNeededDoses()->whereNotNull('tablets')->exists())->toBeFalse();
+
+    $this->get(route('patient.home'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('asNeeded', 2)
+            ->where('asNeeded.1.id', $own->id)
+            ->where('asNeeded.1.drug', 'Фенибут')
+            ->where('asNeeded.1.dose', '½ таблетки')
+            ->where('asNeeded.1.instruction', null)
+            ->where('asNeeded.1.max_daily_doses', null)
+            ->where('asNeeded.1.taken_today', 4),
+        );
+});
+
+test('the daily limit of another drug added by the patient counts doses of the same name', function () {
+    $previous = ownPrescription($this->patient, times: [], attributes: [
+        'kind' => 'as_needed',
+        'max_daily_doses' => 2,
+        'starts_on' => '2026-10-18',
+        'closed_at' => now()->subHour(),
+        'close_reason' => PrescriptionCloseReason::Changed,
+    ]);
+    AsNeededDose::factory()->for($previous)->create(['tablets' => null, 'taken_at' => now()->subHours(2)]);
+    $changed = ownPrescription($this->patient, times: [], attributes: ['kind' => 'as_needed', 'max_daily_doses' => 1, 'previous_id' => $previous->id]);
+    // Приём другого препарата в лимит не входит.
+    $another = ownPrescription($this->patient, times: [], attributes: ['kind' => 'as_needed', 'drug_name' => 'Афобазол', 'max_daily_doses' => 1]);
+    $this->actingAs($this->patient);
+
+    $this->post(route('patient.as-needed-doses.store', $changed), ['day' => 'today'])
+        ->assertSessionHasErrors(['confirmed' => 'Сегодня вы уже приняли препарат 1 раз, а по назначению можно не больше 1 раза в сутки.']);
+    $this->post(route('patient.as-needed-doses.store', $another), ['day' => 'today'])->assertSessionHasNoErrors();
+});
+
+test('the daily limit of a catalog drug counts doses of the medication added by the patient', function () {
+    // Пациент добавил тот же препарат раньше, чем его назначил врач.
+    $own = ownPrescription($this->patient, $this->hydroxyzine, times: [], attributes: ['kind' => 'as_needed', 'max_daily_doses' => null, 'starts_on' => '2026-10-18']);
+    AsNeededDose::factory()->for($own)->count(2)->create(['tablets' => null, 'taken_at' => now()->subHour()]);
+    $this->actingAs($this->patient);
+
+    $this->get(route('patient.home'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('asNeeded.0.id', $this->prescription->id)
+            ->where('asNeeded.0.taken_today', 2)
+            ->where('asNeeded.1.id', $own->id)
+            ->where('asNeeded.1.taken_today', 2),
+        );
+
+    $this->post(route('patient.as-needed-doses.store', $this->prescription), ['day' => 'today'])
+        ->assertSessionHasErrors(['confirmed' => 'Сегодня вы уже приняли препарат 2 раза, а врач разрешил не больше 2 раз в сутки.']);
 });

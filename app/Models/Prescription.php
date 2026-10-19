@@ -7,6 +7,7 @@ use App\Enums\PrescriptionCloseReason;
 use App\Enums\PrescriptionKind;
 use App\Enums\PrescriptionSource;
 use App\Enums\PrescriptionStatus;
+use App\Support\Dose;
 use Carbon\CarbonImmutable;
 use Database\Factories\PrescriptionFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -23,17 +24,24 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * (close_reason = changed) и создаёт следующую со ссылкой previous_id. Даты начала
  * и окончания — по часовому поясу пациента.
  *
+ * Назначение врача — препарат и дозировка из справочника, дозы в таблетках. Препарат,
+ * добавленный пациентом, — из справочника без дозировки или «другой» с названием
+ * drug_name, доза записана текстом в dose.
+ *
  * @property int $id
  * @property int $patient_id
  * @property PrescriptionSource $source
  * @property int|null $prescriber_id
  * @property int|null $previous_id
- * @property int $drug_id
- * @property int $drug_strength_id
+ * @property int|null $drug_id
+ * @property string|null $drug_name
+ * @property int|null $drug_strength_id
  * @property PrescriptionKind $kind
  * @property string|null $tablets
  * @property int|null $max_daily_doses
+ * @property string|null $dose
  * @property string|null $instruction
+ * @property string|null $prescribed_by
  * @property CarbonImmutable $starts_on
  * @property CarbonImmutable|null $ends_on
  * @property CarbonImmutable $effective_at
@@ -47,8 +55,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read User $patient
  * @property-read User|null $prescriber
  * @property-read Prescription|null $previous
- * @property-read Drug $drug
- * @property-read DrugStrength $strength
+ * @property-read Drug|null $drug
+ * @property-read DrugStrength|null $strength
  * @property-read Collection<int, PrescriptionIntake> $intakes
  * @property-read Collection<int, DoseEvent> $doseEvents
  * @property-read Collection<int, AsNeededDose> $asNeededDoses
@@ -59,11 +67,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'prescriber_id',
     'previous_id',
     'drug_id',
+    'drug_name',
     'drug_strength_id',
     'kind',
     'tablets',
     'max_daily_doses',
+    'dose',
     'instruction',
+    'prescribed_by',
     'starts_on',
     'ends_on',
     'effective_at',
@@ -89,6 +100,15 @@ class Prescription extends Model
     public const int MAX_TABLETS = 10;
 
     public const int MAX_DAILY_DOSES = 10;
+
+    /**
+     * Длина названия «другого» препарата, дозы текстом и «кто назначил» у препарата пациента.
+     */
+    public const int MAX_DRUG_NAME_LENGTH = 200;
+
+    public const int MAX_DOSE_LENGTH = 100;
+
+    public const int MAX_PRESCRIBED_BY_LENGTH = 200;
 
     /**
      * @return BelongsTo<User, $this>
@@ -161,6 +181,32 @@ class Prescription extends Model
     }
 
     /**
+     * Название препарата для интерфейса: из справочника или как его записал пациент.
+     */
+    public function drugName(): string
+    {
+        return $this->drug->name ?? (string) $this->drug_name;
+    }
+
+    /**
+     * Доза приёма для интерфейса. У назначения врача — таблетки и миллиграммы («½ таблетки, 12,5 мг»),
+     * нужна загруженная strength. У препарата пациента — доза, как он её записал.
+     */
+    public function doseLabel(?string $tablets): string
+    {
+        return $this->dose ?? Dose::label((string) $tablets, (string) $this->strength?->mg);
+    }
+
+    /**
+     * Один и тот же препарат у разных назначений и версий: препарат справочника,
+     * а у «другого» препарата пациента — название.
+     */
+    public function drugKey(): string
+    {
+        return $this->drug_id !== null ? 'drug:'.$this->drug_id : 'name:'.$this->drug_name;
+    }
+
+    /**
      * Состояние назначения на дату пациента.
      */
     public function status(CarbonImmutable $today): PrescriptionStatus
@@ -183,6 +229,14 @@ class Prescription extends Model
     }
 
     /**
+     * Пациент может изменить или прекратить препарат, который добавил сам, пока тот действует или ещё не начался.
+     */
+    public function isChangeableByPatient(CarbonImmutable $today): bool
+    {
+        return $this->source === PrescriptionSource::Patient && $this->status($today)->isCurrent();
+    }
+
+    /**
      * Пациент выбирает время приёмов у регулярного назначения врача, которое действует или ещё не началось.
      */
     public function acceptsPatientTimes(CarbonImmutable $today): bool
@@ -193,12 +247,11 @@ class Prescription extends Model
     }
 
     /**
-     * Пациент записывает приёмы назначения врача «по необходимости», пока оно действует.
+     * Пациент записывает приёмы назначения «по необходимости», пока оно действует.
      */
     public function acceptsAsNeededDoses(CarbonImmutable $today): bool
     {
-        return $this->source === PrescriptionSource::Doctor
-            && $this->kind === PrescriptionKind::AsNeeded
+        return $this->kind === PrescriptionKind::AsNeeded
             && $this->status($today) === PrescriptionStatus::Active;
     }
 
@@ -225,6 +278,23 @@ class Prescription extends Model
             ->where(fn (Builder $query) => $query
                 ->whereNull('ends_on')
                 ->orWhere('ends_on', '>=', $today->toDateString()));
+    }
+
+    /**
+     * Назначения того же препарата, что у этого, любого источника (см. drugKey()).
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function ofSameDrug(Builder $query, Prescription $prescription): void
+    {
+        if ($prescription->drug_id !== null) {
+            $query->where('drug_id', $prescription->drug_id);
+
+            return;
+        }
+
+        $query->whereNull('drug_id')->where('drug_name', $prescription->drug_name);
     }
 
     /**

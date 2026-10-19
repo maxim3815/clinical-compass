@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $id
  * @property int $patient_id
  * @property int $prescription_id
- * @property string $tablets
+ * @property string|null $tablets У препарата пациента нет: доза текстом в назначении.
  * @property CarbonImmutable $local_date
  * @property CarbonImmutable $taken_at
  * @property CarbonImmutable|null $created_at

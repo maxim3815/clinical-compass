@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Doctor;
 
 use App\Enums\PrescriptionCancelReason;
-use App\Enums\PrescriptionKind;
 use App\Enums\PrescriptionSource;
 use App\Http\Controllers\Controller;
 use App\Models\CareRelationship;
@@ -70,6 +69,12 @@ class PatientController extends Controller
             ->get()
             ->partition(fn (Prescription $prescription): bool => $prescription->status($today)->isCurrent());
 
+        $own = $patient->prescriptions()
+            ->current($today)
+            ->where('source', PrescriptionSource::Patient)
+            ->with(['drug', 'intakes'])
+            ->get();
+
         return Inertia::render('doctor/patients/Show', [
             'patient' => [
                 'id' => $patient->id,
@@ -80,14 +85,9 @@ class PatientController extends Controller
                 'started_at' => DisplayTime::formatDate($care->started_at),
                 'timezone' => $profile?->timezone->label(),
             ],
-            'prescriptions' => $current
-                ->sortBy(fn (Prescription $prescription): array => [
-                    $prescription->drug->name,
-                    $prescription->kind === PrescriptionKind::Regular ? 0 : 1,
-                    $prescription->starts_on->toDateString(),
-                ])
-                ->map(fn (Prescription $prescription): array => PrescriptionPresenter::present($prescription, $today))
-                ->values(),
+            'prescriptions' => PrescriptionPresenter::presentList($current, $today),
+            // Препараты, которые пациент добавил сам: врач их видит, но не меняет.
+            'ownMedications' => PrescriptionPresenter::presentList($own, $today),
             // Сначала то, что закрыто или завершилось последним.
             'prescriptionHistory' => $history
                 ->sortByDesc(fn (Prescription $prescription): array => [

@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Patient;
 
-use App\Enums\PrescriptionKind;
 use App\Enums\PrescriptionSource;
 use App\Http\Controllers\Controller;
 use App\Models\Prescription;
@@ -15,7 +14,7 @@ use Inertia\Response;
 class MedicationController extends Controller
 {
     /**
-     * «Мои препараты»: действующие и будущие назначения врача.
+     * «Мои препараты»: действующие и будущие назначения врача и препараты, которые пациент добавил сам.
      */
     public function __invoke(Request $request): Response
     {
@@ -23,21 +22,15 @@ class MedicationController extends Controller
         $patient = $request->user();
         $today = $patient->localToday();
 
-        $prescriptions = $patient->prescriptions()
+        [$prescriptions, $own] = $patient->prescriptions()
             ->current($today)
-            ->where('source', PrescriptionSource::Doctor)
             ->with(['drug', 'strength', 'intakes', 'prescriber'])
             ->get()
-            ->sortBy(fn (Prescription $prescription): array => [
-                $prescription->drug->name,
-                $prescription->kind === PrescriptionKind::Regular ? 0 : 1,
-                $prescription->starts_on->toDateString(),
-            ])
-            ->map(fn (Prescription $prescription): array => PrescriptionPresenter::present($prescription, $today))
-            ->values();
+            ->partition(fn (Prescription $prescription): bool => $prescription->source === PrescriptionSource::Doctor);
 
         return Inertia::render('patient/Medications', [
-            'prescriptions' => $prescriptions,
+            'prescriptions' => PrescriptionPresenter::presentList($prescriptions, $today),
+            'ownMedications' => PrescriptionPresenter::presentList($own, $today),
         ]);
     }
 }

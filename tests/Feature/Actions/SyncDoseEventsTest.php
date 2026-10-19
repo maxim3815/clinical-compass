@@ -226,3 +226,37 @@ test('future unmarked dose events of closed prescriptions are deleted', function
 
     expect(doseSchedule($this->patient))->toBe(['2026-10-19 morning 2026-10-19 05:00']);
 });
+
+test('another drug added by the patient gets the default window and a catalog drug the window of the drug', function () {
+    ownPrescription($this->patient, times: ['morning' => '08:00', 'evening' => '20:00'], attributes: $this->weekAgo);
+    ownPrescription($this->patient, catalogDrug('Препарат с окном', [10 => true], ['window_hours' => 4]), ['afternoon' => '14:00'], $this->weekAgo);
+
+    ($this->sync)();
+
+    $actual = DoseEvent::query()
+        ->where('local_date', '2026-10-20')
+        ->with('prescription')
+        ->get()
+        ->mapWithKeys(fn (DoseEvent $event) => [$event->prescription->drugName().' '.$event->time_of_day->value => (int) $event->scheduled_at->diffInMinutes($event->window_closes_at)])
+        ->all();
+
+    expect($actual)->toEqualCanonicalizing([
+        'Фенибут morning' => 360,
+        'Фенибут evening' => 360,
+        'Препарат с окном afternoon' => 240,
+    ])
+        ->and(DoseEvent::query()->whereNotNull('tablets')->exists())->toBeFalse();
+});
+
+test('a prescription of the doctor and a medication added by the patient of the same drug do not replace each other', function () {
+    timedPrescription($this->patient, $this->strength, ['morning' => '08:00'], $this->weekAgo);
+    ($this->sync)();
+    // Пациент добавил тот же препарат, когда утренний приём по назначению врача уже прошёл.
+    $own = ownPrescription($this->patient, $this->strength->drug, ['morning' => '12:30'], $this->weekAgo);
+
+    ($this->sync)();
+
+    expect($own->doseEvents()->pluck('local_date')->map(fn (CarbonImmutable $date) => $date->toDateString())->sort()->values()->all())
+        ->toBe(['2026-10-19', '2026-10-20'])
+        ->and(DoseEvent::query()->count())->toBe(4);
+});

@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Patient;
 use App\Actions\CancelAsNeededDose;
 use App\Actions\RecordAsNeededDose;
 use App\Enums\PrescriptionKind;
-use App\Enums\PrescriptionSource;
 use App\Exceptions\DoseNotMarkable;
 use App\Exceptions\PrescriptionNotChangeable;
 use App\Http\Controllers\Controller;
@@ -27,12 +26,7 @@ class AsNeededDoseController extends Controller
         /** @var User $patient */
         $patient = $request->user();
 
-        abort_unless(
-            $prescription->patient_id === $patient->id
-                && $prescription->source === PrescriptionSource::Doctor
-                && $prescription->kind === PrescriptionKind::AsNeeded,
-            404,
-        );
+        abort_unless($prescription->patient_id === $patient->id && $prescription->kind === PrescriptionKind::AsNeeded, 404);
 
         $validated = $request->validate([
             'day' => ['required', Rule::in(['today', 'yesterday'])],

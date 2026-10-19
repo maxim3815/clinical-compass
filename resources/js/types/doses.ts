@@ -40,7 +40,8 @@ export type AsNeeded = {
     drug: string;
     dose: string;
     instruction: string | null;
-    max_daily_doses: number;
+    // У препарата, добавленного пациентом, ограничения может не быть.
+    max_daily_doses: number | null;
     taken_today: number;
     doses: {
         id: number;

@@ -4,6 +4,8 @@ use App\Enums\PrescriptionCloseReason;
 use App\Enums\PrescriptionKind;
 use App\Enums\PrescriptionSource;
 use App\Enums\PrescriptionStatus;
+use App\Models\Drug;
+use App\Models\DrugStrength;
 use App\Models\Prescription;
 use App\Models\PrescriptionIntake;
 use App\Models\User;
@@ -58,10 +60,7 @@ test('database rejects two open prescriptions of the doctor with overlapping dat
     Prescription::factory()->for($patient, 'patient')->for($strength, 'strength')->create(['starts_on' => '2026-11-01']);
     Prescription::factory()->for($patient, 'patient')->for($strength, 'strength')->asNeeded()->create(['starts_on' => '2026-10-10']);
     Prescription::factory()->for($patient, 'patient')->for($strength, 'strength')->cancelled()->create(['starts_on' => '2026-10-10']);
-    Prescription::factory()->for($patient, 'patient')->for($strength, 'strength')->create([
-        'source' => PrescriptionSource::Patient,
-        'starts_on' => '2026-10-10',
-    ]);
+    Prescription::factory()->for($patient, 'patient')->for($strength->drug, 'drug')->addedByPatient()->create(['starts_on' => '2026-10-10']);
 
     expect(Prescription::query()->count())->toBe(5);
 });
@@ -81,6 +80,20 @@ test('database keeps prescription fields consistent', function (array $attribute
         ['closed_at' => '2026-10-19 09:00', 'close_reason' => PrescriptionCloseReason::Changed, 'cancel_comment' => 'Ошибка'],
         'prescriptions_cancel_reason_check',
     ],
+]);
+
+test('database keeps the fields of the doctor and of the patient apart', function (Closure $create) {
+    expect(fn () => DB::transaction($create))->toThrow(QueryException::class, 'prescriptions_source_check');
+})->with([
+    'doctor without a strength' => fn () => Prescription::factory()->create(['drug_strength_id' => null]),
+    'doctor with a dose as text' => fn () => Prescription::factory()->create(['dose' => '1 таблетка']),
+    'doctor with a prescriber named by the patient' => fn () => Prescription::factory()->create(['prescribed_by' => 'невролог']),
+    'patient with a strength' => fn () => Prescription::factory()->addedByPatient()->create(['drug_strength_id' => DrugStrength::factory()]),
+    'patient without a drug and a name' => fn () => Prescription::factory()->addedByPatient()->create(['drug_name' => null]),
+    'patient with a drug and a name' => fn () => Prescription::factory()->for(Drug::factory())->addedByPatient()->create(['drug_name' => 'Фенибут']),
+    'patient without a dose' => fn () => Prescription::factory()->addedByPatient()->create(['dose' => null]),
+    'patient with tablets' => fn () => Prescription::factory()->addedByPatient()->asNeeded()->create(['tablets' => '1']),
+    'patient with a doctor' => fn () => Prescription::factory()->addedByPatient()->create(['prescriber_id' => User::factory()->doctor()]),
 ]);
 
 test('database rejects the same time of day twice and parts of a tablet other than a half', function () {

@@ -2,7 +2,6 @@
 
 use App\Actions\SyncDoseEvents;
 use App\Enums\PrescriptionCloseReason;
-use App\Enums\PrescriptionSource;
 use App\Enums\RussianTimezone;
 use App\Models\DoseEvent;
 use App\Models\DrugStrength;
@@ -200,7 +199,7 @@ test('patient can not choose the time of other prescriptions', function (Closure
 })->with([
     'of another patient' => fn (User $patient, DrugStrength $strength) => regularPrescription(User::factory()->patient()->create(), $strength),
     'as needed' => fn (User $patient, DrugStrength $strength) => Prescription::factory()->for($patient, 'patient')->for($strength, 'strength')->asNeeded()->create(),
-    'added by the patient' => fn (User $patient, DrugStrength $strength) => regularPrescription($patient, $strength, attributes: ['source' => PrescriptionSource::Patient]),
+    'added by the patient' => fn (User $patient, DrugStrength $strength) => ownPrescription($patient, $strength->drug),
 ]);
 
 test('doctors can not open the patient time form', function () {

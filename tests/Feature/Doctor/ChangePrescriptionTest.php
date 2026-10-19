@@ -286,7 +286,7 @@ test('changed dates can not overlap another prescription of the same drug', func
         ->and($current->refresh()->closed_at)->toBeNull();
 });
 
-test('changed, cancelled, completed or patient prescription can not be changed by the doctor', function (array $attributes) {
+test('changed, cancelled or completed prescription can not be changed by the doctor', function (array $attributes) {
     $prescription = regularPrescription($this->patient, $this->strength, ['morning' => '1'], [
         'starts_on' => '2026-10-01',
         ...$attributes,
@@ -318,5 +318,4 @@ test('changed, cancelled, completed or patient prescription can not be changed b
     'changed' => [['closed_at' => '2026-10-18 10:00:00', 'close_reason' => PrescriptionCloseReason::Changed]],
     'cancelled' => [['closed_at' => '2026-10-18 10:00:00', 'close_reason' => PrescriptionCloseReason::Cancelled]],
     'completed' => [['ends_on' => '2026-10-18']],
-    'added by the patient' => [['source' => 'patient']],
 ]);

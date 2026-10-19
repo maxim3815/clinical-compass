@@ -39,12 +39,32 @@ class PrescriptionFactory extends Factory
         ];
     }
 
-    public function asNeeded(string $tablets = '1', int $maxDailyDoses = 3): static
+    /**
+     * У препарата, добавленного пациентом, таблеток нет: доза записана текстом.
+     */
+    public function asNeeded(string $tablets = '1', ?int $maxDailyDoses = 3): static
     {
         return $this->state(fn (array $attributes) => [
             'kind' => PrescriptionKind::AsNeeded,
-            'tablets' => $tablets,
+            'tablets' => $attributes['source'] === PrescriptionSource::Patient ? null : $tablets,
             'max_daily_doses' => $maxDailyDoses,
+        ]);
+    }
+
+    /**
+     * Препарат, который пациент добавил сам: без врача и дозировки, доза текстом. Препарат
+     * справочника задаётся через for($drug, 'drug'), без него — «другой» препарат с названием.
+     */
+    public function addedByPatient(string $dose = '1 таблетка'): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'source' => PrescriptionSource::Patient,
+            'prescriber_id' => null,
+            'drug_strength_id' => null,
+            'tablets' => null,
+            'dose' => $dose,
+            'instruction' => null,
+            'drug_name' => fn (array $attributes) => $attributes['drug_id'] === null ? 'Фенибут' : null,
         ]);
     }
 

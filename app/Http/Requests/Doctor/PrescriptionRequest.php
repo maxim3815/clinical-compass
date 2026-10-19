@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Doctor;
 
 use App\Enums\PrescriptionKind;
+use App\Enums\PrescriptionSource;
 use App\Enums\TimeOfDay;
 use App\Models\DrugStrength;
 use App\Models\Prescription;
@@ -25,14 +26,23 @@ class PrescriptionRequest extends FormRequest
 {
     public const int MAX_INSTRUCTION_LENGTH = 1000;
 
+    public const string ADDED_BY_PATIENT = 'Этот препарат пациент добавил сам, врач его не меняет.';
+
     private DrugStrength|false|null $strength = false;
 
     /**
-     * Чужой пациент — 404, как у карточки, и до проверки полей.
+     * Чужой пациент — 404, как у карточки, и до проверки полей. Препарат, который пациент
+     * добавил сам, врач не меняет.
      */
     public function authorize(): Response
     {
-        return Gate::inspect('view', $this->patient());
+        $response = Gate::inspect('view', $this->patient());
+
+        if ($response->allowed() && $this->prescription()?->source === PrescriptionSource::Patient) {
+            return Response::deny(self::ADDED_BY_PATIENT);
+        }
+
+        return $response;
     }
 
     /**

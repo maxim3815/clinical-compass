@@ -10,7 +10,6 @@ use App\Models\AsNeededDose;
 use App\Models\DoseEvent;
 use App\Models\Prescription;
 use App\Models\User;
-use App\Support\Dose;
 use App\Support\DoseEventPresenter;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -53,10 +52,7 @@ class HomeController extends Controller
                 'specialty' => $doctor->doctorProfile?->specialty,
             ],
             'timeSetup' => $this->prescriptionsWithoutTimes($patient, $today),
-            'hasPrescriptions' => $patient->prescriptions()
-                ->current($today)
-                ->where('source', PrescriptionSource::Doctor)
-                ->exists(),
+            'hasPrescriptions' => $patient->prescriptions()->current($today)->exists(),
             'today' => [
                 'date' => $today->isoFormat('D MMMM'),
                 'groups' => $this->groups($todayEvents, $timezone, $today, $now),
@@ -82,7 +78,7 @@ class HomeController extends Controller
             ->map(fn (Collection $group, string $time): array => [
                 'time' => $time,
                 'doses' => $group
-                    ->sortBy(fn (DoseEvent $event): string => $event->prescription->drug->name)
+                    ->sortBy(fn (DoseEvent $event): string => $event->prescription->drugName())
                     ->map(fn (DoseEvent $event): array => DoseEventPresenter::present($event, $timezone, $today, $now))
                     ->values()
                     ->all(),
@@ -92,8 +88,8 @@ class HomeController extends Controller
     }
 
     /**
-     * Действующие назначения «по необходимости» и записанные приёмы за сегодня и вчера.
-     * Приёмы считаются по препарату: после изменения назначения счётчик за сутки не обнуляется.
+     * Действующие назначения «по необходимости» врача и самого пациента и записанные приёмы за сегодня
+     * и вчера. Приёмы считаются по препарату: после изменения назначения счётчик за сутки не обнуляется.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -104,26 +100,26 @@ class HomeController extends Controller
             ->with('prescription')
             ->orderByDesc('taken_at')
             ->get()
-            ->groupBy(fn (AsNeededDose $dose): int => $dose->prescription->drug_id);
+            ->groupBy(fn (AsNeededDose $dose): string => $dose->prescription->drugKey());
 
         return $patient->prescriptions()
             ->current($today)
             ->where('starts_on', '<=', $today->toDateString())
-            ->where('source', PrescriptionSource::Doctor)
             ->where('kind', PrescriptionKind::AsNeeded)
             ->with(['drug', 'strength'])
             ->get()
-            ->sortBy(fn (Prescription $prescription): string => $prescription->drug->name)
+            ->sortBy(fn (Prescription $prescription): array => [$prescription->drugName(), $prescription->source->value])
             ->map(function (Prescription $prescription) use ($doses, $today, $timezone): array {
                 /** @var Collection<int, AsNeededDose> $taken */
-                $taken = $doses->get($prescription->drug_id, new Collection);
+                $taken = $doses->get($prescription->drugKey(), new Collection);
 
                 return [
                     'id' => $prescription->id,
-                    'drug' => $prescription->drug->name,
-                    'dose' => Dose::label((string) $prescription->tablets, $prescription->strength->mg),
+                    'drug' => $prescription->drugName(),
+                    'dose' => $prescription->doseLabel($prescription->tablets),
                     'instruction' => $prescription->instruction,
-                    'max_daily_doses' => (int) $prescription->max_daily_doses,
+                    // У препарата пациента ограничения может не быть.
+                    'max_daily_doses' => $prescription->max_daily_doses,
                     'taken_today' => $taken->filter(fn (AsNeededDose $dose): bool => $dose->local_date->eq($today))->count(),
                     'doses' => $taken
                         ->map(fn (AsNeededDose $dose): array => [
@@ -153,10 +149,10 @@ class HomeController extends Controller
             ->whereHas('intakes', fn (Builder $query) => $query->whereNull('time'))
             ->with(['drug', 'strength'])
             ->get()
-            ->sortBy(fn (Prescription $prescription): array => [$prescription->drug->name, $prescription->starts_on->toDateString()])
+            ->sortBy(fn (Prescription $prescription): array => [$prescription->drugName(), $prescription->starts_on->toDateString()])
             ->map(fn (Prescription $prescription): array => [
                 'id' => $prescription->id,
-                'title' => $prescription->drug->name.', '.$prescription->strength->label(),
+                'title' => $prescription->drugName().', '.$prescription->strength?->label(),
             ])
             ->values()
             ->all();

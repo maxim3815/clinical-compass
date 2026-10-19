@@ -157,3 +157,49 @@ test('as-needed shows active prescriptions with doses of today and yesterday', f
             ->where('asNeeded.1.doses', []),
         );
 });
+
+test('today shows doses of medications added by the patient together with prescriptions of the doctor', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-10-18 12:00', 'Europe/Moscow'));
+    timedPrescription($this->patient, $this->sertraline, ['morning' => '08:00'], $this->weekAgo);
+    $other = ownPrescription($this->patient, times: ['morning' => '08:00'], attributes: [...$this->weekAgo, 'dose' => '1 таблетка 250 мг']);
+    ownPrescription($this->patient, $this->aviandr->drug, ['morning' => '08:00'], [...$this->weekAgo, 'dose' => '20 мг']);
+    app(SyncDoseEvents::class)->handle($this->patient);
+    $this->travelTo(CarbonImmutable::parse('2026-10-19 12:00', 'Europe/Moscow'));
+    app(SyncDoseEvents::class)->handle($this->patient);
+    $this->artisan('app:dose-events:mark-missed')->assertSuccessful();
+
+    $this->actingAs($this->patient)
+        ->get(route('patient.home'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('today.groups.0.time', '8:00')
+            ->where('today.groups.0.doses.0.drug', 'Авиандр')
+            ->where('today.groups.0.doses.0.dose', '20 мг')
+            ->where('today.groups.0.doses.1.drug', 'Сертралин')
+            ->where('today.groups.0.doses.1.dose', '1 таблетка, 50 мг')
+            ->where('today.groups.0.doses.2.drug', 'Фенибут')
+            ->where('today.groups.0.doses.2.dose', '1 таблетка 250 мг')
+            // Что делать при пропуске дозы — из справочника, у «другого» препарата текста нет.
+            ->where('yesterday.groups.0.doses.0.missed_dose', 'Пропущенную таблетку не принимайте.')
+            ->where('yesterday.groups.0.doses.2.status_text', 'Пропущен')
+            ->where('yesterday.groups.0.doses.2.missed_dose', null),
+        );
+
+    $dose = doseOn($this->patient, '2026-10-19', 'morning', $other);
+
+    $this->put(route('patient.doses.update', $dose), ['status' => 'taken'])
+        ->assertSessionHasNoErrors()
+        ->assertInertiaFlash('toast', ['type' => 'success', 'message' => 'Отметка сохранена.']);
+
+    expect($dose->fresh()?->status)->toBe(DoseEventStatus::Taken);
+});
+
+test('medications added by the patient count as prescriptions on the home page', function () {
+    ownPrescription($this->patient, attributes: ['starts_on' => '2026-10-25']);
+
+    $this->actingAs($this->patient)
+        ->get(route('patient.home'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('hasPrescriptions', true)
+            ->where('today.groups', []),
+        );
+});

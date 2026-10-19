@@ -141,6 +141,32 @@ function timedPrescription(User $patient, DrugStrength $strength, array $times =
 }
 
 /**
+ * Препарат, который пациент добавил сам, с выбранным временем приёмов: время суток => «08:00».
+ * Без препарата справочника — «другой» препарат «Фенибут» или с названием из drug_name.
+ * Время выбрано в момент, с которого действует препарат (effective_at).
+ *
+ * @param  array<string, string>  $times
+ * @param  array<string, mixed>  $attributes
+ */
+function ownPrescription(User $patient, ?Drug $drug = null, array $times = ['morning' => '08:00'], array $attributes = []): Prescription
+{
+    $prescription = Prescription::factory()
+        ->for($patient, 'patient')
+        ->addedByPatient()
+        ->state(['drug_id' => $drug?->id])
+        ->create($attributes);
+
+    foreach ($times as $timeOfDay => $time) {
+        PrescriptionIntake::factory()->for($prescription)->at($time, $prescription->effective_at)->create([
+            'time_of_day' => $timeOfDay,
+            'tablets' => null,
+        ]);
+    }
+
+    return $prescription;
+}
+
+/**
  * Плановые приёмы пациента по порядку: местная дата, время суток и scheduled_at в UTC — «2026-10-19 morning 2026-10-19 05:00».
  *
  * @return list<string>

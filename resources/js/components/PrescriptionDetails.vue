@@ -47,13 +47,23 @@ const closing = computed(() => {
     >
         <header class="flex flex-wrap items-center gap-2">
             <h3 class="font-medium">
-                {{ prescription.drug.name }}, {{ prescription.strength }}
+                {{ prescription.drug.name
+                }}<template v-if="prescription.strength"
+                    >, {{ prescription.strength }}</template
+                >
             </h3>
             <Badge variant="secondary">{{ prescription.kind_label }}</Badge>
             <Badge v-if="prescription.status === 'upcoming'" variant="outline">
                 Начнётся {{ prescription.starts_on }}
             </Badge>
         </header>
+
+        <p
+            v-if="prescription.kind === 'regular' && prescription.dose"
+            class="text-sm"
+        >
+            <span class="font-medium">Доза:</span> {{ prescription.dose }}
+        </p>
 
         <ul
             v-if="prescription.kind === 'regular'"
@@ -67,7 +77,7 @@ const closing = computed(() => {
                 <span class="font-medium"
                     >{{ intake.time_of_day
                     }}<template v-if="intake.time">, {{ intake.time }}</template
-                    >:</span
+                    ><template v-if="intake.dose">:</template></span
                 >
                 {{ intake.dose }}
                 <span
@@ -87,7 +97,9 @@ const closing = computed(() => {
                 <span class="font-medium">За приём:</span>
                 {{ prescription.as_needed.dose }}
             </p>
-            <p>{{ prescription.as_needed.limit }}</p>
+            <p v-if="prescription.as_needed.limit">
+                {{ prescription.as_needed.limit }}
+            </p>
         </div>
 
         <p v-if="prescription.instruction" class="text-sm">
@@ -98,6 +110,9 @@ const closing = computed(() => {
             {{ period }}
             <template v-if="prescription.prescriber">
                 · назначил врач {{ prescription.prescriber }}
+            </template>
+            <template v-if="prescription.prescribed_by">
+                · кто назначил: {{ prescription.prescribed_by }}
             </template>
         </p>
 

@@ -14,11 +14,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Приём регулярного назначения: время суток и сколько таблеток. Точное время выбирает пациент.
+ * У препарата, добавленного пациентом, таблеток нет: доза записана текстом в назначении.
  *
  * @property int $id
  * @property int $prescription_id
  * @property TimeOfDay $time_of_day
- * @property string $tablets
+ * @property string|null $tablets
  * @property string|null $time Местное время приёма по часовому поясу пациента, «08:00».
  * @property CarbonImmutable|null $time_set_at
  * @property CarbonImmutable|null $created_at

@@ -21,8 +21,8 @@ final class DoseEventPresenter
 
         return [
             'id' => $event->id,
-            'drug' => $prescription->drug->name,
-            'dose' => Dose::label($event->tablets, $prescription->strength->mg),
+            'drug' => $prescription->drugName(),
+            'dose' => $prescription->doseLabel($event->tablets),
             'instruction' => $prescription->instruction,
             'day' => $event->local_date->eq($today) ? 'сегодня' : 'вчера',
             'time' => self::clock($event->scheduled_at, $timezone),
@@ -36,7 +36,8 @@ final class DoseEventPresenter
                 && ($event->taken_at === null || ! $event->marked_at->eq($event->taken_at))
                 ? self::moment($event->marked_at, $event->local_date, $timezone)
                 : null,
-            'missed_dose' => $event->status === DoseEventStatus::Missed ? $prescription->drug->missed_dose : null,
+            // У «другого» препарата пациента справочника нет, и текста тоже.
+            'missed_dose' => $event->status === DoseEventStatus::Missed ? $prescription->drug?->missed_dose : null,
             'due' => $now->gte($event->dueFrom()),
             'due_from' => self::clock($event->dueFrom(), $timezone),
             // Начальные значения формы отметки.

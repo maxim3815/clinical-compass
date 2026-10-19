@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Enums\PrescriptionSource;
 use App\Exceptions\PrescriptionNotChangeable;
 use App\Models\AsNeededDose;
 use App\Models\Prescription;
@@ -15,7 +16,8 @@ use InvalidArgumentException;
 
 /**
  * Пациент записывает приём «по необходимости»: сейчас или в указанное время сегодня или вчера.
- * Если за эти сутки препарат уже принят столько раз, сколько разрешил врач, запись нужно подтвердить.
+ * Если за эти сутки препарат уже принят столько раз, сколько разрешено назначением, запись нужно
+ * подтвердить. У препарата, добавленного пациентом, ограничения может не быть.
  */
 class RecordAsNeededDose
 {
@@ -67,17 +69,18 @@ class RecordAsNeededDose
                 throw ValidationException::withMessages(['time' => 'Это время ещё не наступило.']);
             }
 
+            $limit = $current->max_daily_doses;
             $taken = $patient->asNeededDoses()
                 ->where('local_date', $date->toDateString())
-                ->whereHas('prescription', fn (Builder $query) => $query->where('drug_id', $current->drug_id))
+                ->whereHas('prescription', fn (Builder $query) => $query->ofSameDrug($current))
                 ->count();
-            $limit = (int) $current->max_daily_doses;
 
-            if ($taken >= $limit && ! $overLimit) {
+            if ($limit !== null && $taken >= $limit && ! $overLimit) {
                 throw ValidationException::withMessages([
                     'confirmed' => ($yesterday ? 'Вчера' : 'Сегодня').' вы уже приняли препарат '
                         .$taken.' '.Plural::choose($taken, ['раз', 'раза', 'раз'])
-                        .', а врач разрешил не больше '.$limit.' '.Plural::choose($limit, ['раза', 'раз', 'раз']).' в сутки.',
+                        .($current->source === PrescriptionSource::Doctor ? ', а врач разрешил' : ', а по назначению можно')
+                        .' не больше '.$limit.' '.Plural::choose($limit, ['раза', 'раз', 'раз']).' в сутки.',
                 ]);
             }
 

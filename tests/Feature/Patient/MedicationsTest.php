@@ -1,7 +1,6 @@
 <?php
 
 use App\Enums\PrescriptionCloseReason;
-use App\Enums\PrescriptionSource;
 use App\Models\Prescription;
 use App\Models\PrescriptionIntake;
 use App\Models\User;
@@ -34,7 +33,7 @@ test('patient sees current and upcoming prescriptions of the doctor', function (
     regularPrescription($this->patient, $aviandr, attributes: ['closed_at' => now(), 'close_reason' => PrescriptionCloseReason::Cancelled]);
     regularPrescription($this->patient, $aviandr, attributes: ['closed_at' => now(), 'close_reason' => PrescriptionCloseReason::Changed]);
     regularPrescription($this->patient, $aviandr, attributes: ['starts_on' => '2026-10-01', 'ends_on' => '2026-10-18']);
-    regularPrescription($this->patient, $aviandr, attributes: ['source' => PrescriptionSource::Patient, 'starts_on' => '2026-12-01']);
+    ownPrescription($this->patient, $aviandr->drug, attributes: ['starts_on' => '2026-12-01']);
     regularPrescription(User::factory()->patientOf($this->doctor)->create(), $hydroxyzine);
 
     $this->actingAs($this->patient)

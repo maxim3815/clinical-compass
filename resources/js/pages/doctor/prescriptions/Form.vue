@@ -265,7 +265,11 @@ function submit(): void {
 
         <form class="flex flex-col gap-6" @submit.prevent="submit">
             <div class="grid gap-2">
-                <Label for="drug_id">Препарат</Label>
+                <Label v-if="editing === null" for="drug_id">Препарат</Label>
+                <!-- При изменении вместо поля текст, и подпись тоже текст. -->
+                <span v-else class="text-sm leading-none font-medium"
+                    >Препарат</span
+                >
                 <NativeSelect
                     v-if="editing === null"
                     id="drug_id"
@@ -482,7 +486,12 @@ function submit(): void {
 
             <div class="grid gap-4 sm:grid-cols-2">
                 <div class="grid content-start gap-2">
-                    <Label for="starts_on">Дата начала</Label>
+                    <span
+                        v-if="editing?.has_started"
+                        class="text-sm leading-none font-medium"
+                        >Дата начала</span
+                    >
+                    <Label v-else for="starts_on">Дата начала</Label>
                     <p v-if="editing?.has_started" class="text-sm">
                         {{ editing.starts_on_label }}
                     </p>

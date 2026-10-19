@@ -1,7 +1,6 @@
 <?php
 
 use App\Enums\PrescriptionCloseReason;
-use App\Enums\PrescriptionSource;
 use App\Models\CareRelationship;
 use App\Models\Prescription;
 use App\Models\PrescriptionIntake;
@@ -61,7 +60,7 @@ test('patient is asked to choose the time for prescriptions with intakes without
     Prescription::factory()->for($patient, 'patient')->for($hydroxyzine, 'strength')->asNeeded()->create();
     regularPrescription($patient, $hydroxyzine, attributes: ['closed_at' => now(), 'close_reason' => PrescriptionCloseReason::Cancelled]);
     regularPrescription($patient, $hydroxyzine, attributes: ['starts_on' => '2026-01-01', 'ends_on' => '2026-01-31']);
-    regularPrescription($patient, $aviandr, attributes: ['source' => PrescriptionSource::Patient, 'starts_on' => now()->addMonths(3)->toDateString()]);
+    ownPrescription($patient, $aviandr->drug, attributes: ['starts_on' => now()->addMonths(3)->toDateString()]);
 
     $this->actingAs($patient)
         ->get(route('patient.home'))

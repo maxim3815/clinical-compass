@@ -20,7 +20,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $patient_id
  * @property int $prescription_id
  * @property TimeOfDay $time_of_day
- * @property string $tablets
+ * @property string|null $tablets Доза на момент планирования. У препарата пациента её нет: доза текстом в назначении.
  * @property CarbonImmutable $local_date
  * @property CarbonImmutable $scheduled_at
  * @property CarbonImmutable $window_closes_at

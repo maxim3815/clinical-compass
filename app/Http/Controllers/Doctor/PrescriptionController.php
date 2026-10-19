@@ -7,6 +7,7 @@ use App\Actions\ChangePrescription;
 use App\Actions\PrescribeDrug;
 use App\Enums\PrescriptionCancelReason;
 use App\Enums\PrescriptionChangeOutcome;
+use App\Enums\PrescriptionSource;
 use App\Enums\TimeOfDay;
 use App\Exceptions\PrescriptionNotChangeable;
 use App\Http\Controllers\Controller;
@@ -50,7 +51,7 @@ class PrescriptionController extends Controller
 
     public function edit(User $patient, Prescription $prescription): Response|RedirectResponse
     {
-        Gate::authorize('view', $patient);
+        $this->authorizeChange($patient, $prescription);
 
         if (! $prescription->isChangeableByDoctor($patient->localToday())) {
             return $this->notChangeable($patient);
@@ -87,7 +88,7 @@ class PrescriptionController extends Controller
         Prescription $prescription,
         CancelPrescription $cancelPrescription,
     ): RedirectResponse {
-        Gate::authorize('view', $patient);
+        $this->authorizeChange($patient, $prescription);
 
         $validated = $request->validate([
             'reason' => ['nullable', Rule::enum(PrescriptionCancelReason::class)],
@@ -115,6 +116,16 @@ class PrescriptionController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Назначение отменено.']);
 
         return to_route('doctor.patients.show', $patient);
+    }
+
+    /**
+     * Чужой пациент — 404. Препарат, который пациент добавил сам, врач видит, но не меняет.
+     */
+    private function authorizeChange(User $patient, Prescription $prescription): void
+    {
+        Gate::authorize('view', $patient);
+
+        abort_if($prescription->source === PrescriptionSource::Patient, 403, PrescriptionRequest::ADDED_BY_PATIENT);
     }
 
     /**

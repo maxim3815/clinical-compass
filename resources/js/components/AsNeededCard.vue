@@ -47,7 +47,9 @@ watch(
 );
 
 const limitReached = computed(
-    () => props.prescription.taken_today >= props.prescription.max_daily_doses,
+    () =>
+        props.prescription.max_daily_doses !== null &&
+        props.prescription.taken_today >= props.prescription.max_daily_doses,
 );
 
 function submit(confirmed = false): void {
@@ -109,8 +111,10 @@ function cancel(id: number): void {
             :class="limitReached ? 'text-amber-700 dark:text-amber-400' : ''"
             data-test="as-needed-counter"
         >
-            Сегодня принято {{ prescription.taken_today }} из
-            {{ prescription.max_daily_doses }}
+            Сегодня принято {{ prescription.taken_today
+            }}<template v-if="prescription.max_daily_doses !== null">
+                из {{ prescription.max_daily_doses }}</template
+            >
         </p>
 
         <div class="flex flex-wrap gap-2">
