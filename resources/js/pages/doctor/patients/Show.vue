@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Form, Head, Link, usePage } from '@inertiajs/vue3';
-import { KeyRound, Plus } from '@lucide/vue';
+import { KeyRound, MessageCircle, Plus } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import PasswordResetLinkController from '@/actions/App/Http/Controllers/Doctor/PasswordResetLinkController';
 import PrescriptionController from '@/actions/App/Http/Controllers/Doctor/PrescriptionController';
@@ -11,6 +11,7 @@ import PrescriptionDetails from '@/components/PrescriptionDetails.vue';
 import { Button } from '@/components/ui/button';
 import { formatAge } from '@/lib/plural';
 import { index, show } from '@/routes/doctor/patients';
+import { show as chat } from '@/routes/doctor/patients/chat';
 import type { Prescription, SelectOption } from '@/types';
 
 type Patient = {
@@ -81,6 +82,13 @@ const details = computed(() => [
                 <dd class="-mt-2 font-medium sm:mt-0">{{ item.value }}</dd>
             </template>
         </dl>
+
+        <Button variant="outline" class="self-start" as-child>
+            <Link :href="chat(patient.id)" data-test="chat-button">
+                <MessageCircle />
+                Написать
+            </Link>
+        </Button>
 
         <section class="flex flex-col gap-3" data-test="prescriptions">
             <div class="flex flex-wrap items-center justify-between gap-2">

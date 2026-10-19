@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\CareRelationship;
 use App\Models\DoseEvent;
 use App\Models\Drug;
 use App\Models\DrugStrength;
@@ -191,4 +192,31 @@ function doseOn(User $patient, string $date, string $timeOfDay, ?Prescription $p
         ->where('time_of_day', $timeOfDay)
         ->when($prescription !== null, fn ($query) => $query->where('prescription_id', $prescription?->id))
         ->sole();
+}
+
+/**
+ * Трансляция через Reverb вместо null из phpunit.xml: для проверки авторизации каналов
+ * и браузерного теста в реальном времени. Каналы из routes/channels.php регистрируются
+ * на драйвере по умолчанию при загрузке приложения, поэтому после смены драйвера их нужно
+ * зарегистрировать заново. Ключ и секрет приложения Reverb берутся из .env.
+ */
+function useReverbBroadcaster(int $port = 8080): void
+{
+    config([
+        'broadcasting.default' => 'reverb',
+        'broadcasting.connections.reverb.options.host' => '127.0.0.1',
+        'broadcasting.connections.reverb.options.port' => $port,
+        'broadcasting.connections.reverb.options.scheme' => 'http',
+        'broadcasting.connections.reverb.options.useTLS' => false,
+    ]);
+
+    require base_path('routes/channels.php');
+}
+
+/**
+ * Диалог пациента с лечащим врачом: связь между ними.
+ */
+function careBetween(User $doctor, User $patient): CareRelationship
+{
+    return CareRelationship::query()->active()->between($doctor, $patient)->sole();
 }

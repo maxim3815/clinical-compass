@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { CalendarCheck, Pill, Settings, UserPlus, Users } from '@lucide/vue';
+import {
+    CalendarCheck,
+    MessageCircle,
+    MessagesSquare,
+    Pill,
+    Settings,
+    UserPlus,
+    Users,
+} from '@lucide/vue';
 import { computed, onUnmounted } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavMain from '@/components/NavMain.vue';
@@ -16,22 +24,37 @@ import {
     useSidebar,
 } from '@/components/ui/sidebar';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
+import { useRealtime } from '@/composables/useRealtime';
 import { home as doctorHome } from '@/routes/doctor';
+import { index as conversations } from '@/routes/doctor/conversations';
 import { index as drugs } from '@/routes/doctor/drugs';
 import { index as invitations } from '@/routes/doctor/invitations';
 import { index as patients } from '@/routes/doctor/patients';
 import { home as patientHome, medications } from '@/routes/patient';
+import { show as patientChat } from '@/routes/patient/chat';
 import { edit as editProfile } from '@/routes/profile';
 import type { NavItem } from '@/types';
 
 const page = usePage();
-const { isCurrentOrParentUrl } = useCurrentUrl();
+const { currentUrl, isCurrentUrl, isCurrentOrParentUrl } = useCurrentUrl();
 const { setOpenMobile } = useSidebar();
 
 // На телефоне меню открывается поверх страницы: после перехода его нужно закрыть.
 onUnmounted(router.on('navigate', () => setOpenMobile(false)));
 
 const isDoctor = computed(() => page.props.auth.user.role === 'doctor');
+
+// Счётчик непрочитанного приходит с каждой страницей, а между переходами — событием.
+useRealtime<{ count: number }>(
+    `App.Models.User.${page.props.auth.user.id}`,
+    'unread.changed',
+    (event) => router.replaceProp('unreadMessages', event.count),
+);
+
+// Диалог с пациентом относится к «Сообщениям», а не к «Пациентам».
+const isDoctorChat = computed(() =>
+    /^\/doctor\/patients\/\d+\/chat$/.test(currentUrl.value),
+);
 
 const cabinet = computed(() => (isDoctor.value ? doctorHome() : patientHome()));
 
@@ -49,7 +72,15 @@ const mainNavItems = computed<NavItem[]>(() =>
                   href: patients(),
                   icon: Users,
                   // Карточка пациента тоже относится к разделу.
-                  isActive: isCurrentOrParentUrl(patients()),
+                  isActive:
+                      isCurrentOrParentUrl(patients()) && !isDoctorChat.value,
+              },
+              {
+                  title: 'Сообщения',
+                  href: conversations(),
+                  icon: MessagesSquare,
+                  isActive: isCurrentUrl(conversations()) || isDoctorChat.value,
+                  badge: page.props.unreadMessages,
               },
               {
                   title: 'Приглашения',
@@ -75,6 +106,12 @@ const mainNavItems = computed<NavItem[]>(() =>
                   title: 'Мои препараты',
                   href: medications(),
                   icon: Pill,
+              },
+              {
+                  title: 'Чат с врачом',
+                  href: patientChat(),
+                  icon: MessageCircle,
+                  badge: page.props.unreadMessages,
               },
               settings,
           ],

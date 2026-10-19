@@ -1,0 +1,268 @@
+<script setup lang="ts">
+import { HttpResponseError } from '@inertiajs/core';
+import { useHttp, usePage } from '@inertiajs/vue3';
+import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue';
+import { toast } from 'vue-sonner';
+import InputError from '@/components/InputError.vue';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { useRealtime } from '@/composables/useRealtime';
+import type { Chat, ChatMessage, MessagesRead } from '@/types';
+import type { RouteDefinition } from '@/wayfinder';
+
+// Как Message::MAX_LENGTH на сервере.
+const MAX_LENGTH = 4000;
+
+const props = defineProps<{
+    chat: Chat;
+    // Более ранние сообщения, отправка и прочтение для своей стороны диалога.
+    routes: {
+        messages: RouteDefinition<'get'>;
+        store: RouteDefinition<'post'>;
+        read: RouteDefinition<'post'>;
+    };
+    // Текст пустой ленты.
+    empty: string;
+    placeholder: string;
+}>();
+
+const page = usePage();
+const me = computed(() => page.props.auth.user.id);
+
+// Лента живёт на странице: новые сообщения приходят событиями, более ранние — по кнопке.
+const messages = ref<ChatMessage[]>([...props.chat.messages]);
+const hasEarlier = ref(props.chat.has_earlier);
+const list = useTemplateRef<HTMLElement>('list');
+
+const form = useHttp<{ body: string }, ChatMessage>({ body: '' });
+const earlier = useHttp<
+    { before: number },
+    { messages: ChatMessage[]; has_earlier: boolean }
+>({ before: 0 });
+const reading = useHttp<{ up_to: number }>({ up_to: 0 });
+
+const tooLong = computed(() => form.body.length > MAX_LENGTH);
+
+watch(
+    () => form.body,
+    () => form.clearErrors('body'),
+);
+
+onMounted(() => scrollToBottom());
+
+useRealtime<ChatMessage>(`chat.${props.chat.id}`, 'message.sent', (message) => {
+    const follow = message.sender_id === me.value || isNearBottom();
+
+    add(message);
+
+    if (message.sender_id !== me.value) {
+        markRead(message.id);
+    }
+
+    if (follow) {
+        void scrollToBottom();
+    }
+});
+
+useRealtime<MessagesRead>(`chat.${props.chat.id}`, 'messages.read', (event) => {
+    if (event.reader_id === me.value) {
+        return;
+    }
+
+    for (const message of messages.value) {
+        if (
+            message.sender_id === me.value &&
+            message.id <= event.last_read_id
+        ) {
+            message.read = true;
+        }
+    }
+});
+
+// Своё сообщение приходит и в ответе на отправку, и событием: второе не добавляется.
+function add(message: ChatMessage): void {
+    if (messages.value.some((item) => item.id === message.id)) {
+        return;
+    }
+
+    const next = messages.value.findIndex((item) => item.id > message.id);
+
+    if (next === -1) {
+        messages.value.push(message);
+    } else {
+        messages.value.splice(next, 0, message);
+    }
+}
+
+async function send(): Promise<void> {
+    if (form.processing) {
+        return;
+    }
+
+    // При ошибке проверки onSuccess не вызывается, текст ошибки уже под полем.
+    try {
+        await form.post(props.routes.store.url, {
+            onSuccess: (message) => {
+                add(message);
+                // Только здесь: после onSuccess useHttp запоминает отправленный текст
+                // как значение по умолчанию, и reset() вернул бы его в поле.
+                form.reset();
+                void scrollToBottom();
+            },
+        });
+    } catch (error) {
+        form.setError('body', sendError(error));
+    }
+}
+
+function sendError(error: unknown): string {
+    if (error instanceof HttpResponseError && error.response.status === 429) {
+        return (JSON.parse(error.response.data) as { message: string }).message;
+    }
+
+    return 'Не удалось отправить сообщение. Проверьте соединение и попробуйте ещё раз.';
+}
+
+// Фоновая отметка: если не дошла, сообщение станет прочитанным при следующем открытии диалога.
+function markRead(upTo: number): void {
+    reading.up_to = upTo;
+    reading.post(props.routes.read.url).catch(() => {});
+}
+
+async function loadEarlier(): Promise<void> {
+    if (!list.value || messages.value.length === 0) {
+        return;
+    }
+
+    earlier.before = messages.value[0].id;
+    const heightBefore = list.value.scrollHeight;
+
+    try {
+        const result = await earlier.get(props.routes.messages.url);
+        result.messages.forEach(add);
+        hasEarlier.value = result.has_earlier;
+    } catch {
+        toast.error('Не удалось загрузить сообщения. Попробуйте ещё раз.');
+
+        return;
+    }
+
+    // Лента остаётся на том же сообщении, а более ранние появляются выше.
+    await nextTick();
+    list.value.scrollTop += list.value.scrollHeight - heightBefore;
+}
+
+function isNearBottom(): boolean {
+    const el = list.value;
+
+    return !el || el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+}
+
+async function scrollToBottom(): Promise<void> {
+    await nextTick();
+
+    if (list.value) {
+        list.value.scrollTop = list.value.scrollHeight;
+    }
+}
+</script>
+
+<template>
+    <div class="flex flex-col gap-3">
+        <div
+            ref="list"
+            class="flex h-[55svh] min-h-64 flex-col gap-2 overflow-y-auto rounded-lg border p-3"
+            aria-live="polite"
+            data-test="chat-messages"
+        >
+            <Button
+                v-if="hasEarlier"
+                variant="ghost"
+                size="sm"
+                class="self-center"
+                :disabled="earlier.processing"
+                @click="loadEarlier"
+            >
+                Показать более ранние
+            </Button>
+
+            <p
+                v-if="messages.length === 0"
+                class="m-auto max-w-sm text-center text-sm text-muted-foreground"
+            >
+                {{ empty }}
+            </p>
+
+            <template v-for="(message, i) in messages" :key="message.id">
+                <p
+                    v-if="i === 0 || messages[i - 1].date !== message.date"
+                    class="my-1 self-center text-xs text-muted-foreground"
+                >
+                    {{ message.date }}
+                </p>
+
+                <div
+                    class="flex max-w-[85%] flex-col gap-1"
+                    :class="
+                        message.sender_id === me
+                            ? 'items-end self-end'
+                            : 'items-start self-start'
+                    "
+                    data-test="chat-message"
+                >
+                    <p
+                        class="rounded-2xl px-3 py-2 text-sm wrap-anywhere whitespace-pre-wrap"
+                        :class="
+                            message.sender_id === me
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-muted'
+                        "
+                    >
+                        {{ message.body }}
+                    </p>
+                    <p class="text-xs text-muted-foreground">
+                        {{ message.time }}
+                        <template v-if="message.sender_id === me">
+                            · {{ message.read ? 'Прочитано' : 'Отправлено' }}
+                        </template>
+                    </p>
+                </div>
+            </template>
+        </div>
+
+        <form class="flex flex-col gap-2" @submit.prevent="send">
+            <Label for="chat-body" class="sr-only">Сообщение</Label>
+            <Textarea
+                id="chat-body"
+                v-model="form.body"
+                name="body"
+                rows="2"
+                class="max-h-40"
+                :placeholder="placeholder"
+                :aria-invalid="form.errors.body ? true : undefined"
+                @keydown.enter.ctrl.exact.prevent="send"
+                @keydown.enter.meta.exact.prevent="send"
+            />
+            <InputError :message="form.errors.body" />
+
+            <div class="flex items-center justify-between gap-3">
+                <p class="text-xs text-muted-foreground">
+                    <span v-if="tooLong" class="text-destructive">
+                        {{ form.body.length }} из {{ MAX_LENGTH }} символов
+                    </span>
+                    <span v-else class="hidden md:inline">
+                        Ctrl+Enter — отправить
+                    </span>
+                </p>
+                <Button
+                    type="submit"
+                    :disabled="form.processing"
+                    data-test="send-message"
+                >
+                    Отправить
+                </Button>
+            </div>
+        </form>
+    </div>
+</template>

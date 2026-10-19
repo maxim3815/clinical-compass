@@ -7,6 +7,7 @@ use App\Policies\PatientPolicy;
 use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -35,6 +36,15 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(User::class, PatientPolicy::class);
 
         RateLimiter::for('access-link', fn (Request $request) => Limit::perMinute(10)->by($request->ip()));
+
+        // Отправка сообщений в чат. Ответ JSON: форма показывает текст под полем.
+        RateLimiter::for('chat', fn (Request $request) => Limit::perMinute(30)
+            ->by('chat:'.$request->user()?->id)
+            ->response(fn (Request $request, array $headers) => response()->json(
+                ['message' => 'Слишком много сообщений подряд. Подождите минуту и отправьте снова.'],
+                Response::HTTP_TOO_MANY_REQUESTS,
+                $headers,
+            )));
     }
 
     /**

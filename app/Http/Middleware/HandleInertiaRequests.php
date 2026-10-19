@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\UnreadMessages;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -41,6 +42,8 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user()?->only(['id', 'name', 'login', 'role']),
             ],
+            // Счётчик в пункте меню чата. Дальше его обновляют события в реальном времени.
+            'unreadMessages' => fn (): int => $request->user() === null ? 0 : UnreadMessages::count($request->user()),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
     }

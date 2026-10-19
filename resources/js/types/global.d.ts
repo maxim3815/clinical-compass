@@ -21,6 +21,8 @@ declare module '@inertiajs/core' {
             name: string;
             auth: Auth;
             sidebarOpen: boolean;
+            // У пациента — непрочитанные сообщения, у врача — диалоги с ними.
+            unreadMessages: number;
             [key: string]: unknown;
         };
         flashDataType: {

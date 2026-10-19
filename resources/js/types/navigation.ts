@@ -11,4 +11,6 @@ export type NavItem = {
     href: NonNullable<InertiaLinkProps['href']>;
     icon?: LucideIcon;
     isActive?: boolean;
+    // Число на пункте меню, например непрочитанные сообщения. Ноль не показывается.
+    badge?: number;
 };

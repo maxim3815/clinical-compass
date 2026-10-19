@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Doctor\ChatController;
+use App\Http\Controllers\Doctor\ConversationController;
 use App\Http\Controllers\Doctor\DrugController;
 use App\Http\Controllers\Doctor\InvitationController;
 use App\Http\Controllers\Doctor\PasswordResetLinkController;
@@ -9,6 +11,7 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InvitationRegistrationController;
 use App\Http\Controllers\PasswordResetByLinkController;
 use App\Http\Controllers\Patient\AsNeededDoseController;
+use App\Http\Controllers\Patient\ChatController as PatientChatController;
 use App\Http\Controllers\Patient\DoseController;
 use App\Http\Controllers\Patient\HomeController as PatientHomeController;
 use App\Http\Controllers\Patient\IntakeTimeController;
@@ -56,6 +59,17 @@ Route::middleware('auth')->group(function () {
                 ->name('patients.prescriptions.cancel');
         });
 
+        // Чат: страница диалога, а более ранние сообщения, отправка и прочтение — JSON.
+        Route::get('messages', [ConversationController::class, 'index'])->name('conversations.index');
+        Route::whereNumber('patient')->group(function () {
+            Route::get('patients/{patient}/chat', [ChatController::class, 'show'])->name('patients.chat.show');
+            Route::get('patients/{patient}/chat/messages', [ChatController::class, 'messages'])->name('patients.chat.messages');
+            Route::post('patients/{patient}/chat/messages', [ChatController::class, 'store'])
+                ->middleware('throttle:chat')
+                ->name('patients.chat.store');
+            Route::post('patients/{patient}/chat/read', [ChatController::class, 'read'])->name('patients.chat.read');
+        });
+
         Route::get('drugs', [DrugController::class, 'index'])->name('drugs.index');
         Route::get('drugs/{drug:code}', [DrugController::class, 'show'])
             ->where('drug', Drug::CODE_PATTERN)
@@ -87,6 +101,11 @@ Route::middleware('auth')->group(function () {
         Route::put('medications/{prescription}/times', [IntakeTimeController::class, 'update'])
             ->whereNumber('prescription')
             ->name('intake-times.update');
+
+        Route::get('chat', [PatientChatController::class, 'show'])->name('chat.show');
+        Route::get('chat/messages', [PatientChatController::class, 'messages'])->name('chat.messages');
+        Route::post('chat/messages', [PatientChatController::class, 'store'])->middleware('throttle:chat')->name('chat.store');
+        Route::post('chat/read', [PatientChatController::class, 'read'])->name('chat.read');
 
         Route::put('doses/{doseEvent}', [DoseController::class, 'update'])->whereNumber('doseEvent')->name('doses.update');
         Route::delete('doses/{doseEvent}/mark', [DoseController::class, 'cancel'])->whereNumber('doseEvent')->name('doses.cancel');

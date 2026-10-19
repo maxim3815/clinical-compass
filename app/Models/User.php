@@ -79,6 +79,16 @@ class User extends Authenticatable
     }
 
     /**
+     * Действующая связь пациента с лечащим врачом.
+     *
+     * @return HasOne<CareRelationship, $this>
+     */
+    public function activeCareRelationship(): HasOne
+    {
+        return $this->hasOne(CareRelationship::class, 'patient_id')->whereNull('ended_at');
+    }
+
+    /**
      * Назначения пациента, все версии.
      *
      * @return HasMany<Prescription, $this>

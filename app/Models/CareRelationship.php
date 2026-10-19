@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * Связь «лечащий врач»: кто ведёт пациента и в какой период.
@@ -21,6 +23,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable|null $ended_at
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
+ * @property-read User $doctor
+ * @property-read User $patient
+ * @property-read Message|null $latestMessage
  */
 #[Fillable(['doctor_id', 'patient_id', 'started_at', 'ended_at'])]
 class CareRelationship extends Model
@@ -45,12 +50,49 @@ class CareRelationship extends Model
     }
 
     /**
+     * Сообщения чата пациента и врача по этой связи.
+     *
+     * @return HasMany<Message, $this>
+     */
+    public function messages(): HasMany
+    {
+        return $this->hasMany(Message::class);
+    }
+
+    /**
+     * @return HasOne<Message, $this>
+     */
+    public function latestMessage(): HasOne
+    {
+        return $this->hasOne(Message::class)->latestOfMany();
+    }
+
+    /**
+     * Пользователь — врач или пациент этой связи.
+     */
+    public function involves(User $user): bool
+    {
+        return $this->doctor_id === $user->id || $this->patient_id === $user->id;
+    }
+
+    /**
      * @param  Builder<self>  $query
      */
     #[Scope]
     protected function active(Builder $query): void
     {
         $query->whereNull('ended_at');
+    }
+
+    /**
+     * Связь врача с пациентом.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function between(Builder $query, User $doctor, User $patient): void
+    {
+        $query->where('doctor_id', $doctor->id)->where('patient_id', $patient->id);
     }
 
     /**
