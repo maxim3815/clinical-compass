@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Dose;
 use Carbon\CarbonImmutable;
 use Database\Factories\DrugStrengthFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -42,9 +43,7 @@ class DrugStrength extends Model
      */
     public function label(): string
     {
-        $mg = rtrim(rtrim($this->mg, '0'), '.');
-
-        return str_replace('.', ',', $mg).' мг';
+        return Dose::mg($this->mg);
     }
 
     /**
