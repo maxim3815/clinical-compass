@@ -113,10 +113,14 @@ const errors = computed(
 );
 
 // После правки поля прежняя ошибка уже не относится к введённому. Ошибка о назначении
-// врача зависит и от дат.
+// врача зависит и от вида, и от дат.
 watch(
     () => [form.drug_id, form.drug_name, form.starts_on, form.ends_on],
     () => form.clearErrors('drug_id', 'drug_name', 'starts_on', 'ends_on'),
+);
+watch(
+    () => form.kind,
+    () => form.clearErrors('drug_id'),
 );
 watch(
     () => form.dose,
