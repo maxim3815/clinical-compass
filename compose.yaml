@@ -109,7 +109,8 @@ services:
   queue:
     <<: *php-image
     init: true
-    command: ["php", "artisan", "queue:listen", "--tries=1"]
+    # Через очередь уходят события чата: пустую очередь проверяем раз в секунду, а не раз в три.
+    command: ["php", "artisan", "queue:listen", "--tries=1", "--sleep=1"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -119,6 +120,20 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  # WebSocket-сервер для обновлений без перезагрузки страницы. Браузер подключается к нему
+  # через nginx, приложение отправляет события напрямую. Порт наружу не публикуется.
+  reverb:
+    <<: *php-image
+    init: true
+    command: ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=8080"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8080/up"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+      start_interval: 1s
 
   scheduler:
     <<: *php-image
