@@ -35,6 +35,7 @@ class PrescriptionFactory extends Factory
             'instruction' => 'За 30 минут до еды.',
             'starts_on' => now()->toDateString(),
             'ends_on' => null,
+            'effective_at' => now(),
         ];
     }
 

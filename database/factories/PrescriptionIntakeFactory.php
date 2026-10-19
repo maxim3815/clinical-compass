@@ -25,4 +25,15 @@ class PrescriptionIntakeFactory extends Factory
             'tablets' => '1',
         ];
     }
+
+    /**
+     * Пациент выбрал время приёма, по умолчанию сейчас.
+     */
+    public function at(string $time, mixed $setAt = null): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'time' => $time,
+            'time_set_at' => $setAt ?? now(),
+        ]);
+    }
 }

@@ -24,6 +24,19 @@ enum TimeOfDay: string
     }
 
     /**
+     * Подсказка в форме выбора времени приёма.
+     */
+    public function defaultTime(): string
+    {
+        return match ($this) {
+            self::Morning => '08:00',
+            self::Afternoon => '14:00',
+            self::Evening => '20:00',
+            self::Bedtime => '22:00',
+        };
+    }
+
+    /**
      * Место в течение дня, чтобы сортировать приёмы.
      */
     public function position(): int

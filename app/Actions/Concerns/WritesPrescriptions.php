@@ -6,6 +6,7 @@ use App\Enums\PrescriptionKind;
 use App\Enums\UserRole;
 use App\Exceptions\PrescriptionNotChangeable;
 use App\Models\Prescription;
+use App\Models\PrescriptionIntake;
 use App\Models\User;
 use App\Support\PrescriptionData;
 use Carbon\CarbonImmutable;
@@ -93,15 +94,26 @@ trait WritesPrescriptions
             'instruction' => $data->instruction,
             'starts_on' => $data->startsOn->toDateString(),
             'ends_on' => $data->endsOn?->toDateString(),
+            'effective_at' => now(),
         ];
     }
 
-    private function createIntakes(Prescription $prescription, PrescriptionData $data): void
+    /**
+     * Приёмы новой версии. Время, выбранное пациентом в прежней версии, переходит к приёму
+     * с тем же временем суток. Новые приёмы ждут, пока пациент выберет время.
+     */
+    private function createIntakes(Prescription $prescription, PrescriptionData $data, ?Prescription $previous = null): void
     {
+        $previousIntakes = $previous?->intakes->keyBy(fn (PrescriptionIntake $intake): string => $intake->time_of_day->value);
+
         foreach ($data->intakes as $timeOfDay => $tablets) {
+            $carried = $previousIntakes?->get($timeOfDay);
+
             $prescription->intakes()->create([
                 'time_of_day' => $timeOfDay,
                 'tablets' => $tablets,
+                'time' => $carried?->time,
+                'time_set_at' => $carried?->time_set_at,
             ]);
         }
     }

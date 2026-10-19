@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\DoseEvent;
 use App\Models\Drug;
 use App\Models\DrugStrength;
 use App\Models\Prescription;
@@ -119,4 +120,37 @@ function regularPrescription(User $patient, DrugStrength $strength, array $intak
     }
 
     return $prescription;
+}
+
+/**
+ * Регулярное назначение врача, у которого пациент уже выбрал время: время суток => «08:00»,
+ * по таблетке на приём. Время выбрано в момент, с которого действует назначение (effective_at).
+ *
+ * @param  array<string, string>  $times
+ * @param  array<string, mixed>  $attributes
+ */
+function timedPrescription(User $patient, DrugStrength $strength, array $times = ['morning' => '08:00'], array $attributes = []): Prescription
+{
+    $prescription = Prescription::factory()->for($patient, 'patient')->for($strength, 'strength')->create($attributes);
+
+    foreach ($times as $timeOfDay => $time) {
+        PrescriptionIntake::factory()->for($prescription)->at($time, $prescription->effective_at)->create(['time_of_day' => $timeOfDay]);
+    }
+
+    return $prescription;
+}
+
+/**
+ * Плановые приёмы пациента по порядку: местная дата, время суток и scheduled_at в UTC — «2026-10-19 morning 2026-10-19 05:00».
+ *
+ * @return list<string>
+ */
+function doseSchedule(User $patient): array
+{
+    return $patient->doseEvents()
+        ->orderBy('scheduled_at')
+        ->get()
+        ->map(fn (DoseEvent $event): string => $event->local_date->toDateString().' '.$event->time_of_day->value.' '.$event->scheduled_at->utc()->format('Y-m-d H:i'))
+        ->values()
+        ->all();
 }

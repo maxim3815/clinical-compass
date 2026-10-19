@@ -89,12 +89,30 @@ class User extends Authenticatable
     }
 
     /**
-     * Сегодняшняя дата по часовому поясу пациента (у врача — по поясу интерфейса) как полночь UTC,
+     * Плановые приёмы пациента.
+     *
+     * @return HasMany<DoseEvent, $this>
+     */
+    public function doseEvents(): HasMany
+    {
+        return $this->hasMany(DoseEvent::class, 'patient_id');
+    }
+
+    /**
+     * Часовой пояс пациента, у врача — пояс интерфейса.
+     */
+    public function localTimezone(): string
+    {
+        return $this->patientProfile->timezone->value ?? DisplayTime::TIMEZONE;
+    }
+
+    /**
+     * Сегодняшняя дата по часовому поясу пользователя (localTimezone()) как полночь UTC,
      * см. DisplayTime::today(). По ней считаются даты назначений.
      */
     public function localToday(): CarbonImmutable
     {
-        return DisplayTime::today($this->patientProfile->timezone->value ?? DisplayTime::TIMEZONE);
+        return DisplayTime::today($this->localTimezone());
     }
 
     /**

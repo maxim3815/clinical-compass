@@ -1,7 +1,9 @@
 <?php
 
+use App\Actions\SyncDoseEvents;
 use App\Enums\RussianTimezone;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Inertia\Testing\AssertableInertia as Assert;
 
 test('profile page is displayed', function () {
@@ -93,6 +95,28 @@ test('patient changes name, birth date and timezone', function () {
     expect($patient->name)->toBe('Петрова Мария Ивановна')
         ->and($patient->patientProfile?->birth_date?->toDateString())->toBe('1990-04-15')
         ->and($patient->patientProfile?->timezone)->toBe(RussianTimezone::Yekaterinburg);
+});
+
+test('changing the timezone moves future dose events', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-10-19 09:00', 'UTC'));
+    $patient = User::factory()->patient()->create();
+    timedPrescription($patient, catalogDrug('Гидроксизин')->strengths()->sole(), ['morning' => '08:00', 'evening' => '20:00'], [
+        'starts_on' => '2026-10-12',
+        'effective_at' => now()->subWeek(),
+    ]);
+    app(SyncDoseEvents::class)->handle($patient);
+
+    $this->actingAs($patient)
+        ->patch(route('profile.update'), ['name' => $patient->name, 'timezone' => 'Asia/Yekaterinburg'])
+        ->assertSessionHasNoErrors();
+
+    // Утренний приём по Москве уже прошёл и остаётся, будущие переезжают на время Екатеринбурга.
+    expect(doseSchedule($patient))->toBe([
+        '2026-10-19 morning 2026-10-19 05:00',
+        '2026-10-19 evening 2026-10-19 15:00',
+        '2026-10-20 morning 2026-10-20 03:00',
+        '2026-10-20 evening 2026-10-20 15:00',
+    ]);
 });
 
 test('patient can clear the birth date', function () {

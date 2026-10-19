@@ -17,6 +17,8 @@ class CancelPrescription
 {
     use WritesPrescriptions;
 
+    public function __construct(private readonly SyncDoseEvents $syncDoseEvents) {}
+
     /**
      * @throws PrescriptionNotChangeable
      */
@@ -34,6 +36,9 @@ class CancelPrescription
                 'cancel_reason' => $reason,
                 'cancel_comment' => $comment,
             ]);
+
+            // Будущие неотмеченные приёмы отменённого назначения удаляются.
+            $this->syncDoseEvents->handle($patient);
         });
     }
 }

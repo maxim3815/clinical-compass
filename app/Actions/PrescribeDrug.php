@@ -19,6 +19,8 @@ class PrescribeDrug
 {
     use WritesPrescriptions;
 
+    public function __construct(private readonly SyncDoseEvents $syncDoseEvents) {}
+
     /**
      * @throws ValidationException
      */
@@ -42,6 +44,7 @@ class PrescribeDrug
             ]);
 
             $this->createIntakes($prescription, $data);
+            $this->syncDoseEvents->handle($patient);
 
             return $prescription;
         });

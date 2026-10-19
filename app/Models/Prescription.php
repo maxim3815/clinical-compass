@@ -36,6 +36,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $instruction
  * @property CarbonImmutable $starts_on
  * @property CarbonImmutable|null $ends_on
+ * @property CarbonImmutable $effective_at
  * @property CarbonImmutable|null $closed_at
  * @property int|null $closed_by_id
  * @property PrescriptionCloseReason|null $close_reason
@@ -49,6 +50,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read Drug $drug
  * @property-read DrugStrength $strength
  * @property-read Collection<int, PrescriptionIntake> $intakes
+ * @property-read Collection<int, DoseEvent> $doseEvents
  */
 #[Fillable([
     'patient_id',
@@ -63,6 +65,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'instruction',
     'starts_on',
     'ends_on',
+    'effective_at',
     'closed_at',
     'closed_by_id',
     'close_reason',
@@ -137,6 +140,16 @@ class Prescription extends Model
     }
 
     /**
+     * Плановые приёмы этой версии.
+     *
+     * @return HasMany<DoseEvent, $this>
+     */
+    public function doseEvents(): HasMany
+    {
+        return $this->hasMany(DoseEvent::class);
+    }
+
+    /**
      * Состояние назначения на дату пациента.
      */
     public function status(CarbonImmutable $today): PrescriptionStatus
@@ -156,6 +169,16 @@ class Prescription extends Model
     public function isChangeableByDoctor(CarbonImmutable $today): bool
     {
         return $this->source === PrescriptionSource::Doctor && $this->status($today)->isCurrent();
+    }
+
+    /**
+     * Пациент выбирает время приёмов у регулярного назначения врача, которое действует или ещё не началось.
+     */
+    public function acceptsPatientTimes(CarbonImmutable $today): bool
+    {
+        return $this->source === PrescriptionSource::Doctor
+            && $this->kind === PrescriptionKind::Regular
+            && $this->status($today)->isCurrent();
     }
 
     /**
@@ -222,6 +245,7 @@ class Prescription extends Model
             'max_daily_doses' => 'integer',
             'starts_on' => 'date',
             'ends_on' => 'date',
+            'effective_at' => 'datetime',
             'closed_at' => 'datetime',
             'close_reason' => PrescriptionCloseReason::class,
             'cancel_reason' => PrescriptionCancelReason::class,

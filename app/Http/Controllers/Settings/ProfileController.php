@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Settings;
 
+use App\Actions\SyncDoseEvents;
 use App\Enums\RussianTimezone;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\ProfileUpdateRequest;
@@ -37,15 +38,20 @@ class ProfileController extends Controller
     /**
      * Update the user's profile information.
      */
-    public function update(ProfileUpdateRequest $request): RedirectResponse
+    public function update(ProfileUpdateRequest $request, SyncDoseEvents $syncDoseEvents): RedirectResponse
     {
         /** @var User $user */
         $user = $request->user();
         $data = $request->validated();
 
-        DB::transaction(function () use ($user, $data): void {
+        DB::transaction(function () use ($user, $data, $syncDoseEvents): void {
             $user->update(Arr::only($data, ['name']));
             $user->patientProfile?->update(Arr::only($data, ['birth_date', 'timezone']));
+
+            // Время приёма местное: в новом поясе будущие приёмы переезжают на другие моменты.
+            if ($user->patientProfile?->wasChanged('timezone')) {
+                $syncDoseEvents->handle($user);
+            }
         });
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Profile updated.')]);

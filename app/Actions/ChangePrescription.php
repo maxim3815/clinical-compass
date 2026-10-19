@@ -19,11 +19,14 @@ use InvalidArgumentException;
 /**
  * Врач меняет назначение. Ещё не начавшееся назначение исправляется на месте. У действующего
  * прежняя версия закрывается сейчас, а новая действует с сегодняшнего дня: плановые приёмы
- * и отметки остаются привязаны к версии, по которой были.
+ * и отметки остаются привязаны к версии, по которой были. Будущие неотмеченные приёмы
+ * пересчитываются под новую версию.
  */
 class ChangePrescription
 {
     use WritesPrescriptions;
+
+    public function __construct(private readonly SyncDoseEvents $syncDoseEvents) {}
 
     /**
      * @throws PrescriptionNotChangeable
@@ -54,6 +57,7 @@ class ChangePrescription
                     'prescriber_id' => $doctor->id,
                 ]);
                 $this->syncIntakes($current, $data);
+                $this->syncDoseEvents->handle($patient);
 
                 return PrescriptionChangeOutcome::Edited;
             }
@@ -74,7 +78,8 @@ class ChangePrescription
                 'prescriber_id' => $doctor->id,
                 'previous_id' => $current->id,
             ]);
-            $this->createIntakes($next, $data);
+            $this->createIntakes($next, $data, $current);
+            $this->syncDoseEvents->handle($patient);
 
             return PrescriptionChangeOutcome::NewVersion;
         });
