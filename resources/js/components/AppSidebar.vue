@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { House, Settings, UserPlus, Users } from '@lucide/vue';
+import { House, Pill, Settings, UserPlus, Users } from '@lucide/vue';
 import { computed, onUnmounted } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavMain from '@/components/NavMain.vue';
@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/sidebar';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
 import { home as doctorHome } from '@/routes/doctor';
+import { index as drugs } from '@/routes/doctor/drugs';
 import { index as invitations } from '@/routes/doctor/invitations';
 import { index as patients } from '@/routes/doctor/patients';
 import { home as patientHome } from '@/routes/patient';
@@ -54,6 +55,13 @@ const mainNavItems = computed<NavItem[]>(() =>
                   title: 'Приглашения',
                   href: invitations(),
                   icon: UserPlus,
+              },
+              {
+                  title: 'Препараты',
+                  href: drugs(),
+                  icon: Pill,
+                  // Карточка препарата тоже относится к разделу.
+                  isActive: isCurrentOrParentUrl(drugs()),
               },
               settings,
           ]
