@@ -17,6 +17,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Запросы приходят через nginx в контейнере, а в продакшене ещё и через прокси с TLS.
+        // Заголовкам X-Forwarded-* от адресов частных сетей верим: так приложение видит https
+        // и настоящий адрес клиента.
+        $middleware->trustProxies(at: 'PRIVATE_SUBNETS');
+
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
         $middleware->alias([
