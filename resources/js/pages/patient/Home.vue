@@ -6,6 +6,7 @@ import IntakeTimeController from '@/actions/App/Http/Controllers/Patient/IntakeT
 import AsNeededCard from '@/components/AsNeededCard.vue';
 import DoseGroupCard from '@/components/DoseGroupCard.vue';
 import DoseMarkDialog from '@/components/DoseMarkDialog.vue';
+import InstallAppBanner from '@/components/InstallAppBanner.vue';
 import { Button } from '@/components/ui/button';
 import { home } from '@/routes/patient';
 import type { AsNeeded, Dose, DoseGroup, SelectOption } from '@/types';
@@ -71,6 +72,8 @@ function openMark(dose: Dose, status: 'taken' | 'skipped'): void {
 
     <div class="flex max-w-xl flex-col gap-6 p-4">
         <h1 class="text-xl font-semibold">Здравствуйте, {{ greetingName }}!</h1>
+
+        <InstallAppBanner />
 
         <section
             v-for="prescription in timeSetup"

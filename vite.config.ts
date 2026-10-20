@@ -5,6 +5,7 @@ import vue from '@vitejs/plugin-vue';
 import laravel from 'laravel-vite-plugin';
 import { bunny } from 'laravel-vite-plugin/fonts';
 import { defineConfig, lazyPlugins } from 'vite-plus';
+import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
     plugins: lazyPlugins(() => [
@@ -29,6 +30,33 @@ export default defineConfig({
         }),
         wayfinder({
             formVariants: true,
+        }),
+        VitePWA({
+            // Свой service worker (resources/js/sw.ts): Workbox только вставляет в него
+            // список предкэша. Регистрирует его приложение, манифест лежит в public/.
+            strategies: 'injectManifest',
+            srcDir: 'resources/js',
+            filename: 'sw.ts',
+            injectRegister: false,
+            manifest: false,
+            // Ассеты Laravel собираются в public/build, а service worker кладём в корень
+            // сайта: так его scope — всё приложение.
+            outDir: 'public',
+            base: '/',
+            scope: '/',
+            injectManifest: {
+                globDirectory: 'public',
+                globPatterns: [
+                    'build/assets/*.{js,css,woff2}',
+                    'offline.html',
+                    'favicon.{ico,svg}',
+                    'apple-touch-icon.png',
+                    'pwa-*.png',
+                    'maskable-icon-*.png',
+                ],
+                // В имени ассетов Vite уже есть хеш, ревизия им не нужна.
+                dontCacheBustURLsMatching: /^build\/assets\//,
+            },
         }),
     ]),
     server: {

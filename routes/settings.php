@@ -16,4 +16,7 @@ Route::middleware('auth')->group(function () {
         ->name('user-password.update');
 
     Route::inertia('settings/appearance', 'settings/Appearance')->name('appearance.edit');
+
+    // Установка на телефон. Подсказку об установке видит только пациент.
+    Route::inertia('settings/app', 'settings/App')->middleware('role:patient')->name('app.edit');
 });

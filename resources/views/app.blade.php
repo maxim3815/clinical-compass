@@ -30,9 +30,15 @@
             }
         </style>
 
-        <link rel="icon" href="/favicon.ico" sizes="any">
+        <link rel="icon" href="/favicon.ico" sizes="48x48">
         <link rel="icon" href="/favicon.svg" type="image/svg+xml">
         <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+        {{-- Приложение на телефоне: манифест, название под иконкой на iPhone и цвет строки состояния по фону темы --}}
+        <link rel="manifest" href="/manifest.webmanifest">
+        <meta name="apple-mobile-web-app-title" content="Компас">
+        <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+        <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
 
         @fonts
 

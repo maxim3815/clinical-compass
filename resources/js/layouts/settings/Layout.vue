@@ -1,16 +1,22 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
 import { toUrl } from '@/lib/utils';
+import { edit as editApp } from '@/routes/app';
 import { edit as editAppearance } from '@/routes/appearance';
 import { edit as editPassword } from '@/routes/password';
 import { edit as editProfile } from '@/routes/profile';
 import type { NavItem } from '@/types';
 
-const sidebarNavItems: NavItem[] = [
+const page = usePage();
+
+const isPatient = computed(() => page.props.auth.user.role === 'patient');
+
+const sidebarNavItems = computed<NavItem[]>(() => [
     {
         title: 'Профиль',
         href: editProfile(),
@@ -23,14 +29,30 @@ const sidebarNavItems: NavItem[] = [
         title: 'Оформление',
         href: editAppearance(),
     },
-];
+    // Установка приложения на телефон нужна только пациенту.
+    ...(isPatient.value
+        ? [
+              {
+                  title: 'Приложение',
+                  href: editApp(),
+              },
+          ]
+        : []),
+]);
 
 const { isCurrentOrParentUrl } = useCurrentUrl();
 </script>
 
 <template>
     <div class="px-4 py-6">
-        <Heading title="Настройки" description="Профиль, пароль и оформление" />
+        <Heading
+            title="Настройки"
+            :description="
+                isPatient
+                    ? 'Профиль, пароль, оформление и приложение'
+                    : 'Профиль, пароль и оформление'
+            "
+        />
 
         <div class="flex flex-col lg:flex-row lg:space-x-12">
             <aside class="w-full max-w-xl lg:w-48">

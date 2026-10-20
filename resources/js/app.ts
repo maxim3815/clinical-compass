@@ -1,10 +1,13 @@
 import { createInertiaApp } from '@inertiajs/vue3';
 import { initializeTheme } from '@/composables/useAppearance';
+import { initializeInstallPrompt } from '@/composables/useInstallApp';
 import AppLayout from '@/layouts/AppLayout.vue';
 import AuthLayout from '@/layouts/AuthLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { initializeEcho } from '@/lib/echo';
 import { initializeFlashToast } from '@/lib/flashToast';
+import { initializeOfflineVisits } from '@/lib/offlineVisits';
+import { initializeServiceWorker } from '@/lib/serviceWorker';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Клинический компас';
 
@@ -53,3 +56,8 @@ initializeTheme();
 initializeFlashToast();
 
 initializeEcho();
+
+// Приложение на телефоне: service worker, переходы без сети и предложение установки.
+initializeServiceWorker();
+initializeOfflineVisits();
+initializeInstallPrompt();

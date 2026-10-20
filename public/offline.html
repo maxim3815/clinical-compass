@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="ru">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Нет подключения — Клинический компас</title>
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <meta
+            name="theme-color"
+            content="#ffffff"
+            media="(prefers-color-scheme: light)"
+        />
+        <meta
+            name="theme-color"
+            content="#0a0a0a"
+            media="(prefers-color-scheme: dark)"
+        />
+
+        <!--
+            Страницу показывает service worker, когда без сети не открылась страница приложения.
+            Она лежит в кэше устройства, поэтому всё нужное — внутри файла. Тема та же,
+            что выбрана в настройках оформления приложения.
+        -->
+        <script>
+            (function () {
+                var appearance = null;
+
+                try {
+                    appearance = localStorage.getItem('appearance');
+                } catch (error) {}
+
+                if (
+                    appearance === 'dark' ||
+                    (appearance !== 'light' &&
+                        window.matchMedia('(prefers-color-scheme: dark)')
+                            .matches)
+                ) {
+                    document.documentElement.classList.add('dark');
+                }
+            })();
+        </script>
+
+        <style>
+            :root {
+                color-scheme: light;
+                --background: #ffffff;
+                --foreground: #0a0a0a;
+                --muted-foreground: #737373;
+                --primary: #171717;
+                --primary-foreground: #fafafa;
+                --ring: #a3a3a3;
+            }
+
+            :root.dark {
+                color-scheme: dark;
+                --background: #0a0a0a;
+                --foreground: #fafafa;
+                --muted-foreground: #a3a3a3;
+                --primary: #fafafa;
+                --primary-foreground: #171717;
+                --ring: #737373;
+            }
+
+            * {
+                box-sizing: border-box;
+            }
+
+            body {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+                min-height: 100dvh;
+                margin: 0;
+                padding: 24px 16px;
+                background: var(--background);
+                color: var(--foreground);
+                font-family: ui-sans-serif, system-ui, sans-serif;
+                -webkit-font-smoothing: antialiased;
+            }
+
+            main {
+                display: flex;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 16px;
+                max-width: 24rem;
+            }
+
+            img {
+                width: 48px;
+                height: 48px;
+            }
+
+            h1 {
+                margin: 0;
+                font-size: 1.25rem;
+                font-weight: 600;
+                line-height: 1.4;
+            }
+
+            p {
+                margin: 0;
+                color: var(--muted-foreground);
+                font-size: 0.875rem;
+                line-height: 1.5;
+            }
+
+            button {
+                height: 36px;
+                padding: 0 16px;
+                border: 0;
+                border-radius: 6px;
+                background: var(--primary);
+                color: var(--primary-foreground);
+                font: inherit;
+                font-size: 0.875rem;
+                font-weight: 500;
+                cursor: pointer;
+            }
+
+            button:focus-visible {
+                outline: 3px solid var(--ring);
+                outline-offset: 2px;
+            }
+        </style>
+    </head>
+    <body>
+        <main>
+            <img src="/favicon.svg" alt="" />
+            <h1>Нет подключения к интернету</h1>
+            <p>
+                Если вы приняли препарат, отметьте его, когда появится сеть:
+                кнопка «Принял в …» на экране «Сегодня». Отметить приём можно за
+                сегодня и вчера.
+            </p>
+            <button type="button" onclick="location.reload()">Повторить</button>
+        </main>
+    </body>
+</html>
