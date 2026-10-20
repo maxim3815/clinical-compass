@@ -4,6 +4,7 @@ import { KeyRound, MessageCircle, Plus } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import PasswordResetLinkController from '@/actions/App/Http/Controllers/Doctor/PasswordResetLinkController';
 import PrescriptionController from '@/actions/App/Http/Controllers/Doctor/PrescriptionController';
+import AdherenceCourse from '@/components/AdherenceCourse.vue';
 import CancelPrescriptionDialog from '@/components/CancelPrescriptionDialog.vue';
 import Heading from '@/components/Heading.vue';
 import OneTimeLink from '@/components/OneTimeLink.vue';
@@ -12,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { formatAge } from '@/lib/plural';
 import { index, show } from '@/routes/doctor/patients';
 import { show as chat } from '@/routes/doctor/patients/chat';
-import type { Prescription, SelectOption } from '@/types';
+import type { Adherence, Prescription, SelectOption } from '@/types';
 
 type Patient = {
     id: number;
@@ -29,6 +30,7 @@ const props = defineProps<{
     prescriptions: Prescription[];
     ownMedications: Prescription[];
     prescriptionHistory: Prescription[];
+    adherence: Adherence;
     cancelReasons: SelectOption[];
 }>();
 
@@ -50,6 +52,13 @@ defineOptions({
 const page = usePage();
 const cancelling = ref<Prescription | null>(null);
 const passwordResetUrl = computed(() => page.flash.passwordResetUrl);
+
+const hasCourses = computed(
+    () =>
+        props.adherence.courses.length > 0 ||
+        props.adherence.finished.length > 0 ||
+        props.adherence.own.length > 0,
+);
 
 const details = computed(() => [
     {
@@ -158,6 +167,49 @@ const details = computed(() => [
                 :key="prescription.id"
                 :prescription="prescription"
                 for-doctor
+            />
+        </section>
+
+        <section class="flex flex-col gap-3" data-test="adherence">
+            <Heading
+                variant="small"
+                title="Приём препаратов"
+                description="Доля принятых приёмов по контрольным периодам курса: дни 1–7, 8–14, 15–28, дальше каждые 28 дней."
+            />
+
+            <p
+                v-if="adherence.timezone"
+                class="text-sm text-muted-foreground"
+                data-test="adherence-timezone"
+            >
+                Время пациента: {{ adherence.timezone }}
+            </p>
+
+            <p v-if="!hasCourses" class="text-sm text-muted-foreground">
+                Пациент пока не принимает препараты по назначению.
+            </p>
+
+            <AdherenceCourse
+                v-for="course in adherence.courses"
+                :key="course.id"
+                :course="course"
+            />
+
+            <template v-if="adherence.finished.length > 0">
+                <h3 class="mt-2 text-sm font-medium text-muted-foreground">
+                    Завершённые курсы
+                </h3>
+                <AdherenceCourse
+                    v-for="course in adherence.finished"
+                    :key="course.id"
+                    :course="course"
+                />
+            </template>
+
+            <AdherenceCourse
+                v-for="course in adherence.own"
+                :key="course.id"
+                :course="course"
             />
         </section>
 

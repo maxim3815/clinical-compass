@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CareRelationship;
 use App\Models\Prescription;
 use App\Models\User;
+use App\Support\Adherence\PatientAdherence;
 use App\Support\DisplayTime;
 use App\Support\PrescriptionPresenter;
 use Illuminate\Database\Eloquent\Builder;
@@ -96,6 +97,7 @@ class PatientController extends Controller
                 ])
                 ->map(fn (Prescription $prescription): array => PrescriptionPresenter::present($prescription, $today))
                 ->values(),
+            'adherence' => PatientAdherence::present($patient, $today),
             'cancelReasons' => PrescriptionCancelReason::options(),
         ]);
     }

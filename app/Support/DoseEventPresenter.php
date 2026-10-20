@@ -8,7 +8,8 @@ use Carbon\CarbonImmutable;
 
 /**
  * Плановый приём для экрана «Сегодня». Нужны загруженные prescription.drug и prescription.strength.
- * Время показывается по часовому поясу пациента.
+ * Время показывается по часовому поясу пациента. Тексты статуса и момента берёт и блок
+ * «Приём препаратов» у врача (App\Support\Adherence\PatientAdherence).
  */
 final class DoseEventPresenter
 {
@@ -57,7 +58,7 @@ final class DoseEventPresenter
     /**
      * «Принят в 8:05», «Принят поздно, в 10:30», «Не принят: забыл», «Пропущен». У запланированного — null.
      */
-    private static function statusText(DoseEvent $event, string $timezone): ?string
+    public static function statusText(DoseEvent $event, string $timezone): ?string
     {
         return match ($event->status) {
             DoseEventStatus::Taken => $event->taken_at === null ? null
@@ -71,7 +72,7 @@ final class DoseEventPresenter
     /**
      * Момент относительно дня приёма: «в 8:05», а если это другой день — «20.10 в 0:30».
      */
-    private static function moment(CarbonImmutable $time, CarbonImmutable $localDate, string $timezone): string
+    public static function moment(CarbonImmutable $time, CarbonImmutable $localDate, string $timezone): string
     {
         $local = $time->setTimezone($timezone);
         $clock = 'в '.$local->format('G:i');
