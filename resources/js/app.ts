@@ -20,6 +20,8 @@ void createInertiaApp({
             case name.startsWith('password-reset/'):
             case name === 'Consent':
                 return AuthLayout;
+            case name === 'DesignSystemShowcase':
+                return null;
             case name.startsWith('settings/'):
                 return [AppLayout, SettingsLayout];
             default:

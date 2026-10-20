@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', HomeController::class)->name('home');
 
 Route::inertia('consent', 'Consent')->name('consent');
+Route::inertia('design-system', 'DesignSystemShowcase')->name('design-system');
 
 // Страницы одноразовых ссылок от врача: общий лимит, чтобы токены нельзя было перебирать.
 Route::middleware('throttle:access-link')->group(function () {

@@ -55,6 +55,22 @@
     --color-chart-4: var(--chart-4);
     --color-chart-5: var(--chart-5);
 
+    --color-clinical-pine: #235347;
+    --color-clinical-pine-dark: #1b4339;
+    --color-clinical-mint: #e8f2ec;
+    --color-clinical-mint-hover: #dceae1;
+    --color-clinical-mint-dark: #a3c9b8;
+    --color-clinical-bg: #fbf9f5;
+    --color-clinical-slate: #1e293b;
+    --color-clinical-muted: #64748b;
+    --color-clinical-border: #e2e8f0;
+    --color-clinical-warning: #f59e0b;
+    --color-clinical-warning-bg: #fef3c7;
+    --color-clinical-alert: #ef4444;
+    --color-clinical-alert-bg: #fee2e2;
+    --color-clinical-success: #2d6a4f;
+    --color-clinical-success-bg: #d1e7dd;
+
     --color-sidebar: var(--sidebar-background);
     --color-sidebar-foreground: var(--sidebar-foreground);
     --color-sidebar-primary: var(--sidebar-primary);
