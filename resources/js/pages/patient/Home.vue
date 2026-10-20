@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import { Clock, Stethoscope } from '@lucide/vue';
-import { computed, nextTick, onMounted, ref } from 'vue';
+import {
+    computed,
+    nextTick,
+    onBeforeUnmount,
+    onMounted,
+    ref,
+    useTemplateRef,
+} from 'vue';
 import IntakeTimeController from '@/actions/App/Http/Controllers/Patient/IntakeTimeController';
 import AsNeededCard from '@/components/AsNeededCard.vue';
 import DoseGroupCard from '@/components/DoseGroupCard.vue';
@@ -69,6 +76,8 @@ function openMark(dose: Dose, status: 'taken' | 'skipped'): void {
 
 // Переход из напоминания (`?doses=12,13`): карточка с этими приёмами выделена и на экране.
 const highlighted = ref<number[]>([]);
+const content = useTemplateRef<HTMLElement>('content');
+let stopKeepingInView: (() => void) | null = null;
 
 function isHighlighted(group: DoseGroup): boolean {
     return group.doses.some((dose) => highlighted.value.includes(dose.id));
@@ -87,16 +96,50 @@ onMounted(async () => {
     }
 
     await nextTick();
-    document
-        .querySelector('[data-test="dose-group"][data-highlighted="true"]')
-        ?.scrollIntoView({ block: 'center' });
+    const card = document.querySelector(
+        '[data-test="dose-group"][data-highlighted="true"]',
+    );
+
+    if (card !== null && content.value !== null) {
+        stopKeepingInView = keepInView(card, content.value);
+    }
 });
+
+onBeforeUnmount(() => stopKeepingInView?.());
+
+/**
+ * Баннеры установки и пушей появляются над карточками позже, когда браузер решит, что
+ * приложение можно установить, и сдвигают карточку за край экрана. Пока пациент сам
+ * не трогает страницу, карточка возвращается в центр экрана при каждом изменении высоты.
+ */
+function keepInView(card: Element, container: HTMLElement): () => void {
+    const events = ['pointerdown', 'wheel', 'keydown'] as const;
+    const observer = new ResizeObserver(() =>
+        card.scrollIntoView({ block: 'center' }),
+    );
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const stop = (): void => {
+        observer.disconnect();
+        clearTimeout(timer);
+        events.forEach((name) => window.removeEventListener(name, stop));
+    };
+
+    // Первый вызов наблюдателя сразу прокручивает к карточке.
+    observer.observe(container);
+    events.forEach((name) =>
+        window.addEventListener(name, stop, { passive: true }),
+    );
+    timer = setTimeout(stop, 10_000);
+
+    return stop;
+}
 </script>
 
 <template>
     <Head title="Сегодня" />
 
-    <div class="flex max-w-xl flex-col gap-6 p-4">
+    <div ref="content" class="flex max-w-xl flex-col gap-6 p-4">
         <h1 class="text-xl font-semibold">Здравствуйте, {{ greetingName }}!</h1>
 
         <InstallAppBanner />

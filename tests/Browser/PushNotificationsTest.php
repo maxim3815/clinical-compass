@@ -221,17 +221,31 @@ test('a tap on a reminder brings the patient to the doses of the reminder', func
     $this->artisan('app:dose-events:sync')->assertSuccessful();
     $evening = doseOn($patient, $tomorrow->toDateString(), 'evening');
 
-    visit(route('login'))
+    $page = visit(route('login'))
         ->on()->mobile()
         ->fill('login', 'ivanov')
         ->fill('password', 'password')
         ->press('Войти')
         ->assertPathIs('/patient')
         ->assertMissing('[data-highlighted="true"]')
+        // Экран Chrome на телефоне с Android: карточка помещается без прокрутки.
+        ->resize(412, 656)
         ->navigate(route('patient.home', ['doses' => (string) $evening->id]))
         ->assertPresent('[data-test="dose-group"][data-highlighted="true"]')
         ->assertSeeIn('[data-test="dose-group"][data-highlighted="true"]', '20:00')
-        ->assertScript('document.querySelector(\'[data-highlighted="true"]\').getBoundingClientRect().top < window.innerHeight')
+        ->assertScript('document.querySelector(\'[data-highlighted="true"]\').getBoundingClientRect().top < window.innerHeight');
+
+    // Chrome предлагает установку уже после загрузки: баннер над карточками не уводит
+    // выделенную карточку за край экрана.
+    waitForPushState(offerInstall($page), '[data-test="install-banner"]')
+        ->wait(0.5)
+        ->assertScript(<<<'JS'
+            () => {
+                const card = document.querySelector('[data-highlighted="true"]').getBoundingClientRect();
+
+                return card.top >= 0 && card.bottom <= window.innerHeight;
+            }
+            JS)
         ->assertNoJavaScriptErrors();
 });
 
