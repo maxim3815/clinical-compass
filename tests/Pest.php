@@ -1,5 +1,8 @@
 <?php
 
+use App\Enums\DoseSkipReason;
+use App\Enums\PrescriptionCloseReason;
+use App\Models\AsNeededDose;
 use App\Models\CareRelationship;
 use App\Models\DoseEvent;
 use App\Models\Drug;
@@ -8,8 +11,14 @@ use App\Models\Prescription;
 use App\Models\PrescriptionIntake;
 use App\Models\User;
 use App\Support\DisplayTime;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Routing\Events\RouteMatched;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Session;
+use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
 /*
@@ -168,6 +177,76 @@ function ownPrescription(User $patient, ?Drug $drug = null, array $times = ['mor
 }
 
 /**
+ * Регулярный курс врача с выбранным временем: утром 8:00 и вечером 20:00, если не задано иначе.
+ *
+ * @param  array<string, mixed>  $attributes
+ * @param  array<string, string>  $times
+ */
+function adherenceCourse(User $doctor, User $patient, DrugStrength $strength, string $startsOn, array $attributes = [], array $times = ['morning' => '08:00', 'evening' => '20:00']): Prescription
+{
+    return timedPrescription($patient, $strength, $times, [
+        'prescriber_id' => $doctor->id,
+        'starts_on' => $startsOn,
+        'effective_at' => CarbonImmutable::parse($startsOn, 'Europe/Moscow'),
+        ...$attributes,
+    ]);
+}
+
+/**
+ * Версия назначения, закрытая отменой или изменением в момент UTC.
+ *
+ * @return array<string, mixed>
+ */
+function closedAt(User $doctor, string $moment, PrescriptionCloseReason $reason = PrescriptionCloseReason::Cancelled): array
+{
+    return ['closed_at' => $moment, 'closed_by_id' => $doctor->id, 'close_reason' => $reason];
+}
+
+/**
+ * Плановый приём курса на местную дату пациента: утром в 8:00, днём в 14:00, вечером в 20:00,
+ * перед сном в 22:00, окно 6 часов. Принятый — в плановое время и отмечен тогда же, не принятый —
+ * «Забыл» с отметкой в плановое время.
+ *
+ * @param  array<string, mixed>  $attributes
+ */
+function adherenceDose(Prescription $prescription, string $date, string $status = 'taken', string $timeOfDay = 'morning', array $attributes = []): DoseEvent
+{
+    $time = ['morning' => '08:00', 'afternoon' => '14:00', 'evening' => '20:00', 'bedtime' => '22:00'][$timeOfDay];
+    $scheduledAt = CarbonImmutable::parse($date.' '.$time, $prescription->patient->localTimezone())->utc();
+    $takenAt = $attributes['taken_at'] ?? $scheduledAt;
+
+    return DoseEvent::factory()->for($prescription)->create([
+        'patient_id' => $prescription->patient_id,
+        'time_of_day' => $timeOfDay,
+        'local_date' => $date,
+        'scheduled_at' => $scheduledAt,
+        'window_closes_at' => $scheduledAt->addHours(6),
+        'status' => $status,
+        ...match ($status) {
+            'taken' => ['taken_at' => $takenAt, 'marked_at' => $takenAt],
+            'skipped' => ['marked_at' => $scheduledAt, 'skip_reason' => DoseSkipReason::Forgot],
+            default => [],
+        },
+        ...$attributes,
+    ]);
+}
+
+/**
+ * Приёмы «по необходимости» на местную дату пациента, с 9:00 каждый час.
+ */
+function asNeededDosesOn(Prescription $prescription, string $date, int $count): void
+{
+    for ($i = 0; $i < $count; $i++) {
+        AsNeededDose::factory()->for($prescription)->create([
+            'patient_id' => $prescription->patient_id,
+            'tablets' => $prescription->tablets,
+            'local_date' => $date,
+            'taken_at' => CarbonImmutable::parse($date.' 09:00', $prescription->patient->localTimezone())->addHours($i)->utc(),
+        ]);
+    }
+}
+
+/**
  * Плановые приёмы пациента по порядку: местная дата, время суток и scheduled_at в UTC — «2026-10-19 morning 2026-10-19 05:00».
  *
  * @return list<string>
@@ -211,6 +290,68 @@ function useReverbBroadcaster(int $port = 8080): void
     ]);
 
     require base_path('routes/channels.php');
+}
+
+/**
+ * Браузерный тест в реальном времени для двух пользователей: Reverb запускается прямо в контейнере
+ * тестов на том же порту, что и в собранных ассетах (VITE_REVERB_PORT), поэтому браузер подключается
+ * к нему как в окружении разработки. Остановить его нужно после теста.
+ *
+ * Тестовый сервер обрабатывает запросы в одном контейнере: вошедший пользователь и данные сессии
+ * переходили бы из запроса в запрос. Для врача и пациента в одном тесте перед каждым запросом
+ * они забываются, и сессия читается заново по cookie своего браузера.
+ */
+function startReverb(): Process
+{
+    $port = (int) env('VITE_REVERB_PORT', 8080);
+
+    $reverb = new Process(['php', 'artisan', 'reverb:start', '--host=0.0.0.0', "--port={$port}"], base_path());
+    $reverb->start();
+
+    $deadline = microtime(true) + 10;
+
+    while (@file_get_contents("http://127.0.0.1:{$port}/up") === false) {
+        if (! $reverb->isRunning() || microtime(true) > $deadline) {
+            throw new RuntimeException('Reverb не запустился: '.$reverb->getErrorOutput());
+        }
+
+        usleep(100_000);
+    }
+
+    useReverbBroadcaster($port);
+
+    Event::listen(RouteMatched::class, function () {
+        Auth::forgetGuards();
+        Session::driver()->flush();
+    });
+
+    return $reverb;
+}
+
+/**
+ * Ждёт текст на странице: событие из Reverb приходит не сразу, а assertSee проверяет один раз.
+ */
+function waitForText(mixed $page, string $text): mixed
+{
+    return $page->assertScript(sprintf(<<<'JS'
+        function () {
+            const started = Date.now();
+
+            return new Promise((resolve) => {
+                const check = () => {
+                    const found = document.body.innerText.includes(%s);
+
+                    if (found || Date.now() - started > 10000) {
+                        resolve(found);
+                    } else {
+                        setTimeout(check, 100);
+                    }
+                };
+
+                check();
+            });
+        }
+        JS, json_encode($text, JSON_UNESCAPED_UNICODE)));
 }
 
 /**

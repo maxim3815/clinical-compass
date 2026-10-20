@@ -3,9 +3,6 @@
 use App\Enums\DoseSkipReason;
 use App\Enums\PrescriptionCloseReason;
 use App\Enums\RussianTimezone;
-use App\Models\AsNeededDose;
-use App\Models\DoseEvent;
-use App\Models\DrugStrength;
 use App\Models\Prescription;
 use App\Models\User;
 use App\Support\Adherence\PatientAdherence;
@@ -32,76 +29,6 @@ function adherenceOf(User $patient): array
     $patient = $patient->fresh() ?? $patient;
 
     return PatientAdherence::present($patient, $patient->localToday());
-}
-
-/**
- * Регулярный курс врача с выбранным временем: утром 8:00 и вечером 20:00, если не задано иначе.
- *
- * @param  array<string, mixed>  $attributes
- * @param  array<string, string>  $times
- */
-function adherenceCourse(User $doctor, User $patient, DrugStrength $strength, string $startsOn, array $attributes = [], array $times = ['morning' => '08:00', 'evening' => '20:00']): Prescription
-{
-    return timedPrescription($patient, $strength, $times, [
-        'prescriber_id' => $doctor->id,
-        'starts_on' => $startsOn,
-        'effective_at' => CarbonImmutable::parse($startsOn, 'Europe/Moscow'),
-        ...$attributes,
-    ]);
-}
-
-/**
- * Версия назначения, закрытая отменой или изменением в момент UTC.
- *
- * @return array<string, mixed>
- */
-function closedAt(User $doctor, string $moment, PrescriptionCloseReason $reason = PrescriptionCloseReason::Cancelled): array
-{
-    return ['closed_at' => $moment, 'closed_by_id' => $doctor->id, 'close_reason' => $reason];
-}
-
-/**
- * Плановый приём курса на местную дату пациента: утром в 8:00, днём в 14:00, вечером в 20:00,
- * перед сном в 22:00, окно 6 часов. Принятый — в плановое время и отмечен тогда же, не принятый —
- * «Забыл» с отметкой в плановое время.
- *
- * @param  array<string, mixed>  $attributes
- */
-function adherenceDose(Prescription $prescription, string $date, string $status = 'taken', string $timeOfDay = 'morning', array $attributes = []): DoseEvent
-{
-    $time = ['morning' => '08:00', 'afternoon' => '14:00', 'evening' => '20:00', 'bedtime' => '22:00'][$timeOfDay];
-    $scheduledAt = CarbonImmutable::parse($date.' '.$time, $prescription->patient->localTimezone())->utc();
-    $takenAt = $attributes['taken_at'] ?? $scheduledAt;
-
-    return DoseEvent::factory()->for($prescription)->create([
-        'patient_id' => $prescription->patient_id,
-        'time_of_day' => $timeOfDay,
-        'local_date' => $date,
-        'scheduled_at' => $scheduledAt,
-        'window_closes_at' => $scheduledAt->addHours(6),
-        'status' => $status,
-        ...match ($status) {
-            'taken' => ['taken_at' => $takenAt, 'marked_at' => $takenAt],
-            'skipped' => ['marked_at' => $scheduledAt, 'skip_reason' => DoseSkipReason::Forgot],
-            default => [],
-        },
-        ...$attributes,
-    ]);
-}
-
-/**
- * Приёмы «по необходимости» на местную дату пациента, с 9:00 каждый час.
- */
-function asNeededDosesOn(Prescription $prescription, string $date, int $count): void
-{
-    for ($i = 0; $i < $count; $i++) {
-        AsNeededDose::factory()->for($prescription)->create([
-            'patient_id' => $prescription->patient_id,
-            'tablets' => $prescription->tablets,
-            'local_date' => $date,
-            'taken_at' => CarbonImmutable::parse($date.' 09:00', $prescription->patient->localTimezone())->addHours($i)->utc(),
-        ]);
-    }
 }
 
 test('a changed prescription continues the course, a new prescription after cancellation starts another', function () {
