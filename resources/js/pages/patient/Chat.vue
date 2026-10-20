@@ -34,7 +34,7 @@ defineOptions({
 
     <div class="flex max-w-2xl flex-col gap-4 p-4">
         <div
-            class="flex items-start gap-3 rounded-lg border border-amber-500/50 bg-amber-50 p-3 text-sm dark:bg-amber-950/30"
+            class="flex items-start gap-3 rounded-lg border border-amber-500/50 bg-amber-50 p-3 text-sm"
             role="note"
             data-test="emergency-note"
         >

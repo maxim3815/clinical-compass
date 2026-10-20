@@ -49,11 +49,10 @@ test('name is required and the error is in russian', function () {
         ->assertRedirect(route('profile.edit'));
 });
 
-test('appearance page is displayed', function () {
+test('settings have no appearance page, the theme is always light', function () {
     $this->actingAs(User::factory()->create())
-        ->get(route('appearance.edit'))
-        ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page->component('settings/Appearance'));
+        ->get('/settings/appearance')
+        ->assertNotFound();
 });
 
 test('patient profile page has the birth date and the russian timezones', function () {

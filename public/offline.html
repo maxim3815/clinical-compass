@@ -5,40 +5,14 @@
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Нет подключения — Клинический компас</title>
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-        <meta
-            name="theme-color"
-            content="#ffffff"
-            media="(prefers-color-scheme: light)"
-        />
-        <meta
-            name="theme-color"
-            content="#0a0a0a"
-            media="(prefers-color-scheme: dark)"
-        />
+        <meta name="color-scheme" content="only light" />
+        <meta name="theme-color" content="#ffffff" />
 
         <!--
             Страницу показывает service worker, когда без сети не открылась страница приложения.
-            Она лежит в кэше устройства, поэтому всё нужное — внутри файла. Тема та же,
-            что выбрана в настройках оформления приложения.
+            Она лежит в кэше устройства, поэтому всё нужное — внутри файла. Тема, как и в
+            приложении, только светлая.
         -->
-        <script>
-            (function () {
-                var appearance = null;
-
-                try {
-                    appearance = localStorage.getItem('appearance');
-                } catch (error) {}
-
-                if (
-                    appearance === 'dark' ||
-                    (appearance !== 'light' &&
-                        window.matchMedia('(prefers-color-scheme: dark)')
-                            .matches)
-                ) {
-                    document.documentElement.classList.add('dark');
-                }
-            })();
-        </script>
 
         <style>
             :root {
@@ -49,16 +23,6 @@
                 --primary: #171717;
                 --primary-foreground: #fafafa;
                 --ring: #a3a3a3;
-            }
-
-            :root.dark {
-                color-scheme: dark;
-                --background: #0a0a0a;
-                --foreground: #fafafa;
-                --muted-foreground: #a3a3a3;
-                --primary: #fafafa;
-                --primary-foreground: #171717;
-                --ring: #737373;
             }
 
             * {

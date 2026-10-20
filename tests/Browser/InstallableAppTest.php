@@ -190,7 +190,7 @@ test('doctor sees neither the banner nor the app section of settings', function 
     offerInstall($page)->assertMissing('[data-test="install-banner"]');
 
     $page->navigate(route('profile.edit'))
-        ->assertSee('Профиль, пароль и оформление')
+        ->assertSee('Профиль и пароль')
         ->assertNotPresent('[href$="/settings/app"]')
         ->assertNoJavaScriptErrors();
 });

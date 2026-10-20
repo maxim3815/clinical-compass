@@ -40,7 +40,7 @@ async function copyLink(): Promise<void> {
 
 <template>
     <div
-        class="flex flex-col gap-3 rounded-lg border border-green-600/40 bg-green-50 p-4 dark:bg-green-950/30"
+        class="flex flex-col gap-3 rounded-lg border border-green-600/40 bg-green-50 p-4"
     >
         <p class="text-sm font-medium">
             <slot />

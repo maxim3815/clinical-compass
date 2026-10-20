@@ -22,12 +22,12 @@ const results: { result: DoseDayResult; label: string; class: string }[] = [
     {
         result: 'late',
         label: 'все, часть поздно',
-        class: 'bg-emerald-200 text-emerald-950 dark:bg-emerald-300 dark:text-emerald-950',
+        class: 'bg-emerald-200 text-emerald-950',
     },
     {
         result: 'partial',
         label: 'часть не принята',
-        class: 'bg-amber-300 text-amber-950 dark:bg-amber-500 dark:text-amber-950',
+        class: 'bg-amber-300 text-amber-950',
     },
     {
         result: 'none',
@@ -84,7 +84,7 @@ function asNeededClass(day: AsNeededDay): string {
     }
 
     return day.count > 0
-        ? 'bg-sky-200 text-sky-950 dark:bg-sky-800 dark:text-sky-50'
+        ? 'bg-sky-200 text-sky-950'
         : 'bg-muted text-muted-foreground';
 }
 </script>

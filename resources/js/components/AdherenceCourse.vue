@@ -75,7 +75,7 @@ function counts(period: RegularPeriod): string[] {
         <template v-if="open">
             <p
                 v-if="course.missing_times"
-                class="flex items-start gap-2 rounded-md bg-amber-100 p-2 text-sm text-amber-950 dark:bg-amber-950 dark:text-amber-100"
+                class="flex items-start gap-2 rounded-md bg-amber-100 p-2 text-sm text-amber-950"
                 data-test="adherence-missing-times"
             >
                 <TriangleAlert class="mt-0.5 size-4 shrink-0" />

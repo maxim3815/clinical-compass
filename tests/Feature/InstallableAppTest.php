@@ -50,7 +50,7 @@ test('home screen icon on iphone is 180 pixels', function () {
         ->and([$image[0], $image[1]])->toBe([180, 180]);
 });
 
-test('pages link the manifest and color the status bar for both themes', function (?string $role) {
+test('pages link the manifest and keep the light theme with a white status bar', function (?string $role) {
     if ($role !== null) {
         $this->actingAs(User::factory()->{$role}()->create());
     }
@@ -59,8 +59,9 @@ test('pages link the manifest and color the status bar for both themes', functio
         ->assertOk()
         ->assertSee('<link rel="manifest" href="/manifest.webmanifest">', false)
         ->assertSee('<meta name="apple-mobile-web-app-title" content="Компас">', false)
-        ->assertSee('<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">', false)
-        ->assertSee('<meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">', false);
+        ->assertSee('<meta name="color-scheme" content="only light">', false)
+        ->assertSee('<meta name="theme-color" content="#ffffff">', false)
+        ->assertDontSee('prefers-color-scheme', false);
 })->with([
     'guest' => null,
     'patient' => 'patient',
@@ -76,6 +77,10 @@ test('offline page needs nothing from the network and tells how to mark a dose l
         // Стили и скрипт внутри файла, картинка — иконка из предкэша service worker.
         ->not->toMatch('/<script[^>]+src=/')
         ->not->toContain('rel="stylesheet"')
+        // Тема только светлая, как в приложении.
+        ->toContain('<meta name="color-scheme" content="only light" />')
+        ->toContain('<meta name="theme-color" content="#ffffff" />')
+        ->not->toContain('prefers-color-scheme')
         ->and(preg_match_all('/<img[^>]+src="([^"]+)"/', $html, $images))->toBe(1)
         ->and($images[1])->toBe(['/favicon.svg']);
 });
