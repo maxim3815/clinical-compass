@@ -204,3 +204,82 @@ make npm c="run build"
 1. В `.env` поставьте `XDEBUG=true` и выполните `make build`, затем `make up`.
 2. Задайте режим, например `XDEBUG_MODE=debug`, и снова выполните `make up`.
 3. Отладка включается триггером (`XDEBUG_TRIGGER` или расширение браузера), клиент на порту 9003. Для PhpStorm имя сервера `clinical-compass`, путь в контейнере `/var/www/html`.
+
+## Продакшен
+
+Для сервера есть отдельное окружение `compose.prod.yaml`. Код, зависимости и собранные ассеты лежат внутри образов, поэтому на сервер нужны только `compose.prod.yaml` и `.env`. HTTPS обеспечивает прокси перед приложением (например, nginx хоста): service worker и установка приложения на телефон работают только по HTTPS.
+
+| Сервис                         | Образ                    | Что делает                                                                                                                                |
+| ------------------------------ | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `nginx`                        | `clinical-compass/nginx` | Отдаёт статику из образа, передаёт PHP-запросы в `php`, WebSocket — в `reverb`. Единственный опубликованный порт: `127.0.0.1:${APP_PORT}` |
+| `php`                          | `clinical-compass/php`   | php-fpm с `php.ini-production` и opcache, процессы запускаются по запросу (не больше 5)                                                   |
+| `queue`, `scheduler`, `reverb` | `clinical-compass/php`   | Очередь (`queue:work`), планировщик и Reverb                                                                                              |
+| `ssr`                          | `clinical-compass/ssr`   | Серверная отрисовка страниц на Node. Если сервис недоступен, страницы рисуются в браузере                                                 |
+| `postgres`                     | `postgres:18.6-trixie`   | Данные в `./data/postgres` рядом с `compose.prod.yaml`                                                                                    |
+
+Образы собираются из stages `prod`, `prod-nginx` и `prod-ssr` файла `docker/php/Dockerfile`: Composer ставит пакеты без dev-зависимостей, фронтенд и серверная сборка собираются внутри Docker. Контейнеры на образе `php` при запуске выполняют `php artisan optimize`, поэтому кэш конфигурации всегда собран из их переменных окружения. Лимиты памяти в `compose.prod.yaml` рассчитаны на сервер с 2 ГБ памяти.
+
+Прокси должен передавать заголовки `Host`, `X-Forwarded-For`, `X-Forwarded-Proto`, а для WebSocket ещё `Upgrade` и `Connection`. Приложение верит заголовкам `X-Forwarded-*` от адресов частных сетей (`bootstrap/app.php`), поэтому видит https и настоящий адрес клиента. Пример для nginx:
+
+```nginx
+map $http_upgrade $connection_upgrade { default upgrade; '' close; }
+
+location / {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+}
+```
+
+### Настройки
+
+`.env` рядом с `compose.prod.yaml` читают и compose, и все контейнеры на образе `php`. За основу берётся `.env.example`, отличия:
+
+| Переменная                                           | Значение                                          |
+| ---------------------------------------------------- | ------------------------------------------------- |
+| `APP_ENV`, `APP_DEBUG`                               | `production`, `false`                             |
+| `APP_URL`                                            | Адрес приложения с `https://`                     |
+| `APP_KEY`                                            | Свой ключ: `make artisan c="key:generate --show"` |
+| `DB_PASSWORD`, `REVERB_APP_KEY`, `REVERB_APP_SECRET` | Свои значения                                     |
+| `SESSION_SECURE_COOKIE`                              | `true`                                            |
+| `LOG_CHANNEL`                                        | `stderr`: логи видны в `docker compose logs`      |
+| `IMAGE_TAG`                                          | Тег образов, по умолчанию `latest`                |
+
+Переменные `VITE_*` нужны только при сборке: адрес Reverb для браузера вшивается в скрипты. Для сервера с HTTPS это домен в `VITE_REVERB_HOST`, `VITE_REVERB_PORT=443`, `VITE_REVERB_SCHEME=https` и `VITE_REVERB_APP_KEY`, равный `REVERB_APP_KEY`. После их изменения образы нужно пересобрать.
+
+### Сборка и запуск
+
+Сборка в репозитории. Переменные берутся из окружения или из `.env`; под процессор сервера, отличный от вашего, добавьте `DOCKER_DEFAULT_PLATFORM=linux/amd64`:
+
+```sh
+IMAGE_TAG=$(git rev-parse --short HEAD) \
+  VITE_REVERB_HOST=example.org VITE_REVERB_PORT=443 VITE_REVERB_SCHEME=https \
+  docker compose -f compose.prod.yaml build
+```
+
+Образы попадают на сервер через реестр или без него:
+
+```sh
+docker save clinical-compass/php:<тег> clinical-compass/nginx:<тег> clinical-compass/ssr:<тег> | gzip | ssh <сервер> 'docker load'
+```
+
+Запуск на сервере, в каталоге с `compose.prod.yaml` и `.env`:
+
+```sh
+docker compose -f compose.prod.yaml run --rm php php artisan migrate --force
+docker compose -f compose.prod.yaml up -d --wait
+docker compose -f compose.prod.yaml exec php php artisan app:drugs:import
+docker compose -f compose.prod.yaml exec php php artisan app:doctor:create
+```
+
+Демо-пользователей из раздела «Демо-доступ» на сервере создаёт `exec php php artisan db:seed --class=DemoSeeder --force`. Пароль у них общий и известный, поэтому так стоит делать только на стенде для показа.
+
+Перед обновлением сделайте дамп базы:
+
+```sh
+docker compose -f compose.prod.yaml exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > backup.dump
+```
