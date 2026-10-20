@@ -32,7 +32,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->web(append: [
             HandleInertiaRequests::class,
-            AddLinkHeadersForPreloadedAssets::class,
+            // Шрифты, стили и общие скрипты. Ссылки на все чанки страницы есть в HTML, а в
+            // заголовке они не помещаются в буфер прокси: nginx отвечает 502.
+            AddLinkHeadersForPreloadedAssets::using(8),
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
