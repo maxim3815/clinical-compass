@@ -51,6 +51,13 @@ useRealtime<{ count: number }>(
     (event) => router.replaceProp('unreadMessages', event.count),
 );
 
+// Счётчик сигналов о приверженности у врача обновляется так же.
+useRealtime<{ count: number }>(
+    `App.Models.User.${page.props.auth.user.id}`,
+    'adherence.changed',
+    (event) => router.replaceProp('adherenceSignals', event.count),
+);
+
 // Диалог с пациентом относится к «Сообщениям», а не к «Пациентам».
 const isDoctorChat = computed(() =>
     /^\/doctor\/patients\/\d+\/chat$/.test(currentUrl.value),
@@ -74,6 +81,8 @@ const mainNavItems = computed<NavItem[]>(() =>
                   // Карточка пациента тоже относится к разделу.
                   isActive:
                       isCurrentOrParentUrl(patients()) && !isDoctorChat.value,
+                  badge: page.props.adherenceSignals,
+                  badgeLabel: 'с новыми пропусками приёма',
               },
               {
                   title: 'Сообщения',

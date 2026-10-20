@@ -131,3 +131,18 @@ export type AsNeededCourse = CourseBase & {
 };
 
 export type AdherenceCourse = RegularCourse | AsNeededCourse;
+
+/**
+ * Сигнал о приверженности по регулярным назначениям врача, как его отдаёт
+ * `App\Support\Adherence\AdherenceSignal`. Пороги — на сервере.
+ */
+export type AdherenceSignal = {
+    // Доля принятых за последние 7 дней или null, если учтённых приёмов нет.
+    share: number | null;
+    // Доля ниже порога.
+    low_share: boolean;
+    // Непринятые подряд в конце курса, только если их не меньше порога.
+    consecutive_misses: number | null;
+    // Сработало хотя бы одно условие.
+    raised: boolean;
+};

@@ -1,26 +1,33 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
-import { Search, UserPlus } from '@lucide/vue';
-import { ref } from 'vue';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { ArrowDown, ArrowUp, ArrowUpDown, Search, UserPlus } from '@lucide/vue';
+import { computed, ref } from 'vue';
+import AdherenceSignal from '@/components/AdherenceSignal.vue';
 import Heading from '@/components/Heading.vue';
 import ListPagination from '@/components/ListPagination.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useRealtime } from '@/composables/useRealtime';
 import { formatAge } from '@/lib/plural';
 import { index as invitations } from '@/routes/doctor/invitations';
 import { index, show } from '@/routes/doctor/patients';
-import type { Paginated } from '@/types';
+import type { AdherenceSignal as Signal, Paginated } from '@/types';
 
 type PatientRow = {
     id: number;
     name: string;
     age: number | null;
     started_at: string;
+    adherence: Signal;
 };
+
+// По доле за 7 дней: сначала самые низкие или самые высокие. null — по ФИО.
+type Sort = 'adherence' | '-adherence' | null;
 
 const props = defineProps<{
     patients: Paginated<PatientRow>;
     search: string;
+    sort: Sort;
 }>();
 
 defineOptions({
@@ -34,16 +41,45 @@ defineOptions({
     },
 });
 
+const page = usePage();
 const query = ref(props.search);
+
+// Сортировка сохраняет поиск, а поиск — сортировку.
+const sorted = (sort: Sort) =>
+    index({ query: { search: props.search || undefined, sort } });
+
+const byName = computed(() => sorted(null));
+const byAdherence = computed(() =>
+    sorted(props.sort === 'adherence' ? '-adherence' : 'adherence'),
+);
+
+const adherenceAriaSort = computed(() =>
+    props.sort === 'adherence'
+        ? 'ascending'
+        : props.sort === '-adherence'
+          ? 'descending'
+          : undefined,
+);
 
 function submit(): void {
     const search = query.value.trim();
 
-    router.get(index.url(), search ? { search } : {}, {
-        preserveState: true,
-        replace: true,
-    });
+    router.get(
+        index.url(),
+        { search: search || undefined, sort: props.sort ?? undefined },
+        {
+            preserveState: true,
+            replace: true,
+        },
+    );
 }
+
+// Пациент отметил приём или scheduler отметил пропуск: доли и сигналы в строках меняются.
+useRealtime(
+    `App.Models.User.${page.props.auth.user.id}`,
+    'adherence.changed',
+    () => router.reload({ only: ['patients'] }),
+);
 </script>
 
 <template>
@@ -104,7 +140,47 @@ function submit(): void {
                 <table class="w-full text-left text-sm">
                     <thead class="bg-muted/50 text-muted-foreground">
                         <tr>
-                            <th class="px-3 py-2 font-medium">ФИО</th>
+                            <th
+                                class="px-3 py-2 font-medium"
+                                :aria-sort="
+                                    sort === null ? 'ascending' : undefined
+                                "
+                            >
+                                <Link
+                                    :href="byName"
+                                    preserve-scroll
+                                    class="inline-flex items-center gap-1 hover:text-foreground"
+                                    data-test="sort-name"
+                                >
+                                    ФИО
+                                    <ArrowUp
+                                        v-if="sort === null"
+                                        class="size-3.5"
+                                    />
+                                </Link>
+                            </th>
+                            <th
+                                class="px-3 py-2 font-medium"
+                                :aria-sort="adherenceAriaSort"
+                            >
+                                <Link
+                                    :href="byAdherence"
+                                    preserve-scroll
+                                    class="inline-flex items-center gap-1 whitespace-nowrap hover:text-foreground"
+                                    data-test="sort-adherence"
+                                >
+                                    Приём за 7 дней
+                                    <ArrowUp
+                                        v-if="sort === 'adherence'"
+                                        class="size-3.5"
+                                    />
+                                    <ArrowDown
+                                        v-else-if="sort === '-adherence'"
+                                        class="size-3.5"
+                                    />
+                                    <ArrowUpDown v-else class="size-3.5" />
+                                </Link>
+                            </th>
                             <th class="px-3 py-2 font-medium">Возраст</th>
                             <th class="px-3 py-2 font-medium">
                                 Под наблюдением с
@@ -116,7 +192,11 @@ function submit(): void {
                             v-for="patient in patients.data"
                             :key="patient.id"
                             class="border-t"
+                            :class="{
+                                'bg-destructive/5': patient.adherence.raised,
+                            }"
                             data-test="patient-row"
+                            :data-signal="patient.adherence.raised || undefined"
                         >
                             <td class="px-3 py-2">
                                 <Link
@@ -125,6 +205,9 @@ function submit(): void {
                                 >
                                     {{ patient.name }}
                                 </Link>
+                            </td>
+                            <td class="px-3 py-2">
+                                <AdherenceSignal :signal="patient.adherence" />
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap">
                                 {{

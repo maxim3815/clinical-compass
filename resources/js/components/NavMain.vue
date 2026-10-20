@@ -32,7 +32,8 @@ const { isCurrentUrl } = useCurrentUrl();
                         <component :is="item.icon" />
                         <span>{{ item.title }}</span>
                         <span v-if="item.badge" class="sr-only">
-                            (непрочитанных: {{ item.badge }})
+                            ({{ item.badgeLabel ?? 'непрочитанных' }}:
+                            {{ item.badge }})
                         </span>
                     </Link>
                 </SidebarMenuButton>

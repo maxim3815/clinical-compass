@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Enums\UserRole;
+use App\Support\Adherence\AdherenceSignals;
 use App\Support\UnreadMessages;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -44,6 +46,8 @@ class HandleInertiaRequests extends Middleware
             ],
             // Счётчик в пункте меню чата. Дальше его обновляют события в реальном времени.
             'unreadMessages' => fn (): int => $request->user() === null ? 0 : UnreadMessages::count($request->user()),
+            // Счётчик у пункта меню «Пациенты» есть только у врача.
+            'adherenceSignals' => fn (): int => $request->user()?->role === UserRole::Doctor ? AdherenceSignals::count($request->user()) : 0,
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
     }

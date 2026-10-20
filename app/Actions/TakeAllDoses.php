@@ -4,6 +4,7 @@ namespace App\Actions;
 
 use App\Actions\Concerns\MarksDoses;
 use App\Enums\DoseEventStatus;
+use App\Events\AdherenceSignalsChanged;
 use App\Exceptions\DoseNotMarkable;
 use App\Models\DoseEvent;
 use App\Models\User;
@@ -44,6 +45,10 @@ class TakeAllDoses
                     'marked_at' => $now,
                 ]);
                 $marked++;
+            }
+
+            if ($marked > 0) {
+                AdherenceSignalsChanged::dispatchForDoctorOf($patient);
             }
 
             return $marked;

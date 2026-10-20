@@ -4,13 +4,17 @@ namespace App\Http\Controllers\Doctor;
 
 use App\Enums\PrescriptionCancelReason;
 use App\Enums\PrescriptionSource;
+use App\Events\AdherenceSignalsChanged;
 use App\Http\Controllers\Controller;
 use App\Models\CareRelationship;
 use App\Models\Prescription;
 use App\Models\User;
+use App\Support\Adherence\AdherenceSignal;
+use App\Support\Adherence\AdherenceSignals;
 use App\Support\Adherence\PatientAdherence;
 use App\Support\DisplayTime;
 use App\Support\PrescriptionPresenter;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -24,6 +28,9 @@ class PatientController extends Controller
     public function index(Request $request): Response
     {
         $search = trim($request->string('search')->toString());
+        // По доле принятых за 7 дней: adherence — сначала самые низкие, -adherence — самые высокие.
+        $sort = $request->string('sort')->toString();
+        $sort = in_array($sort, ['adherence', '-adherence'], true) ? $sort : null;
 
         // Список строим от связей, а не от patients(): так дата начала наблюдения
         // приходит типизированной моделью, а не строкой из pivot.
@@ -32,22 +39,28 @@ class PatientController extends Controller
             ->where('doctor_id', $request->user()?->id)
             ->join('users', 'users.id', '=', 'care_relationships.patient_id')
             ->when($search !== '', fn (Builder $query) => $query->whereLike('users.name', '%'.self::escapeLike($search).'%'))
+            ->select('care_relationships.*')
+            ->selectSub(AdherenceSignals::shareQuery('care_relationships.patient_id'), 'adherence_share')
+            // Пациенты без доли — в конце при любом направлении.
+            ->when($sort !== null, fn (Builder $query) => $query->orderByRaw('adherence_share '.($sort === 'adherence' ? 'asc' : 'desc').' nulls last'))
             ->orderBy('users.name')
             ->orderBy('users.id')
-            ->select('care_relationships.*')
             ->with('patient.patientProfile')
             ->paginate(self::PER_PAGE)
-            ->withQueryString()
-            ->through(fn (CareRelationship $care): array => [
+            ->withQueryString();
+
+        $misses = AdherenceSignals::consecutiveMisses($patients->getCollection()->map(fn (CareRelationship $care): User => $care->patient));
+
+        return Inertia::render('doctor/patients/Index', [
+            'patients' => $patients->through(fn (CareRelationship $care): array => [
                 'id' => $care->patient->id,
                 'name' => $care->patient->name,
                 'age' => $care->patient->patientProfile?->age(),
                 'started_at' => DisplayTime::formatDate($care->started_at),
-            ]);
-
-        return Inertia::render('doctor/patients/Index', [
-            'patients' => $patients,
+                'adherence' => (new AdherenceSignal($care->adherence_share, $misses[$care->patient_id] ?? 0))->toArray(),
+            ]),
             'search' => $search,
+            'sort' => $sort,
         ]);
     }
 
@@ -55,11 +68,18 @@ class PatientController extends Controller
     {
         Gate::authorize('view', $patient);
 
+        /** @var User $doctor */
+        $doctor = $request->user();
+
         $care = CareRelationship::query()
             ->active()
-            ->where('doctor_id', $request->user()?->id)
+            ->where('doctor_id', $doctor->id)
             ->where('patient_id', $patient->id)
             ->sole();
+
+        // Врач видит пропуски пациента: счётчик у пункта меню «Пациенты» их больше не считает.
+        $care->update(['adherence_seen_at' => CarbonImmutable::now()]);
+        AdherenceSignalsChanged::dispatch($doctor);
 
         $profile = $patient->patientProfile;
         $today = $patient->localToday();
@@ -98,6 +118,7 @@ class PatientController extends Controller
                 ->map(fn (Prescription $prescription): array => PrescriptionPresenter::present($prescription, $today))
                 ->values(),
             'adherence' => PatientAdherence::present($patient, $today),
+            'adherenceSignal' => AdherenceSignals::forPatient($patient)->toArray(),
             'cancelReasons' => PrescriptionCancelReason::options(),
         ]);
     }

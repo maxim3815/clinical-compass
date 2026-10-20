@@ -5,6 +5,7 @@ import { computed, ref } from 'vue';
 import PasswordResetLinkController from '@/actions/App/Http/Controllers/Doctor/PasswordResetLinkController';
 import PrescriptionController from '@/actions/App/Http/Controllers/Doctor/PrescriptionController';
 import AdherenceCourse from '@/components/AdherenceCourse.vue';
+import AdherenceSignal from '@/components/AdherenceSignal.vue';
 import CancelPrescriptionDialog from '@/components/CancelPrescriptionDialog.vue';
 import Heading from '@/components/Heading.vue';
 import OneTimeLink from '@/components/OneTimeLink.vue';
@@ -13,7 +14,12 @@ import { Button } from '@/components/ui/button';
 import { formatAge } from '@/lib/plural';
 import { index, show } from '@/routes/doctor/patients';
 import { show as chat } from '@/routes/doctor/patients/chat';
-import type { Adherence, Prescription, SelectOption } from '@/types';
+import type {
+    Adherence,
+    AdherenceSignal as Signal,
+    Prescription,
+    SelectOption,
+} from '@/types';
 
 type Patient = {
     id: number;
@@ -31,6 +37,7 @@ const props = defineProps<{
     ownMedications: Prescription[];
     prescriptionHistory: Prescription[];
     adherence: Adherence;
+    adherenceSignal: Signal;
     cancelReasons: SelectOption[];
 }>();
 
@@ -176,6 +183,14 @@ const details = computed(() => [
                 title="Приём препаратов"
                 description="Доля принятых приёмов по контрольным периодам курса: дни 1–7, 8–14, 15–28, дальше каждые 28 дней."
             />
+
+            <p
+                v-if="adherenceSignal.raised"
+                class="text-sm"
+                data-test="adherence-signal"
+            >
+                <AdherenceSignal :signal="adherenceSignal" card />
+            </p>
 
             <p
                 v-if="adherence.timezone"

@@ -21,13 +21,15 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property int $patient_id
  * @property CarbonImmutable $started_at
  * @property CarbonImmutable|null $ended_at
+ * @property CarbonImmutable|null $adherence_seen_at Когда врач последний раз открывал карточку пациента.
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  * @property-read User $doctor
  * @property-read User $patient
  * @property-read Message|null $latestMessage
+ * @property-read int|null $adherence_share Доля принятых за последние дни, если выбрана подзапросом AdherenceSignals::shareQuery().
  */
-#[Fillable(['doctor_id', 'patient_id', 'started_at', 'ended_at'])]
+#[Fillable(['doctor_id', 'patient_id', 'started_at', 'ended_at', 'adherence_seen_at'])]
 class CareRelationship extends Model
 {
     /** @use HasFactory<CareRelationshipFactory> */
@@ -105,6 +107,7 @@ class CareRelationship extends Model
         return [
             'started_at' => 'datetime',
             'ended_at' => 'datetime',
+            'adherence_seen_at' => 'datetime',
         ];
     }
 }
