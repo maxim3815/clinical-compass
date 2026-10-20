@@ -8,6 +8,8 @@ import type { Dose, DoseGroup } from '@/types';
 
 const props = defineProps<{
     group: DoseGroup;
+    // Пациент пришёл из напоминания об этих приёмах.
+    highlighted?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -35,8 +37,10 @@ function takeAll(): void {
 
 <template>
     <article
-        class="flex flex-col gap-3 rounded-lg border p-4"
+        class="flex scroll-mt-4 flex-col gap-3 rounded-lg border p-4"
+        :class="{ 'border-primary ring-2 ring-primary/30': highlighted }"
         data-test="dose-group"
+        :data-highlighted="highlighted ? 'true' : undefined"
     >
         <header class="flex items-center justify-between gap-2">
             <h3 class="text-lg font-semibold">{{ group.time }}</h3>

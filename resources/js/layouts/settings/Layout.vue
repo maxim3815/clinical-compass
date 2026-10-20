@@ -7,6 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
 import { toUrl } from '@/lib/utils';
 import { edit as editApp } from '@/routes/app';
+import { edit as editNotifications } from '@/routes/notifications';
 import { edit as editPassword } from '@/routes/password';
 import { edit as editProfile } from '@/routes/profile';
 import type { NavItem } from '@/types';
@@ -23,6 +24,10 @@ const sidebarNavItems = computed<NavItem[]>(() => [
     {
         title: 'Пароль',
         href: editPassword(),
+    },
+    {
+        title: 'Уведомления',
+        href: editNotifications(),
     },
     // Установка приложения на телефон нужна только пациенту.
     ...(isPatient.value
@@ -43,7 +48,9 @@ const { isCurrentOrParentUrl } = useCurrentUrl();
         <Heading
             title="Настройки"
             :description="
-                isPatient ? 'Профиль, пароль и приложение' : 'Профиль и пароль'
+                isPatient
+                    ? 'Профиль, пароль, уведомления и приложение'
+                    : 'Профиль, пароль и уведомления'
             "
         />
 

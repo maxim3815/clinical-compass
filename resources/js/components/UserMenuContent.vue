@@ -8,6 +8,7 @@ import {
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import UserInfo from '@/components/UserInfo.vue';
+import { unsubscribeBeforeLogout } from '@/lib/push';
 import { logout } from '@/routes';
 import { edit } from '@/routes/profile';
 import type { User } from '@/types';
@@ -16,9 +17,13 @@ type Props = {
     user: User;
 };
 
-const handleLogout = () => {
+// Сначала снимаем подписку на пуши этого браузера: на общем устройстве уведомления
+// не должны приходить прежнему пользователю.
+async function handleLogout(): Promise<void> {
+    await unsubscribeBeforeLogout();
     router.flushAll();
-};
+    router.visit(logout());
+}
 
 defineProps<Props>();
 </script>
@@ -39,16 +44,12 @@ defineProps<Props>();
         </DropdownMenuItem>
     </DropdownMenuGroup>
     <DropdownMenuSeparator />
-    <DropdownMenuItem :as-child="true">
-        <Link
-            class="block w-full cursor-pointer"
-            :href="logout()"
-            @click="handleLogout"
-            as="button"
-            data-test="logout-button"
-        >
-            <LogOut class="mr-2 h-4 w-4" />
-            Выйти
-        </Link>
+    <DropdownMenuItem
+        class="w-full cursor-pointer"
+        data-test="logout-button"
+        @select="handleLogout"
+    >
+        <LogOut class="mr-2 h-4 w-4" />
+        Выйти
     </DropdownMenuItem>
 </template>

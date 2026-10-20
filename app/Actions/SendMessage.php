@@ -7,6 +7,7 @@ use App\Events\UnreadMessagesChanged;
 use App\Models\CareRelationship;
 use App\Models\Message;
 use App\Models\User;
+use App\Notifications\NewMessage;
 use InvalidArgumentException;
 
 /**
@@ -30,6 +31,11 @@ class SendMessage
 
         MessageSent::dispatch($message);
         UnreadMessagesChanged::dispatch($recipient);
+
+        // Пуш уйдёт, только если собеседник не прочитает сообщение в открытом чате.
+        if ($recipient->pushSubscriptions()->exists()) {
+            $recipient->notify(new NewMessage($message));
+        }
 
         return $message;
     }

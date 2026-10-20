@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import { Clock, Stethoscope } from '@lucide/vue';
-import { computed, ref } from 'vue';
+import { computed, nextTick, onMounted, ref } from 'vue';
 import IntakeTimeController from '@/actions/App/Http/Controllers/Patient/IntakeTimeController';
 import AsNeededCard from '@/components/AsNeededCard.vue';
 import DoseGroupCard from '@/components/DoseGroupCard.vue';
 import DoseMarkDialog from '@/components/DoseMarkDialog.vue';
 import InstallAppBanner from '@/components/InstallAppBanner.vue';
+import PushBanner from '@/components/PushBanner.vue';
 import { Button } from '@/components/ui/button';
 import { home } from '@/routes/patient';
 import type { AsNeeded, Dose, DoseGroup, SelectOption } from '@/types';
@@ -65,6 +66,31 @@ function openMark(dose: Dose, status: 'taken' | 'skipped'): void {
     markStatus.value = status;
     markedDose.value = dose;
 }
+
+// Переход из напоминания (`?doses=12,13`): карточка с этими приёмами выделена и на экране.
+const highlighted = ref<number[]>([]);
+
+function isHighlighted(group: DoseGroup): boolean {
+    return group.doses.some((dose) => highlighted.value.includes(dose.id));
+}
+
+onMounted(async () => {
+    highlighted.value = (
+        new URLSearchParams(window.location.search).get('doses') ?? ''
+    )
+        .split(',')
+        .map(Number)
+        .filter((id) => id > 0);
+
+    if (highlighted.value.length === 0) {
+        return;
+    }
+
+    await nextTick();
+    document
+        .querySelector('[data-test="dose-group"][data-highlighted="true"]')
+        ?.scrollIntoView({ block: 'center' });
+});
 </script>
 
 <template>
@@ -74,6 +100,8 @@ function openMark(dose: Dose, status: 'taken' | 'skipped'): void {
         <h1 class="text-xl font-semibold">Здравствуйте, {{ greetingName }}!</h1>
 
         <InstallAppBanner />
+
+        <PushBanner />
 
         <section
             v-for="prescription in timeSetup"
@@ -121,6 +149,7 @@ function openMark(dose: Dose, status: 'taken' | 'skipped'): void {
                 v-for="group in today.groups"
                 :key="group.time"
                 :group="group"
+                :highlighted="isHighlighted(group)"
                 @mark="openMark"
             />
         </section>
@@ -142,6 +171,7 @@ function openMark(dose: Dose, status: 'taken' | 'skipped'): void {
                 v-for="group in yesterday.groups"
                 :key="group.time"
                 :group="group"
+                :highlighted="isHighlighted(group)"
                 @mark="openMark"
             />
         </section>

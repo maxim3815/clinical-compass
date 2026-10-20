@@ -12,3 +12,5 @@ Artisan::command('inspire', function () {
 // а раз в час досоздаются приёмы на новый день.
 Schedule::command('app:dose-events:sync')->hourly()->withoutOverlapping();
 Schedule::command('app:dose-events:mark-missed')->everyMinute();
+// Напоминания о приёме пушем. Сами пуши отправляет очередь.
+Schedule::command('app:dose-events:send-reminders')->everyMinute()->withoutOverlapping();

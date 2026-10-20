@@ -25,6 +25,8 @@ declare module '@inertiajs/core' {
             unreadMessages: number;
             // У врача — пациенты с сигналом о приверженности и новыми пропусками, у пациента 0.
             adherenceSignals: number;
+            // Открытый ключ VAPID для подписки на пуши. У гостя null.
+            vapidPublicKey: string | null;
             [key: string]: unknown;
         };
         flashDataType: {

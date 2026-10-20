@@ -17,6 +17,7 @@ use App\Http\Controllers\Patient\HomeController as PatientHomeController;
 use App\Http\Controllers\Patient\IntakeTimeController;
 use App\Http\Controllers\Patient\MedicationController;
 use App\Http\Controllers\Patient\OwnMedicationController;
+use App\Http\Controllers\PushDoseController;
 use App\Models\Drug;
 use Illuminate\Support\Facades\Route;
 
@@ -31,6 +32,13 @@ Route::middleware('throttle:access-link')->group(function () {
 
     Route::get('password-reset/{token}', [PasswordResetByLinkController::class, 'show'])->name('password-reset.show');
     Route::post('password-reset/{token}', [PasswordResetByLinkController::class, 'store'])->name('password-reset.store');
+});
+
+// Кнопки «Принял» и «Через 15 минут» в напоминании. Service worker отправляет их без сессии
+// и CSRF-токена, доступ — по подписанной ссылке из самого пуша.
+Route::middleware(['signed:relative', 'throttle:30,1'])->prefix('push/doses')->name('push.doses.')->group(function () {
+    Route::post('take', [PushDoseController::class, 'take'])->name('take');
+    Route::post('snooze', [PushDoseController::class, 'snooze'])->name('snooze');
 });
 
 Route::middleware('auth')->group(function () {

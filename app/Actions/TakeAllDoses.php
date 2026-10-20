@@ -43,6 +43,7 @@ class TakeAllDoses
                     'status' => DoseEventStatus::Taken,
                     'taken_at' => $now,
                     'marked_at' => $now,
+                    'snoozed_until' => null,
                 ]);
                 $marked++;
             }

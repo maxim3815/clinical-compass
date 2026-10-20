@@ -53,6 +53,8 @@ export default defineConfig({
                     'apple-touch-icon.png',
                     'pwa-*.png',
                     'maskable-icon-*.png',
+                    // Значок уведомлений в строке состояния Android: есть и без сети.
+                    'notification-badge.png',
                 ],
                 // В имени ассетов Vite уже есть хеш, ревизия им не нужна.
                 dontCacheBustURLsMatching: /^build\/assets\//,

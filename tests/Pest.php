@@ -18,6 +18,8 @@ use Illuminate\Routing\Events\RouteMatched;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Str;
+use NotificationChannels\WebPush\PushSubscription;
 use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
@@ -360,4 +362,12 @@ function waitForText(mixed $page, string $text): mixed
 function careBetween(User $doctor, User $patient): CareRelationship
 {
     return CareRelationship::query()->active()->between($doctor, $patient)->sole();
+}
+
+/**
+ * Пользователь включил пуши в одном браузере (Chrome: сервис пушей Google).
+ */
+function subscribeToPush(User $user): PushSubscription
+{
+    return $user->updatePushSubscription('https://fcm.googleapis.com/fcm/send/'.Str::random(40), 'p256dh-key', 'auth-token', 'aes128gcm');
 }

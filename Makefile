@@ -23,6 +23,7 @@ init: ## Первый запуск: .env, образы, зависимости, 
 	$(PHP_ONLY) composer install
 	$(NODE) npm ci
 	@grep -q '^APP_KEY=.' .env || $(PHP_ONLY) php artisan key:generate
+	@grep -q '^VAPID_PUBLIC_KEY=.' .env || $(PHP_ONLY) php artisan webpush:vapid
 	$(ARTISAN) migrate --seed
 	$(COMPOSE) up -d --wait
 

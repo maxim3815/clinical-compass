@@ -5,6 +5,7 @@ import { computed, ref } from 'vue';
 import AdherenceSignal from '@/components/AdherenceSignal.vue';
 import Heading from '@/components/Heading.vue';
 import ListPagination from '@/components/ListPagination.vue';
+import PushBanner from '@/components/PushBanner.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useRealtime } from '@/composables/useRealtime';
@@ -90,6 +91,8 @@ useRealtime(
             title="Пациенты"
             description="Пациенты, которых вы сейчас ведёте."
         />
+
+        <PushBanner />
 
         <div
             v-if="patients.total === 0 && !search"

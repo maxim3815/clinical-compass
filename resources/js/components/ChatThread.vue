@@ -1,7 +1,15 @@
 <script setup lang="ts">
 import { HttpResponseError } from '@inertiajs/core';
 import { useHttp, usePage } from '@inertiajs/vue3';
-import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue';
+import {
+    computed,
+    nextTick,
+    onMounted,
+    onUnmounted,
+    ref,
+    useTemplateRef,
+    watch,
+} from 'vue';
 import { toast } from 'vue-sonner';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
@@ -57,7 +65,7 @@ useRealtime<ChatMessage>(`chat.${props.chat.id}`, 'message.sent', (message) => {
     add(message);
 
     if (message.sender_id !== me.value) {
-        markRead(message.id);
+        readWhenVisible(message.id);
     }
 
     if (follow) {
@@ -123,6 +131,30 @@ function sendError(error: unknown): string {
 
     return 'Не удалось отправить сообщение. Проверьте соединение и попробуйте ещё раз.';
 }
+
+// Сообщение в скрытой вкладке ещё не прочитано: его отметят, когда вкладку откроют.
+// Иначе собеседник не получил бы пуш о сообщении, которого не видел.
+let unreadUpTo = 0;
+
+function readWhenVisible(upTo: number): void {
+    if (document.visibilityState === 'visible') {
+        markRead(upTo);
+    } else {
+        unreadUpTo = Math.max(unreadUpTo, upTo);
+    }
+}
+
+function readPending(): void {
+    if (document.visibilityState === 'visible' && unreadUpTo > 0) {
+        markRead(unreadUpTo);
+        unreadUpTo = 0;
+    }
+}
+
+onMounted(() => document.addEventListener('visibilitychange', readPending));
+onUnmounted(() =>
+    document.removeEventListener('visibilitychange', readPending),
+);
 
 // Фоновая отметка: если не дошла, сообщение станет прочитанным при следующем открытии диалога.
 function markRead(upTo: number): void {

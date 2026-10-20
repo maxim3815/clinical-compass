@@ -29,6 +29,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable|null $marked_at
  * @property DoseSkipReason|null $skip_reason
  * @property string|null $skip_comment
+ * @property CarbonImmutable|null $reminded_at Когда ушло последнее напоминание.
+ * @property CarbonImmutable|null $snoozed_until До какого момента пациент отложил напоминание.
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  * @property-read User $patient
@@ -47,6 +49,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'marked_at',
     'skip_reason',
     'skip_comment',
+    'reminded_at',
+    'snoozed_until',
 ])]
 class DoseEvent extends Model
 {
@@ -103,6 +107,49 @@ class DoseEvent extends Model
     }
 
     /**
+     * Пора ли напомнить о приёме: наступил момент напоминания, и это напоминание ещё не уходило.
+     * Моменты — плановое время и повторы (config medications.reminders) или конец отсрочки.
+     * Пока приём отложен, обычные повторы не идут. Напоминание, момент которого прошёл больше
+     * late_minutes назад, уже не отправляется.
+     */
+    public function isReminderDue(CarbonImmutable $now): bool
+    {
+        if ($this->status !== DoseEventStatus::Scheduled || $this->window_closes_at->lte($now)) {
+            return false;
+        }
+
+        if ($this->snoozed_until !== null && $this->snoozed_until->gt($now)) {
+            return false;
+        }
+
+        $moment = $this->reminderMoment($now);
+
+        return $moment !== null
+            && $now->lte($moment->addMinutes(config()->integer('medications.reminders.late_minutes')))
+            && ($this->reminded_at === null || $this->reminded_at->lt($moment));
+    }
+
+    /**
+     * Последний наступивший момент напоминания или null, если время приёма ещё не пришло.
+     */
+    private function reminderMoment(CarbonImmutable $now): ?CarbonImmutable
+    {
+        $moments = [];
+
+        if ($this->snoozed_until !== null) {
+            $moments[] = $this->snoozed_until;
+        }
+
+        if ($this->scheduled_at->lte($now)) {
+            $repeat = config()->integer('medications.reminders.repeat_minutes');
+            $passed = intdiv((int) $this->scheduled_at->diffInMinutes($now), $repeat);
+            $moments[] = $this->scheduled_at->addMinutes(min($passed, config()->integer('medications.reminders.count') - 1) * $repeat);
+        }
+
+        return $moments === [] ? null : max($moments);
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -119,6 +166,8 @@ class DoseEvent extends Model
             'taken_at' => 'datetime',
             'marked_at' => 'datetime',
             'skip_reason' => DoseSkipReason::class,
+            'reminded_at' => 'datetime',
+            'snoozed_until' => 'datetime',
         ];
     }
 }

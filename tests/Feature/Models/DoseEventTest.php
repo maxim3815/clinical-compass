@@ -6,6 +6,7 @@ use App\Models\AsNeededDose;
 use App\Models\DoseEvent;
 use App\Models\Prescription;
 use App\Models\PrescriptionIntake;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
@@ -57,3 +58,59 @@ test('intake time is read without seconds', function () {
 
     expect($intake->fresh()?->time)->toBe('07:05');
 });
+
+test('a reminder is due at the time of the dose and at two repeats, each once and not late', function (string $now, ?string $remindedAt, bool $due) {
+    $at = fn (string $time) => CarbonImmutable::parse('2026-10-19 '.$time, 'UTC');
+    $dose = new DoseEvent([
+        'status' => DoseEventStatus::Scheduled,
+        'scheduled_at' => $at('05:00'),
+        'window_closes_at' => $at('17:00'),
+        'reminded_at' => $remindedAt === null ? null : $at($remindedAt),
+    ]);
+
+    expect($dose->isReminderDue($at($now)))->toBe($due);
+})->with([
+    'before the time' => ['04:59', null, false],
+    'at the time' => ['05:00', null, true],
+    'already reminded' => ['05:03', '05:00', false],
+    'first reminder is late' => ['05:11', null, false],
+    'first repeat' => ['05:30', '05:00', true],
+    'first repeat after a late start' => ['05:30', null, true],
+    'second repeat' => ['06:00', '05:30', true],
+    'no third repeat' => ['06:30', '06:00', false],
+    'nothing later in the window' => ['16:00', '06:00', false],
+]);
+
+test('a snoozed dose is reminded when the snooze ends and not before', function () {
+    $at = fn (string $time) => CarbonImmutable::parse('2026-10-19 '.$time, 'UTC');
+    $dose = new DoseEvent([
+        'status' => DoseEventStatus::Scheduled,
+        'scheduled_at' => $at('05:00'),
+        'window_closes_at' => $at('17:00'),
+        'reminded_at' => $at('06:00'),
+        'snoozed_until' => $at('07:15'),
+    ]);
+
+    expect($dose->isReminderDue($at('07:14')))->toBeFalse()
+        ->and($dose->isReminderDue($at('07:15')))->toBeTrue()
+        ->and($dose->isReminderDue($at('07:26')))->toBeFalse();
+
+    // Пока приём отложен, обычный повтор ждёт.
+    $dose->fill(['reminded_at' => $at('05:00'), 'snoozed_until' => $at('05:40')]);
+    expect($dose->isReminderDue($at('05:30')))->toBeFalse()
+        ->and($dose->isReminderDue($at('05:40')))->toBeTrue();
+
+    // Окно закрылось: отсрочка больше не напоминает.
+    $dose->fill(['snoozed_until' => $at('17:05')]);
+    expect($dose->isReminderDue($at('17:05')))->toBeFalse();
+});
+
+test('marked and missed doses are not reminded', function (DoseEventStatus $status) {
+    $dose = new DoseEvent([
+        'status' => $status,
+        'scheduled_at' => now(),
+        'window_closes_at' => now()->addHours(12),
+    ]);
+
+    expect($dose->isReminderDue(CarbonImmutable::now()))->toBeFalse();
+})->with([DoseEventStatus::Taken, DoseEventStatus::Skipped, DoseEventStatus::Missed]);

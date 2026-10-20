@@ -92,10 +92,11 @@ test('dose events become missed when the window closes without a mark', function
         ->and($taken->fresh()?->status)->toBe(DoseEventStatus::Taken);
 });
 
-test('the scheduler syncs dose events hourly and marks missed ones every minute', function () {
+test('the scheduler syncs dose events hourly, marks missed ones and sends reminders every minute', function () {
     $events = collect(app(Schedule::class)->events())
         ->mapWithKeys(fn (Event $event) => [(string) preg_replace('/^.*artisan[\'"]?\s+/', '', (string) $event->command) => $event->expression]);
 
     expect($events->get('app:dose-events:sync'))->toBe('0 * * * *')
-        ->and($events->get('app:dose-events:mark-missed'))->toBe('* * * * *');
+        ->and($events->get('app:dose-events:mark-missed'))->toBe('* * * * *')
+        ->and($events->get('app:dose-events:send-reminders'))->toBe('* * * * *');
 });

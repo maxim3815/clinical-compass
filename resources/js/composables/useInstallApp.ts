@@ -33,6 +33,9 @@ const BANNER_PAUSE_MS = 7 * 24 * 60 * 60 * 1000;
 const installPrompt = shallowRef<BeforeInstallPromptEvent | null>(null);
 const justInstalled = ref(false);
 
+// «Не сейчас» общий для всех экземпляров: баннер пушей ждёт, пока скрыт баннер установки.
+const dismissed = ref(false);
+
 export function initializeInstallPrompt(): void {
     if (import.meta.env.SSR) {
         return;
@@ -50,7 +53,7 @@ export function initializeInstallPrompt(): void {
     });
 }
 
-function isStandalone(): boolean {
+export function isStandalone(): boolean {
     return (
         window.matchMedia('(display-mode: standalone)').matches ||
         (navigator as Navigator & { standalone?: boolean }).standalone === true
@@ -59,7 +62,7 @@ function isStandalone(): boolean {
 
 // На iOS все браузеры работают на движке Safari и ставят приложение через «Поделиться».
 // iPad представляется компьютером Mac, но у него сенсорный экран.
-function isIos(): boolean {
+export function isIos(): boolean {
     const userAgent = navigator.userAgent;
 
     return (
@@ -88,7 +91,6 @@ export function useInstallApp(): UseInstallAppReturn {
     const standalone = ref(false);
     const ios = ref(false);
     const phone = ref(false);
-    const dismissed = ref(false);
 
     onMounted(() => {
         standalone.value = isStandalone();

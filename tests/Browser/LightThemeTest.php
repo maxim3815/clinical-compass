@@ -21,7 +21,7 @@ test('pages stay light when the phone has the dark theme', function () {
         ->click('[data-sidebar="trigger"]')
         ->click('Настройки')
         ->assertPathIs('/settings/profile')
-        ->assertSee('Профиль, пароль и приложение')
+        ->assertSee('Профиль, пароль, уведомления и приложение')
         ->assertDontSee('Оформление')
         ->assertScript($light)
         ->assertNoJavaScriptErrors();

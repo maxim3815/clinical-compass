@@ -40,6 +40,7 @@ class TakeDose
                 'status' => DoseEventStatus::Taken,
                 'taken_at' => $time === null ? $now : $this->takenAt($patient, $dose, $time, $now),
                 'marked_at' => $now,
+                'snoozed_until' => null,
                 'skip_reason' => null,
                 'skip_comment' => null,
             ]);

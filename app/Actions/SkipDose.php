@@ -40,6 +40,7 @@ class SkipDose
                 'status' => DoseEventStatus::Skipped,
                 'taken_at' => null,
                 'marked_at' => $now,
+                'snoozed_until' => null,
                 'skip_reason' => $reason,
                 'skip_comment' => $comment,
             ]);

@@ -38,6 +38,7 @@ class CancelDoseMark
                 'status' => $dose->unmarkedStatus(CarbonImmutable::now()),
                 'taken_at' => null,
                 'marked_at' => null,
+                'snoozed_until' => null,
                 'skip_reason' => null,
                 'skip_comment' => null,
             ]);

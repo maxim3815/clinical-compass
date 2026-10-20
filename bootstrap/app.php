@@ -23,6 +23,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->encryptCookies(except: ['sidebar_state']);
 
+        // Кнопки в пуше защищены подписью ссылки, а не CSRF-токеном.
+        $middleware->validateCsrfTokens(except: ['push/doses/*']);
+
         $middleware->alias([
             'role' => EnsureUserHasRole::class,
         ]);
