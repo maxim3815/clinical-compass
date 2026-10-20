@@ -19,6 +19,9 @@ return [
         'enabled' => (bool) env('INERTIA_SSR_ENABLED', true),
         'url' => env('INERTIA_SSR_URL', 'http://127.0.0.1:13714'),
         'hot_url' => env('INERTIA_SSR_HOT_URL'),
+        // Зависший сервер SSR не держит запрос дольше этого: страница рисуется в браузере.
+        // Без значения HTTP-клиент ждёт 30 секунд, и все процессы php-fpm быстро заняты ожиданием.
+        'timeout' => (float) env('INERTIA_SSR_TIMEOUT', 5),
         // 'bundle' => base_path('bootstrap/ssr/ssr.mjs'),
 
     ],
