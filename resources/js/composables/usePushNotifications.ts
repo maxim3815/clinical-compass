@@ -1,6 +1,6 @@
 import { usePage } from '@inertiajs/vue3';
 import type { Ref } from 'vue';
-import { onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 import {
     currentSubscription,
     pushAvailability,
@@ -41,6 +41,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
     const askable = ref(false);
     const busy = ref(false);
     const error = ref<string | null>(null);
+    let permissionStatus: PermissionStatus | null = null;
 
     onMounted(async () => {
         const availability = pushAvailability();
@@ -52,6 +53,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
             return;
         }
 
+        void watchPermission();
         askable.value = Notification.permission === 'default';
 
         if (Notification.permission === 'denied') {
@@ -81,6 +83,43 @@ export function usePushNotifications(): UsePushNotificationsReturn {
         }
     });
 
+    onBeforeUnmount(() => {
+        if (permissionStatus !== null) {
+            permissionStatus.onchange = null;
+        }
+    });
+
+    /**
+     * Разрешение меняется и без кнопок страницы. Chrome на Android может показать тихий
+     * запрос, который сам закрывается через несколько секунд, а после нескольких
+     * закрытых запросов блокирует сайт. Пользователь мог и разрешить уведомления в
+     * настройках сайта.
+     */
+    async function watchPermission(): Promise<void> {
+        try {
+            permissionStatus = await navigator.permissions.query({
+                name: 'notifications',
+            });
+        } catch {
+            return;
+        }
+
+        permissionStatus.onchange = () => {
+            const permission = Notification.permission;
+
+            askable.value = permission === 'default';
+            error.value = null;
+
+            if (permission === 'denied') {
+                state.value = 'denied';
+            } else if (permission === 'default' || state.value === 'denied') {
+                // Без разрешения браузер снимает подписку, а выданное разрешение
+                // ещё нужно подтвердить кнопкой: подписку создаёт она.
+                state.value = 'off';
+            }
+        };
+    }
+
     async function enable(): Promise<void> {
         const publicKey = page.props.vapidPublicKey;
 
@@ -101,6 +140,12 @@ export function usePushNotifications(): UsePushNotificationsReturn {
                     : permission === 'denied'
                       ? 'denied'
                       : 'off';
+
+            // Запрос закрыли или он закрылся сам, не дождавшись ответа.
+            if (permission === 'default') {
+                error.value =
+                    'Браузер не получил разрешения. Нажмите «Включить» ещё раз и выберите «Разрешить».';
+            }
         } catch {
             error.value =
                 'Не удалось включить уведомления. Проверьте соединение и попробуйте ещё раз.';

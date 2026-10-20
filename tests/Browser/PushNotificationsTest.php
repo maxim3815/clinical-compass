@@ -9,6 +9,10 @@ use Carbon\CarbonImmutable;
  * и подписку браузера подменяем до загрузки приложения: скрипт работает на всех следующих
  * страницах этой вкладки. Подписка — как у Chrome, у сервиса пушей Google — переживает
  * перезагрузку страницы.
+ *
+ * На запрос разрешения пользователь отвечает «Разрешить». Ответ на следующий запрос задаёт
+ * window.answerPermissionPrompt('default'), а window.changePermission('denied') меняет
+ * разрешение так, как это делает Chrome или настройки сайта.
  */
 function fakeBrowserPush(mixed $page): mixed
 {
@@ -17,6 +21,9 @@ function fakeBrowserPush(mixed $page): mixed
             const endpoint = 'https://fcm.googleapis.com/fcm/send/browser-test';
             const subscribed = () => sessionStorage.getItem('fake-push') === 'on';
             let permission = subscribed() ? 'granted' : 'default';
+            let answer = 'granted';
+            const status = { onchange: null };
+            const query = navigator.permissions.query.bind(navigator.permissions);
             const subscription = {
                 endpoint,
                 options: { applicationServerKey: null },
@@ -30,9 +37,23 @@ function fakeBrowserPush(mixed $page): mixed
 
             Object.defineProperty(Notification, 'permission', { configurable: true, get: () => permission });
             Notification.requestPermission = async () => {
-                permission = 'granted';
+                permission = answer;
+                answer = 'granted';
 
                 return permission;
+            };
+            navigator.permissions.query = async (descriptor) => (descriptor.name === 'notifications' ? status : query(descriptor));
+            window.answerPermissionPrompt = (value) => {
+                answer = value;
+            };
+            window.changePermission = (value) => {
+                permission = value;
+
+                if (value !== 'granted') {
+                    sessionStorage.removeItem('fake-push');
+                }
+
+                status.onchange?.();
             };
             PushManager.prototype.subscribe = async (options) => {
                 subscription.options.applicationServerKey = options.applicationServerKey.buffer;
@@ -112,6 +133,36 @@ test('patient turns push on and off on the notifications page', function () {
     waitForPushState($page, '[data-test="push-enable"]')->assertNoJavaScriptErrors();
 
     expect($patient->pushSubscriptions()->count())->toBe(0);
+});
+
+test('the notifications page follows the permission when the browser changes it', function () {
+    $patient = User::factory()->patient()->create(['login' => 'ivanov']);
+
+    $page = visit(route('login'))
+        ->on()->mobile()
+        ->fill('login', 'ivanov')
+        ->fill('password', 'password')
+        ->press('Войти')
+        ->assertPathIs('/patient');
+
+    fakeBrowserPush($page)->navigate(route('notifications.edit'));
+    waitForPushState($page, '[data-test="push-enable"]');
+
+    // Тихий запрос Chrome на Android закрылся сам: разрешения нет, кнопка остаётся.
+    $page->script('() => window.answerPermissionPrompt("default")');
+    $page->click('[data-test="push-enable"]');
+    waitForText($page, 'Браузер не получил разрешения')->assertPresent('[data-test="push-enable"]');
+
+    // После нескольких закрытых запросов Chrome блокирует сайт сам.
+    $page->script('() => window.changePermission("denied")');
+    waitForPushState($page, '[data-test="push-denied"]')->assertDontSee('Браузер не получил разрешения');
+
+    // Пользователь разрешил уведомления в настройках сайта: подписку создаёт кнопка.
+    $page->script('() => window.changePermission("granted")');
+    waitForPushState($page, '[data-test="push-enable"]')->click('[data-test="push-enable"]');
+    waitForText($page, 'Уведомления включены на этом устройстве')->assertNoJavaScriptErrors();
+
+    expect($patient->pushSubscriptions()->count())->toBe(1);
 });
 
 test('doctor turns push on from the banner and loses it on logout', function () {
