@@ -90,3 +90,93 @@ RUN set -eux; \
     rm -rf /var/lib/apt/lists/* /root/.npm
 
 USER ${UID}:${GID}
+
+# Продакшен: три образа с кодом внутри (compose.prod.yaml). prod — php-fpm, он же запускает
+# очередь, планировщик и Reverb; prod-nginx — nginx со статикой; prod-ssr — серверная
+# отрисовка страниц на Node.
+
+# Зависимости Composer и сборка фронтенда. Результат от процессора не зависит, поэтому stage
+# работает на платформе сборки: образ под amd64 на Mac с arm64 собирается без эмуляции Node.
+# Расширений из base здесь не нужно: artisan для Wayfinder обходится стандартными.
+FROM --platform=$BUILDPLATFORM node:24-trixie-slim AS build-node
+
+FROM --platform=$BUILDPLATFORM php:8.5-cli-trixie AS build
+
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends unzip; \
+    rm -rf /var/lib/apt/lists/*
+
+COPY --from=composer /usr/bin/composer /usr/local/bin/composer
+COPY --from=build-node /usr/local/bin/node /usr/local/bin/node
+COPY --from=build-node /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
+
+ENV COMPOSER_ALLOW_SUPERUSER=1 \
+    NPM_CONFIG_UPDATE_NOTIFIER=false
+
+WORKDIR /app
+
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --no-interaction --no-progress --prefer-dist --no-scripts --no-autoloader
+
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+
+COPY . .
+
+# Адрес Reverb для браузера вшивается в скрипты при сборке.
+ARG VITE_APP_NAME
+ARG VITE_REVERB_APP_KEY
+ARG VITE_REVERB_HOST
+ARG VITE_REVERB_PORT
+ARG VITE_REVERB_SCHEME
+
+# Каталоги storage в контекст сборки не попадают (.dockerignore), а artisan без них не работает.
+RUN set -eux; \
+    mkdir -p storage/app/private storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache; \
+    composer dump-autoload --no-dev --optimize --no-interaction; \
+    npm run build:ssr; \
+    rm -rf node_modules
+
+FROM base AS prod
+
+RUN cp "${PHP_INI_DIR}/php.ini-production" "${PHP_INI_DIR}/php.ini"
+
+COPY docker/php/conf.d/prod.ini /usr/local/etc/php/conf.d/zz-prod.ini
+COPY docker/php/php-fpm.d/zz-prod.conf /usr/local/etc/php-fpm.d/zz-prod.conf
+COPY docker/php/prod-entrypoint.sh /usr/local/bin/prod-entrypoint
+
+COPY --from=build /app /var/www/html
+
+# Код принадлежит root и только читается, писать процессы могут лишь в storage и bootstrap/cache.
+RUN chown -R www-data:www-data storage bootstrap/cache
+
+USER www-data
+
+ENTRYPOINT ["prod-entrypoint"]
+CMD ["php-fpm"]
+
+FROM nginx:1.30-alpine AS prod-nginx
+
+COPY docker/nginx/prod.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/public /var/www/html/public
+
+FROM node AS prod-ssr
+
+ENV NODE_ENV=production \
+    NPM_CONFIG_UPDATE_NOTIFIER=false
+
+WORKDIR /app
+
+# Серверной сборке нужны пакеты из dependencies (vue, reka-ui и другие), Vite и плагины — нет.
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --omit=optional --ignore-scripts --no-audit --no-fund && npm cache clean --force
+
+COPY --from=build /app/bootstrap/ssr bootstrap/ssr
+
+USER node
+
+EXPOSE 13714
+
+CMD ["node", "bootstrap/ssr/app.js"]

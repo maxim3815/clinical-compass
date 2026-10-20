@@ -1,0 +1,182 @@
+# Продакшен: код внутри образов, приложение за прокси с TLS. Как собрать и запустить —
+# README, раздел «Продакшен». Настройки и секреты лежат в .env рядом с этим файлом.
+name: clinical-compass-prod
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
+x-build: &build
+  context: .
+  dockerfile: docker/php/Dockerfile
+  args:
+    VITE_APP_NAME: ${APP_NAME:-Клинический компас}
+    VITE_REVERB_APP_KEY: ${VITE_REVERB_APP_KEY:-}
+    VITE_REVERB_HOST: ${VITE_REVERB_HOST:-}
+    VITE_REVERB_PORT: ${VITE_REVERB_PORT:-443}
+    VITE_REVERB_SCHEME: ${VITE_REVERB_SCHEME:-https}
+
+# Образ собирает сервис php, очередь, планировщик и Reverb работают на нём же.
+x-app: &app
+  image: clinical-compass/php:${IMAGE_TAG:-latest}
+  restart: unless-stopped
+  logging: *logging
+  env_file: .env
+  environment:
+    INERTIA_SSR_URL: http://ssr:13714
+
+services:
+  nginx:
+    image: clinical-compass/nginx:${IMAGE_TAG:-latest}
+    build:
+      <<: *build
+      target: prod-nginx
+    restart: unless-stopped
+    logging: *logging
+    ports:
+      - 127.0.0.1:${APP_PORT:-8080}:80
+    depends_on:
+      php:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/up"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+      start_interval: 1s
+    deploy:
+      resources:
+        limits:
+          memory: 64m
+
+  php:
+    <<: *app
+    build:
+      <<: *build
+      target: prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "SCRIPT_NAME=/ping SCRIPT_FILENAME=/ping REQUEST_METHOD=GET cgi-fcgi -bind -connect 127.0.0.1:9000 | grep -q pong",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+      start_interval: 1s
+    deploy:
+      resources:
+        limits:
+          memory: 384m
+
+  # Серверная отрисовка страниц. Если сервис недоступен, страница рисуется в браузере.
+  ssr:
+    image: clinical-compass/ssr:${IMAGE_TAG:-latest}
+    build:
+      <<: *build
+      target: prod-ssr
+    restart: unless-stopped
+    logging: *logging
+    init: true
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:13714/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+      start_interval: 1s
+    deploy:
+      resources:
+        limits:
+          memory: 192m
+
+  postgres:
+    image: postgres:18.6-trixie
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:?DB_DATABASE is not set}
+      POSTGRES_USER: ${DB_USERNAME:?DB_USERNAME is not set}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is not set}
+    volumes:
+      - ./data/postgres:/var/lib/postgresql
+    healthcheck:
+      # По TCP, а не через сокет: во время init-скриптов временный сервер слушает только сокет.
+      test: ["CMD-SHELL", 'pg_isready -h 127.0.0.1 -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+      start_interval: 1s
+    deploy:
+      resources:
+        limits:
+          memory: 384m
+
+  queue:
+    <<: *app
+    init: true
+    # Через очередь уходят события чата: пустую очередь проверяем раз в секунду, а не раз в три.
+    command: ["php", "artisan", "queue:work", "--tries=1", "--sleep=1"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "artisan queue:work"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 192m
+
+  # WebSocket-сервер для обновлений без перезагрузки страницы. Браузер подключается к нему
+  # через nginx, приложение отправляет события напрямую. Порт наружу не публикуется.
+  reverb:
+    <<: *app
+    init: true
+    command: ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=8080"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8080/up"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+      start_interval: 1s
+    deploy:
+      resources:
+        limits:
+          memory: 192m
+
+  scheduler:
+    <<: *app
+    init: true
+    command: ["php", "artisan", "schedule:work"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "artisan schedule:work"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 128m
