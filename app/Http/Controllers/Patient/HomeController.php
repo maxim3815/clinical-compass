@@ -33,6 +33,7 @@ class HomeController extends Controller
         $today = $patient->localToday();
         $timezone = $patient->localTimezone();
         $now = CarbonImmutable::now();
+        $female = $patient->isFemalePatient();
 
         $events = $patient->doseEvents()
             ->whereIn('local_date', [$today->subDay()->toDateString(), $today->toDateString()])
@@ -55,13 +56,13 @@ class HomeController extends Controller
             'hasPrescriptions' => $patient->prescriptions()->current($today)->exists(),
             'today' => [
                 'date' => $today->isoFormat('D MMMM'),
-                'groups' => $this->groups($todayEvents, $timezone, $today, $now),
+                'groups' => $this->groups($todayEvents, $timezone, $today, $now, $female),
             ],
             'yesterday' => [
-                'groups' => $this->groups($yesterdayEvents, $timezone, $today, $now),
+                'groups' => $this->groups($yesterdayEvents, $timezone, $today, $now, $female),
             ],
             'asNeeded' => $this->asNeeded($patient, $today, $timezone),
-            'skipReasons' => DoseSkipReason::options(),
+            'skipReasons' => DoseSkipReason::options($female),
         ]);
     }
 
@@ -71,7 +72,7 @@ class HomeController extends Controller
      * @param  Collection<int, DoseEvent>  $events
      * @return array<int, array{time: string, doses: array<int, array<string, mixed>>}>
      */
-    private function groups(Collection $events, string $timezone, CarbonImmutable $today, CarbonImmutable $now): array
+    private function groups(Collection $events, string $timezone, CarbonImmutable $today, CarbonImmutable $now, bool $female): array
     {
         return $events
             ->groupBy(fn (DoseEvent $event): string => DoseEventPresenter::clock($event->scheduled_at, $timezone))
@@ -79,7 +80,7 @@ class HomeController extends Controller
                 'time' => $time,
                 'doses' => $group
                     ->sortBy(fn (DoseEvent $event): string => $event->prescription->drugName())
-                    ->map(fn (DoseEvent $event): array => DoseEventPresenter::present($event, $timezone, $today, $now))
+                    ->map(fn (DoseEvent $event): array => DoseEventPresenter::present($event, $timezone, $today, $now, $female))
                     ->values()
                     ->all(),
             ])

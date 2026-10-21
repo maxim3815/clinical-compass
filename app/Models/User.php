@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Sex;
 use App\Enums\UserRole;
 use App\Support\DisplayTime;
 use Carbon\CarbonImmutable;
@@ -155,6 +156,15 @@ class User extends Authenticatable
     public function localTimezone(): string
     {
         return $this->patientProfile->timezone->value ?? DisplayTime::TIMEZONE;
+    }
+
+    /**
+     * Пациентка: кнопки и причины пропуска пишутся в женском роде («Приняла», «Забыла»).
+     * Если пол в профиле не указан, остаётся мужской род.
+     */
+    public function isFemalePatient(): bool
+    {
+        return $this->role === UserRole::Patient && $this->patientProfile?->sex === Sex::Female;
     }
 
     /**

@@ -66,8 +66,8 @@ test('doctor sees a new signal without reloading the list and opens the card', f
         ->press('Войти')
         ->assertPathIs('/patient')
         ->click('[data-test="today"] [data-test="skip-dose"]')
-        ->assertSee('Отметка приёма')
-        ->select('#skip_reason', 'forgot')
+        ->assertSee('Почему не получилось принять?')
+        ->click('input[name="reason"][value="forgot"]')
         ->click('[data-test="save-dose-mark"]')
         ->assertSee('Не принят: забыл')
         ->assertNoJavaScriptErrors();

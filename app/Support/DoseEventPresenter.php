@@ -16,7 +16,7 @@ final class DoseEventPresenter
     /**
      * @return array<string, mixed>
      */
-    public static function present(DoseEvent $event, string $timezone, CarbonImmutable $today, CarbonImmutable $now): array
+    public static function present(DoseEvent $event, string $timezone, CarbonImmutable $today, CarbonImmutable $now, bool $female = false): array
     {
         $prescription = $event->prescription;
 
@@ -28,7 +28,7 @@ final class DoseEventPresenter
             'day' => $event->local_date->eq($today) ? 'сегодня' : 'вчера',
             'time' => self::clock($event->scheduled_at, $timezone),
             'status' => $event->status->value,
-            'status_text' => self::statusText($event, $timezone),
+            'status_text' => self::statusText($event, $timezone, $female),
             'taken_late' => $event->isTakenLate(),
             'skip_comment' => $event->skip_comment,
             // Отметка после закрытия окна: «20.10 в 9:05». Если приём отмечен «Принял» в момент
@@ -57,13 +57,14 @@ final class DoseEventPresenter
 
     /**
      * «Принят в 8:05», «Принят поздно, в 10:30», «Не принят: забыл», «Пропущен». У запланированного — null.
+     * Причина у пациентки в женском роде: «Не принят: забыла».
      */
-    public static function statusText(DoseEvent $event, string $timezone): ?string
+    public static function statusText(DoseEvent $event, string $timezone, bool $female = false): ?string
     {
         return match ($event->status) {
             DoseEventStatus::Taken => $event->taken_at === null ? null
                 : ($event->isTakenLate() ? 'Принят поздно, ' : 'Принят ').self::moment($event->taken_at, $event->local_date, $timezone),
-            DoseEventStatus::Skipped => 'Не принят: '.mb_lcfirst((string) $event->skip_reason?->label()),
+            DoseEventStatus::Skipped => 'Не принят: '.mb_lcfirst((string) $event->skip_reason?->label($female)),
             DoseEventStatus::Missed => DoseEventStatus::Missed->label(),
             DoseEventStatus::Scheduled => null,
         };

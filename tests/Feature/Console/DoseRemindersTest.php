@@ -2,6 +2,7 @@
 
 use App\Actions\SnoozeDoses;
 use App\Actions\TakeDose;
+use App\Enums\Sex;
 use App\Models\DoseEvent;
 use App\Models\User;
 use App\Notifications\DoseReminder;
@@ -182,4 +183,13 @@ test('the reminder shows the time, drugs and doses and carries signed buttons', 
         ->assertJson(['message' => 'Приёмы отмечены']);
 
     expect($doses->fresh()->pluck('status.value')->all())->toBe(['taken', 'taken']);
+});
+
+test('the reminder button speaks to a female patient in the feminine', function () {
+    $this->patient->patientProfile?->update(['sex' => Sex::Female]);
+    $doses = DoseEvent::query()->whereKey($this->dose->id)->with(['patient.patientProfile', 'prescription.drug', 'prescription.strength'])->get();
+
+    $message = (new DoseReminder($doses))->toWebPush($this->patient->refresh())->toArray();
+
+    expect(array_column($message['actions'], 'title'))->toBe(['Приняла', 'Через 15 минут']);
 });

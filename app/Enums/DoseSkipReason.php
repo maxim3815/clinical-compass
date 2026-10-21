@@ -12,11 +12,14 @@ enum DoseSkipReason: string
     case RanOut = 'ran_out';
     case Other = 'other';
 
-    public function label(): string
+    /**
+     * Причина от лица пациента: у пациентки в женском роде («Забыла»).
+     */
+    public function label(bool $female = false): string
     {
         return match ($this) {
-            self::Forgot => 'Забыл',
-            self::Unwell => 'Плохо себя чувствовал или побочные эффекты',
+            self::Forgot => $female ? 'Забыла' : 'Забыл',
+            self::Unwell => $female ? 'Плохо себя чувствовала или побочные эффекты' : 'Плохо себя чувствовал или побочные эффекты',
             self::RanOut => 'Закончился препарат',
             self::Other => 'Другое',
         };
@@ -25,10 +28,10 @@ enum DoseSkipReason: string
     /**
      * @return list<array{value: string, label: string}>
      */
-    public static function options(): array
+    public static function options(bool $female = false): array
     {
         return array_map(
-            fn (self $reason): array => ['value' => $reason->value, 'label' => $reason->label()],
+            fn (self $reason): array => ['value' => $reason->value, 'label' => $reason->label($female)],
             self::cases(),
         );
     }

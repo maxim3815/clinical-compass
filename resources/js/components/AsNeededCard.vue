@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useForm } from '@inertiajs/vue3';
+import { CircleCheck } from '@lucide/vue';
 import { computed, ref, watch } from 'vue';
+import { toast } from 'vue-sonner';
 import AsNeededDoseController from '@/actions/App/Http/Controllers/Patient/AsNeededDoseController';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
@@ -14,12 +16,15 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { NativeSelect } from '@/components/ui/native-select';
+import { Spinner } from '@/components/ui/spinner';
+import { useDoseWords } from '@/composables/useDoseWords';
 import type { AsNeeded } from '@/types';
 
 const props = defineProps<{
     prescription: AsNeeded;
 }>();
+
+const words = useDoseWords();
 
 const form = useForm({
     day: 'today' as 'today' | 'yesterday',
@@ -27,8 +32,8 @@ const form = useForm({
     confirmed: false,
 });
 
-// Форма «Принял в …» или предупреждение о лимите за сутки.
-const dialog = ref<'time' | 'limit' | null>(null);
+// Форма «Принял в другое время», предупреждение о лимите за сутки или вопрос перед удалением.
+const dialog = ref<'time' | 'limit' | 'delete' | null>(null);
 
 const open = computed({
     get: () => dialog.value !== null,
@@ -60,9 +65,11 @@ function submit(confirmed = false): void {
             dialog.value = null;
             form.reset();
         },
-        // Лимит за сутки исчерпан: пациент подтверждает запись.
+        // Лимит за сутки исчерпан: пациент подтверждает запись. Прежнее «Приём записан.»
+        // рядом с вопросом сбивало бы с толку.
         onError: (errors) => {
             if (errors.confirmed) {
+                toast.dismiss();
                 dialog.value = 'limit';
             }
         },
@@ -75,39 +82,67 @@ function takeNow(): void {
     submit();
 }
 
+// Время заполнено текущим: обычно препарат приняли только что или недавно.
 function openTimeForm(): void {
+    const now = new Date();
+
     form.reset();
     form.clearErrors();
+    form.time = [now.getHours(), now.getMinutes()]
+        .map((part) => String(part).padStart(2, '0'))
+        .join(':');
     dialog.value = 'time';
 }
 
+const days = [
+    { value: 'today', label: 'Сегодня' },
+    { value: 'yesterday', label: 'Вчера' },
+] as const;
+
+// Одинаковые кнопки у разных препаратов скринридер различает по названию.
+const nameId = computed(() => `as-needed-${props.prescription.id}-name`);
+
 const cancelForm = useForm({});
 
-function cancel(id: number): void {
-    cancelForm.submit(AsNeededDoseController.destroy(id), {
+// Запись удаляется только после вопроса: случайное касание не стирает приём.
+const deleting = ref<AsNeeded['doses'][number] | null>(null);
+
+function askDelete(dose: AsNeeded['doses'][number]): void {
+    deleting.value = dose;
+    dialog.value = 'delete';
+}
+
+function cancel(): void {
+    if (deleting.value === null) {
+        return;
+    }
+
+    cancelForm.submit(AsNeededDoseController.destroy(deleting.value.id), {
         preserveScroll: true,
+        onSuccess: () => {
+            dialog.value = null;
+        },
     });
 }
 </script>
 
 <template>
     <article
-        class="flex flex-col gap-3 rounded-lg border p-4 break-words"
+        class="flex flex-col gap-4 rounded-2xl border bg-card p-4 break-words shadow-xs"
         data-test="as-needed"
     >
         <div>
-            <h3 class="font-medium">{{ prescription.drug }}</h3>
-            <p class="text-sm">{{ prescription.dose }}</p>
-            <p
-                v-if="prescription.instruction"
-                class="text-sm text-muted-foreground"
-            >
+            <h3 :id="nameId" class="text-lg font-semibold">
+                {{ prescription.drug }}
+            </h3>
+            <p>{{ prescription.dose }}</p>
+            <p v-if="prescription.instruction" class="text-muted-foreground">
                 {{ prescription.instruction }}
             </p>
         </div>
 
         <p
-            class="text-sm"
+            class="font-medium"
             :class="limitReached ? 'text-warning' : ''"
             data-test="as-needed-counter"
         >
@@ -117,126 +152,210 @@ function cancel(id: number): void {
             >
         </p>
 
-        <div class="flex flex-wrap gap-2">
+        <div class="flex flex-col gap-1">
             <Button
-                size="sm"
+                size="lg"
+                variant="secondary"
+                class="w-full"
                 :disabled="form.processing"
+                :aria-busy="form.processing"
+                :aria-describedby="nameId"
                 data-test="take-as-needed"
                 @click="takeNow"
             >
-                Принял
+                <Spinner v-if="form.processing && !open" class="size-5" />
+                <CircleCheck v-else />
+                {{ words.took }}
             </Button>
             <Button
-                size="sm"
-                variant="outline"
+                size="lg"
+                variant="ghost"
+                class="self-center px-3 text-primary"
+                :aria-describedby="nameId"
                 data-test="take-as-needed-at"
                 @click="openTimeForm"
             >
-                Принял в …
+                {{ words.tookAtAnotherTime }}
             </Button>
         </div>
 
         <ul
             v-if="prescription.doses.length"
-            class="flex flex-col gap-1 text-sm"
+            class="flex flex-col divide-y border-t"
+            aria-label="Записанные приёмы"
         >
             <li
                 v-for="dose in prescription.doses"
                 :key="dose.id"
-                class="flex items-center justify-between gap-2"
+                class="flex items-center justify-between gap-2 pt-1 first:pt-2"
                 data-test="as-needed-dose"
             >
                 <span>{{ dose.day }} в {{ dose.time }}</span>
                 <Button
-                    size="sm"
+                    size="lg"
                     variant="ghost"
                     :disabled="cancelForm.processing"
-                    @click="cancel(dose.id)"
+                    class="px-3 text-primary"
+                    :aria-label="`Удалить запись: ${dose.day.toLowerCase()} в ${dose.time}`"
+                    data-test="delete-as-needed"
+                    @click="askDelete(dose)"
                 >
-                    Отменить
+                    Удалить запись
                 </Button>
             </li>
         </ul>
 
         <Dialog v-model:open="open">
             <DialogContent
-                v-if="dialog === 'limit'"
-                data-test="as-needed-limit-dialog"
+                v-if="dialog === 'delete' && deleting"
+                data-test="as-needed-delete-dialog"
             >
                 <DialogHeader>
-                    <DialogTitle>Записать ещё один приём?</DialogTitle>
-                    <DialogDescription>
-                        {{ form.errors.confirmed }} Если вы всё же приняли
-                        препарат, запишите приём, чтобы врач это видел.
+                    <DialogTitle class="text-xl">Удалить запись?</DialogTitle>
+                    <DialogDescription class="text-base">
+                        {{ prescription.drug }}:
+                        {{ deleting.day.toLowerCase() }} в {{ deleting.time }}.
+                        Удаляйте, если отметили приём по ошибке.
                     </DialogDescription>
                 </DialogHeader>
                 <DialogFooter>
                     <Button
                         type="button"
                         variant="outline"
+                        size="lg"
+                        @click="open = false"
+                    >
+                        Оставить
+                    </Button>
+                    <Button
+                        type="button"
+                        size="lg"
+                        :disabled="cancelForm.processing"
+                        :aria-busy="cancelForm.processing"
+                        data-test="confirm-delete-as-needed"
+                        @click="cancel"
+                    >
+                        <Spinner v-if="cancelForm.processing" class="size-5" />
+                        Удалить
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+
+            <DialogContent
+                v-else-if="dialog === 'limit'"
+                data-test="as-needed-limit-dialog"
+            >
+                <DialogHeader>
+                    <DialogTitle class="text-xl">
+                        Записать ещё один приём?
+                    </DialogTitle>
+                    <DialogDescription class="text-base">
+                        {{ form.errors.confirmed }} Если вы приняли препарат ещё
+                        раз, всё равно запишите приём: так врачу будет проще
+                        подобрать лечение.
+                    </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="lg"
                         @click="open = false"
                     >
                         Не записывать
                     </Button>
                     <Button
                         type="button"
+                        size="lg"
                         :disabled="form.processing"
+                        :aria-busy="form.processing"
                         data-test="confirm-as-needed"
                         @click="submit(true)"
                     >
+                        <Spinner v-if="form.processing" class="size-5" />
                         Записать
                     </Button>
                 </DialogFooter>
             </DialogContent>
 
-            <DialogContent v-else data-test="as-needed-time-dialog">
-                <form class="flex flex-col gap-4" @submit.prevent="submit()">
+            <DialogContent
+                v-else
+                class="[&_[data-slot=input-error]]:text-base"
+                data-test="as-needed-time-dialog"
+            >
+                <form class="flex flex-col gap-5" @submit.prevent="submit()">
                     <DialogHeader>
-                        <DialogTitle>Когда вы приняли препарат?</DialogTitle>
-                        <DialogDescription>
+                        <DialogTitle class="text-xl">
+                            Когда вы приняли препарат?
+                        </DialogTitle>
+                        <DialogDescription class="text-base">
                             {{ prescription.drug }}, {{ prescription.dose }}.
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div class="flex flex-wrap gap-4">
-                        <div class="grid gap-2">
-                            <Label for="as_needed_day">День</Label>
-                            <NativeSelect
-                                id="as_needed_day"
-                                v-model="form.day"
-                                name="day"
+                    <fieldset
+                        class="flex flex-col gap-2"
+                        aria-describedby="as_needed_day-error"
+                    >
+                        <legend class="mb-2 text-base font-medium">День</legend>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label
+                                v-for="day in days"
+                                :key="day.value"
+                                class="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-input bg-card px-3 text-base transition-colors has-checked:border-primary has-checked:bg-secondary has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring has-focus-visible:outline-solid"
                             >
-                                <option value="today">Сегодня</option>
-                                <option value="yesterday">Вчера</option>
-                            </NativeSelect>
+                                <input
+                                    v-model="form.day"
+                                    type="radio"
+                                    name="day"
+                                    :value="day.value"
+                                    class="size-5 shrink-0 outline-none"
+                                />
+                                {{ day.label }}
+                            </label>
                         </div>
-                        <div class="grid gap-2">
-                            <Label for="as_needed_time">Время</Label>
-                            <Input
-                                id="as_needed_time"
-                                v-model="form.time"
-                                type="time"
-                                name="time"
-                                class="w-32"
-                            />
-                        </div>
+                        <InputError
+                            id="as_needed_day-error"
+                            :message="form.errors.day"
+                        />
+                    </fieldset>
+
+                    <div class="grid gap-2">
+                        <Label for="as_needed_time" class="text-base"
+                            >Время</Label
+                        >
+                        <Input
+                            id="as_needed_time"
+                            v-model="form.time"
+                            type="time"
+                            name="time"
+                            class="h-11 w-36 text-lg"
+                            :aria-invalid="form.errors.time ? true : undefined"
+                            aria-describedby="as_needed_time-error"
+                        />
+                        <InputError
+                            id="as_needed_time-error"
+                            :message="form.errors.time"
+                        />
                     </div>
-                    <InputError :message="form.errors.day" />
-                    <InputError :message="form.errors.time" />
 
                     <DialogFooter>
                         <Button
                             type="button"
                             variant="outline"
+                            size="lg"
                             @click="open = false"
                         >
-                            Отмена
+                            Закрыть
                         </Button>
                         <Button
                             type="submit"
+                            size="lg"
                             :disabled="form.processing"
+                            :aria-busy="form.processing"
                             data-test="save-as-needed"
                         >
+                            <Spinner v-if="form.processing" class="size-5" />
                             Записать
                         </Button>
                     </DialogFooter>

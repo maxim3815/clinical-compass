@@ -5,6 +5,7 @@ use App\Enums\DoseEventStatus;
 use App\Enums\DoseSkipReason;
 use App\Enums\PrescriptionCloseReason;
 use App\Enums\RussianTimezone;
+use App\Enums\Sex;
 use App\Models\AsNeededDose;
 use App\Models\Prescription;
 use App\Models\User;
@@ -201,5 +202,31 @@ test('medications added by the patient count as prescriptions on the home page',
         ->assertInertia(fn (Assert $page) => $page
             ->where('hasPrescriptions', true)
             ->where('today.groups', []),
+        );
+});
+
+test('a female patient sees the reasons and buttons in the feminine', function () {
+    timedPrescription($this->patient, $this->aviandr, ['morning' => '08:00'], $this->weekAgo);
+    app(SyncDoseEvents::class)->handle($this->patient);
+    doseOn($this->patient, '2026-10-19', 'morning')->update(['status' => DoseEventStatus::Skipped, 'skip_reason' => DoseSkipReason::Forgot, 'marked_at' => now()]);
+
+    // Пол не указан: как раньше, в мужском роде.
+    $this->actingAs($this->patient)
+        ->get(route('patient.home'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('femalePatient', false)
+            ->where('skipReasons.0.label', 'Забыл')
+            ->where('today.groups.0.doses.0.status_text', 'Не принят: забыл'),
+        );
+
+    $this->patient->patientProfile?->update(['sex' => Sex::Female]);
+
+    $this->actingAs($this->patient->refresh())
+        ->get(route('patient.home'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('femalePatient', true)
+            ->where('skipReasons.0.label', 'Забыла')
+            ->where('skipReasons.1.label', 'Плохо себя чувствовала или побочные эффекты')
+            ->where('today.groups.0.doses.0.status_text', 'Не принят: забыла'),
         );
 });

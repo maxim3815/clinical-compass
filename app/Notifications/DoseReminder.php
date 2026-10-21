@@ -62,7 +62,7 @@ class DoseReminder extends Notification implements ShouldQueue
             ->tag($this->tag($doses))
             ->renotify()
             ->requireInteraction()
-            ->action($doses->count() > 1 ? 'Принял всё' : 'Принял', 'take')
+            ->action($this->takeLabel($notifiable, $doses->count()), 'take')
             ->action('Через 15 минут', 'snooze')
             ->data([
                 'url' => $this->url($doses),
@@ -75,6 +75,16 @@ class DoseReminder extends Notification implements ShouldQueue
                 'urgency' => 'high',
                 'topic' => $this->tag($doses),
             ]);
+    }
+
+    /**
+     * Кнопка отметки, у пациентки в женском роде: «Приняла всё».
+     */
+    private function takeLabel(User $notifiable, int $count): string
+    {
+        $verb = $notifiable->isFemalePatient() ? 'Приняла' : 'Принял';
+
+        return $count > 1 ? $verb.' всё' : $verb;
     }
 
     /**

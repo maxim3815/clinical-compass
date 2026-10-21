@@ -27,6 +27,8 @@ declare module '@inertiajs/core' {
             patientSignals: number;
             // Открытый ключ VAPID для подписки на пуши. У гостя null.
             vapidPublicKey: string | null;
+            // Пациентка: кнопки отметки приёма в женском роде.
+            femalePatient: boolean;
             [key: string]: unknown;
         };
         flashDataType: {

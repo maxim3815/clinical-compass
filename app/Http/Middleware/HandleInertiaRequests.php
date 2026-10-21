@@ -44,6 +44,8 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user()?->only(['id', 'name', 'login', 'role']),
             ],
+            // Пациентке кнопки отметки приёма пишутся в женском роде: «Приняла», «Не приняла».
+            'femalePatient' => fn (): bool => (bool) $request->user()?->isFemalePatient(),
             // Счётчик в пункте меню чата. Дальше его обновляют события в реальном времени.
             'unreadMessages' => fn (): int => $request->user() === null ? 0 : UnreadMessages::count($request->user()),
             // Счётчик у пункта меню «Пациенты» есть только у врача: пропуски приёма и противопоказания без решения.

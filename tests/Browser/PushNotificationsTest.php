@@ -179,7 +179,9 @@ test('doctor turns push on from the banner and loses it on logout', function () 
         ->assertSee('Включите уведомления о сообщениях')
         ->click('[data-test="push-banner-enable"]');
 
-    waitForPushState($page, '[data-test="push-banner"]', present: false);
+    // Баннер не пропадает молча: говорит, что уведомления включены и где их выключить.
+    waitForPushState($page, '[data-test="push-banner"]', present: false)
+        ->assertSeeIn('[data-test="push-banner-outcome"]', 'Уведомления включены');
     expect($doctor->pushSubscriptions()->count())->toBe(1);
 
     // На общем устройстве после выхода пуши врача сюда больше не приходят.

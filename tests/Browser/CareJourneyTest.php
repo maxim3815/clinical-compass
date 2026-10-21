@@ -111,7 +111,7 @@ test('a new patient goes from the invitation to an adherence signal at the docto
     $this->travelTo($day->setTime(20, 30));
     $patientPage->navigate(route('patient.home'))
         ->click('[data-test="skip-dose"]')
-        ->select('#skip_reason', 'forgot')
+        ->click('input[name="reason"][value="forgot"]')
         ->click('[data-test="save-dose-mark"]')
         ->assertSee('Не принят: забыл')
         ->assertNoJavaScriptErrors();
