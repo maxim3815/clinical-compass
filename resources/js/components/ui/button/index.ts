@@ -12,8 +12,9 @@ export const buttonVariants = cva(
           "bg-primary text-primary-foreground shadow-xs hover:bg-primary-hover",
         destructive:
           "bg-destructive text-destructive-foreground shadow-xs hover:bg-destructive/90 focus-visible:outline-destructive",
+        // Рамка как у полей ввода (3:1): кнопку узнают и при слабом зрении.
         outline:
-          "border border-border bg-card text-foreground shadow-xs hover:border-primary/30 hover:bg-accent hover:text-accent-foreground",
+          "border border-input bg-card text-foreground shadow-xs hover:border-primary/60 hover:bg-accent hover:text-accent-foreground",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary-hover",
         ghost:

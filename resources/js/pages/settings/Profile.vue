@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { Form, Head, usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NativeSelect } from '@/components/ui/native-select';
 import { edit } from '@/routes/profile';
 
 type PatientProfile = {
@@ -14,7 +15,7 @@ type PatientProfile = {
     timezone: string;
 };
 
-defineProps<{
+const props = defineProps<{
     patientProfile: PatientProfile | null;
     timezones: { value: string; label: string }[];
 }>();
@@ -32,6 +33,8 @@ defineOptions({
 
 const page = usePage();
 const user = computed(() => page.props.auth.user);
+
+const timezone = ref(props.patientProfile?.timezone ?? '');
 </script>
 
 <template>
@@ -53,31 +56,33 @@ const user = computed(() => page.props.auth.user);
         <Form
             v-bind="ProfileController.update.form()"
             class="space-y-6"
+            novalidate
             v-slot="{ errors, processing }"
         >
             <div class="grid gap-2">
                 <Label for="name">ФИО</Label>
                 <Input
                     id="name"
-                    class="mt-1 block w-full"
                     name="name"
                     :default-value="user.name"
                     required
                     autocomplete="name"
                     placeholder="Фамилия Имя Отчество"
+                    :aria-invalid="errors.name ? true : undefined"
+                    aria-describedby="name-error"
                 />
-                <InputError class="mt-2" :message="errors.name" />
+                <InputError id="name-error" :message="errors.name" />
             </div>
 
             <div class="grid gap-2">
                 <Label for="login">Логин</Label>
                 <Input
                     id="login"
-                    class="mt-1 block w-full"
                     :default-value="user.login"
                     disabled
+                    aria-describedby="login-hint"
                 />
-                <p class="text-sm text-muted-foreground">
+                <p id="login-hint" class="text-base text-muted-foreground">
                     Логин изменить нельзя.
                 </p>
             </div>
@@ -89,46 +94,58 @@ const user = computed(() => page.props.auth.user);
                     >
                     <Input
                         id="birth_date"
-                        class="mt-1 block w-full"
                         name="birth_date"
                         type="date"
                         :default-value="patientProfile.birth_date ?? ''"
                         autocomplete="bday"
+                        :aria-invalid="errors.birth_date ? true : undefined"
+                        aria-describedby="birth_date-error"
                     />
-                    <InputError class="mt-2" :message="errors.birth_date" />
+                    <InputError
+                        id="birth_date-error"
+                        :message="errors.birth_date"
+                    />
                 </div>
 
                 <div class="grid gap-2">
                     <Label for="timezone">Часовой пояс</Label>
-                    <select
+                    <NativeSelect
                         id="timezone"
                         name="timezone"
-                        class="mt-1 h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm"
+                        v-model="timezone"
                         required
+                        :aria-invalid="errors.timezone ? true : undefined"
+                        aria-describedby="timezone-hint timezone-error"
                     >
                         <option
-                            v-for="timezone in timezones"
-                            :key="timezone.value"
-                            :value="timezone.value"
-                            :selected="
-                                timezone.value === patientProfile.timezone
-                            "
+                            v-for="option in timezones"
+                            :key="option.value"
+                            :value="option.value"
                         >
-                            {{ timezone.label }}
+                            {{ option.label }}
                         </option>
-                    </select>
-                    <p class="text-sm text-muted-foreground">
+                    </NativeSelect>
+                    <p
+                        id="timezone-hint"
+                        class="text-base text-muted-foreground"
+                    >
                         По нему будут приходить напоминания о приёме препаратов.
                     </p>
-                    <InputError class="mt-2" :message="errors.timezone" />
+                    <InputError
+                        id="timezone-error"
+                        :message="errors.timezone"
+                    />
                 </div>
             </template>
 
-            <div class="flex items-center gap-4">
-                <Button :disabled="processing" data-test="update-profile-button"
-                    >Сохранить</Button
-                >
-            </div>
+            <Button
+                size="lg"
+                class="w-full sm:w-auto"
+                :disabled="processing"
+                data-test="update-profile-button"
+            >
+                Сохранить
+            </Button>
         </Form>
     </div>
 </template>

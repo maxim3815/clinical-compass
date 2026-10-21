@@ -74,6 +74,27 @@ test('the form shows the chosen time', function () {
         );
 });
 
+test('patient who came from the today screen goes back there after saving', function () {
+    $prescription = regularPrescription($this->patient, $this->strength, ['morning' => '1']);
+
+    $this->actingAs($this->patient)
+        ->get(route('patient.intake-times.edit', ['prescription' => $prescription, 'from' => 'today']))
+        ->assertInertia(fn (Assert $page) => $page->where('fromToday', true));
+
+    $this->actingAs($this->patient)
+        ->get(route('patient.intake-times.edit', $prescription))
+        ->assertInertia(fn (Assert $page) => $page->where('fromToday', false));
+
+    $this->actingAs($this->patient)
+        ->put(route('patient.intake-times.update', $prescription), ['times' => ['morning' => '08:00'], 'from' => 'today'])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect(route('patient.home'));
+
+    $this->actingAs($this->patient)
+        ->put(route('patient.intake-times.update', $prescription), ['times' => ['morning' => '08:00'], 'from' => 'elsewhere'])
+        ->assertSessionHasErrors('from');
+});
+
 test('patient chooses the time and dose events are planned in their timezone', function () {
     $this->patient->patientProfile?->update(['timezone' => RussianTimezone::Kamchatka]);
     $prescription = regularPrescription($this->patient, $this->strength, ['morning' => '1', 'evening' => '1'], ['starts_on' => '2026-10-19']);

@@ -31,8 +31,11 @@ test('patient on a phone adds another drug and marks it on the today screen', fu
         ->fill('#dose', '1 таблетка 250 мг')
         ->assertValue('#intake_time_0', '08:00')
         ->fill('#intake_time_0', '07:30')
+        // Необязательные поля свёрнуты.
+        ->assertMissing('#prescribed_by')
+        ->click('[data-test="optional-fields-button"]')
         ->fill('#prescribed_by', 'невролог Петров')
-        ->assertScript('document.documentElement.scrollWidth <= window.innerWidth')
+        ->assertScript(FITS_SCREEN)
         ->click('[data-test="save-medication"]')
         ->assertPathIs('/patient/medications')
         ->assertSee('Препарат добавлен.')
@@ -40,7 +43,7 @@ test('patient on a phone adds another drug and marks it on the today screen', fu
         ->assertSee('Доза: 1 таблетка 250 мг')
         ->assertSee('Утром, 7:30')
         ->assertSee('кто назначил: невролог Петров')
-        ->assertScript('document.documentElement.scrollWidth <= window.innerWidth')
+        ->assertScript(FITS_SCREEN)
         ->assertNoJavaScriptErrors();
 
     $page->click('[data-test="tab-today"]')
@@ -50,7 +53,7 @@ test('patient on a phone adds another drug and marks it on the today screen', fu
         ->click('[data-test="take-dose"]')
         ->assertSee('Отметка сохранена.')
         ->assertSee('Принят в 7:00')
-        ->assertScript('document.documentElement.scrollWidth <= window.innerWidth')
+        ->assertScript(FITS_SCREEN)
         ->assertNoJavaScriptErrors();
 
     $prescription = Prescription::query()->sole();

@@ -6,6 +6,7 @@ import type { Prescription } from '@/types';
 const props = defineProps<{
     prescription: Prescription;
     // Врачу у действующего назначения показываем, что пациент ещё не выбрал время приёма.
+    // У врача и текст плотнее, у пациента — не мельче 16 px.
     forDoctor?: boolean;
 }>();
 
@@ -42,33 +43,46 @@ const closing = computed(() => {
 
 <template>
     <article
-        class="flex flex-col gap-3 rounded-lg border p-4 break-words"
+        class="flex flex-col break-words"
+        :class="
+            forDoctor
+                ? 'gap-3 rounded-lg border p-4 text-sm'
+                : 'gap-3 rounded-2xl border bg-card p-4 text-base shadow-xs'
+        "
         data-test="prescription"
     >
         <header class="flex flex-wrap items-center gap-2">
-            <h3 class="font-medium">
+            <!-- По id названия кнопки карточки озвучиваются вместе с препаратом. -->
+            <h3
+                :id="`prescription-${prescription.id}-title`"
+                :class="
+                    forDoctor
+                        ? 'text-base font-medium'
+                        : 'text-lg font-semibold'
+                "
+            >
                 {{ prescription.drug.name
                 }}<template v-if="prescription.strength"
                     >, {{ prescription.strength }}</template
                 >
             </h3>
-            <Badge variant="secondary">{{ prescription.kind_label }}</Badge>
-            <Badge v-if="prescription.status === 'upcoming'" variant="outline">
+            <Badge variant="secondary" :class="{ 'text-base': !forDoctor }">
+                {{ prescription.kind_label }}
+            </Badge>
+            <Badge
+                v-if="prescription.status === 'upcoming'"
+                variant="outline"
+                :class="{ 'text-base': !forDoctor }"
+            >
                 Начнётся {{ prescription.starts_on }}
             </Badge>
         </header>
 
-        <p
-            v-if="prescription.kind === 'regular' && prescription.dose"
-            class="text-sm"
-        >
+        <p v-if="prescription.kind === 'regular' && prescription.dose">
             <span class="font-medium">Доза:</span> {{ prescription.dose }}
         </p>
 
-        <ul
-            v-if="prescription.kind === 'regular'"
-            class="flex flex-col gap-1 text-sm"
-        >
+        <ul v-if="prescription.kind === 'regular'" class="flex flex-col gap-1">
             <li
                 v-for="intake in prescription.intakes"
                 :key="intake.time_of_day"
@@ -89,10 +103,7 @@ const closing = computed(() => {
             </li>
         </ul>
 
-        <div
-            v-else-if="prescription.as_needed"
-            class="flex flex-col gap-1 text-sm"
-        >
+        <div v-else-if="prescription.as_needed" class="flex flex-col gap-1">
             <p>
                 <span class="font-medium">За приём:</span>
                 {{ prescription.as_needed.dose }}
@@ -102,11 +113,14 @@ const closing = computed(() => {
             </p>
         </div>
 
-        <p v-if="prescription.instruction" class="text-sm">
+        <p
+            v-if="prescription.instruction"
+            :class="{ 'rounded-xl bg-muted p-3': !forDoctor }"
+        >
             {{ prescription.instruction }}
         </p>
 
-        <p class="text-sm text-muted-foreground">
+        <p class="text-muted-foreground">
             {{ period }}
             <template v-if="prescription.prescriber">
                 · назначил врач {{ prescription.prescriber }}
@@ -116,7 +130,7 @@ const closing = computed(() => {
             </template>
         </p>
 
-        <div v-if="closing" class="text-sm" data-test="prescription-closing">
+        <div v-if="closing" data-test="prescription-closing">
             <p class="font-medium">{{ closing }}</p>
             <p v-if="prescription.cancel_comment" class="text-muted-foreground">
                 {{ prescription.cancel_comment }}
@@ -124,6 +138,8 @@ const closing = computed(() => {
         </div>
 
         <slot name="safety" />
+
+        <slot name="notice" />
 
         <div v-if="$slots.actions" class="flex flex-wrap gap-2">
             <slot name="actions" />

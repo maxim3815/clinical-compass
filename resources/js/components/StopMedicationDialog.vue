@@ -48,24 +48,27 @@ function submit(): void {
     <Dialog v-model:open="open">
         <DialogContent data-test="stop-medication-dialog">
             <DialogHeader>
-                <DialogTitle>Прекратить приём?</DialogTitle>
-                <DialogDescription v-if="prescription">
+                <DialogTitle class="text-xl">Прекратить приём?</DialogTitle>
+                <DialogDescription v-if="prescription" class="text-base">
                     {{ prescription.drug.name }},
-                    {{ prescription.kind_label.toLowerCase() }}. Препарат
-                    пропадёт из списка, будущих приёмов в «Сегодня» не будет.
-                    Отметки прошлых приёмов сохранятся.
+                    {{ prescription.kind_label.toLowerCase() }}. Отметьте, если
+                    вы уже не принимаете препарат или врач, который его
+                    назначил, его отменил. Препарат пропадёт из списка, будущих
+                    приёмов в «Сегодня» не будет. Отметки прошлых приёмов
+                    сохранятся.
                 </DialogDescription>
             </DialogHeader>
 
             <DialogFooter>
                 <DialogClose as-child>
-                    <Button type="button" variant="outline">
+                    <Button type="button" variant="outline" size="lg">
                         Не прекращать
                     </Button>
                 </DialogClose>
                 <Button
                     type="button"
                     variant="destructive"
+                    size="lg"
                     :disabled="form.processing"
                     data-test="confirm-stop-medication"
                     @click="submit"

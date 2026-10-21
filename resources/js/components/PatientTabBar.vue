@@ -58,7 +58,7 @@ const tabs = computed<(NavItem & { name: string })[]>(() => [
             <li v-for="tab in tabs" :key="tab.name">
                 <Link
                     :href="tab.href"
-                    class="group flex h-full flex-col items-center justify-center gap-1 text-sm font-medium outline-none focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-ring focus-visible:outline-solid max-[21rem]:text-xs"
+                    class="group flex h-full flex-col items-center justify-center gap-1 text-base font-medium tracking-tight outline-none focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-ring focus-visible:outline-solid max-[21rem]:text-sm"
                     :class="
                         tab.isActive
                             ? 'text-primary'
@@ -68,7 +68,7 @@ const tabs = computed<(NavItem & { name: string })[]>(() => [
                     :data-test="`tab-${tab.name}`"
                 >
                     <span
-                        class="relative flex h-8 w-16 items-center justify-center rounded-full transition-colors"
+                        class="relative flex h-8 w-14 items-center justify-center rounded-full transition-colors"
                         :class="
                             tab.isActive
                                 ? 'bg-secondary'
@@ -85,10 +85,13 @@ const tabs = computed<(NavItem & { name: string })[]>(() => [
                             {{ tab.badge }}
                         </span>
                     </span>
-                    <!-- Крупный шрифт на телефоне: длинная подпись переносится по слогам, а не вылезает. -->
+                    <!--
+                        Подпись 16 px и на экране 360 px. Полужирной активную не делаем: «Препараты»
+                        тогда не помещается. Уже 336 px и с крупным шрифтом подпись меньше
+                        или переносится по слогам.
+                    -->
                     <span
-                        class="max-w-full px-0.5 text-center leading-tight hyphens-auto"
-                        :class="{ 'font-semibold': tab.isActive }"
+                        class="max-w-full text-center leading-tight hyphens-auto"
                         >{{ tab.title }}</span
                     >
                     <span v-if="tab.badge" class="sr-only">

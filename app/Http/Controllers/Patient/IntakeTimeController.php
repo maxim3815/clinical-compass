@@ -13,11 +13,13 @@ use App\Models\User;
 use App\Support\Dose;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Пациент выбирает время приёмов регулярного назначения врача.
+ * Пациент выбирает время приёмов регулярного назначения врача. Со страницы «Сегодня» (`?from=today`)
+ * пациент после сохранения возвращается туда же, иначе — в «Мои препараты».
  */
 class IntakeTimeController extends Controller
 {
@@ -47,6 +49,7 @@ class IntakeTimeController extends Controller
                 'has_times' => $prescription->intakes->every(fn (PrescriptionIntake $intake): bool => $intake->time !== null),
             ],
             'timezone' => $patient->patientProfile?->timezone->label(),
+            'fromToday' => $request->query('from') === 'today',
         ]);
     }
 
@@ -66,6 +69,7 @@ class IntakeTimeController extends Controller
                 "times.{$timeOfDay}" => ['required', 'date_format:H:i'],
             ])->all(),
             'times.*' => ['distinct'],
+            'from' => ['nullable', Rule::in(['today'])],
         ], [
             'times' => 'Время приёма указано неверно.',
             'times.*.required' => 'Укажите время приёма.',
@@ -83,7 +87,7 @@ class IntakeTimeController extends Controller
             ? ['type' => 'success', 'message' => 'Время приёма сохранено.']
             : ['type' => 'info', 'message' => 'Изменений нет, время осталось прежним.']);
 
-        return to_route('patient.medications');
+        return to_route(($validated['from'] ?? null) === 'today' ? 'patient.home' : 'patient.medications');
     }
 
     /**

@@ -33,13 +33,13 @@ const { ready, installed, method, install } = useInstallApp();
             description="Компас на экране «Домой» телефона"
         />
 
-        <div v-if="ready" class="flex flex-col items-start gap-3 text-sm">
+        <div v-if="ready" class="flex flex-col items-start gap-3">
             <p
                 v-if="installed"
                 class="flex items-center gap-2 font-medium"
                 data-test="app-installed"
             >
-                <CircleCheck class="size-4 text-success" />
+                <CircleCheck class="size-5 text-success" />
                 Приложение установлено
             </p>
 
@@ -48,7 +48,7 @@ const { ready, installed, method, install } = useInstallApp();
                     Установите приложение: оно откроется с экрана «Домой» одним
                     нажатием, как обычное приложение.
                 </p>
-                <Button data-test="install-button" @click="install">
+                <Button size="lg" data-test="install-button" @click="install">
                     Установить
                 </Button>
             </template>

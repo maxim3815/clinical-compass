@@ -38,6 +38,9 @@ const props = defineProps<{
 const page = usePage();
 const me = computed(() => page.props.auth.user.id);
 
+// У пациента текст не мельче 16 px, у врача на компьютере плотнее.
+const isPatient = computed(() => page.props.auth.user.role === 'patient');
+
 // Лента живёт на странице: новые сообщения приходят событиями, более ранние — по кнопке.
 const messages = ref<ChatMessage[]>([...props.chat.messages]);
 const hasEarlier = ref(props.chat.has_earlier);
@@ -204,18 +207,25 @@ async function scrollToBottom(): Promise<void> {
     <!--
         Лента растягивается на всё место, которое страница отвела чату: страница чата
         высотой с экран, поэтому поле и кнопка «Отправить» видны без прокрутки.
+        Новые сообщения скринридер читает сам (role="log"), а подгруженные ранние — нет:
+        пока они грузятся, лента занята (aria-busy).
     -->
-    <div class="flex min-h-0 flex-1 flex-col gap-3">
+    <div
+        class="flex min-h-0 flex-1 flex-col gap-3"
+        :class="isPatient ? 'text-base' : 'text-sm'"
+    >
         <div
             ref="list"
-            class="flex min-h-40 flex-1 flex-col gap-2 overflow-y-auto rounded-lg border bg-card p-3"
-            aria-live="polite"
+            class="flex min-h-40 flex-1 flex-col gap-2 overflow-y-auto rounded-2xl border bg-card p-3"
+            role="log"
+            aria-label="Переписка"
+            :aria-busy="earlier.processing"
             data-test="chat-messages"
         >
             <Button
                 v-if="hasEarlier"
                 variant="ghost"
-                size="sm"
+                :size="isPatient ? 'lg' : 'sm'"
                 class="self-center"
                 :disabled="earlier.processing"
                 @click="loadEarlier"
@@ -225,7 +235,7 @@ async function scrollToBottom(): Promise<void> {
 
             <p
                 v-if="messages.length === 0"
-                class="m-auto max-w-sm text-center text-sm text-muted-foreground"
+                class="m-auto max-w-sm text-center text-muted-foreground"
             >
                 {{ empty }}
             </p>
@@ -233,7 +243,8 @@ async function scrollToBottom(): Promise<void> {
             <template v-for="(message, i) in messages" :key="message.id">
                 <p
                     v-if="i === 0 || messages[i - 1].date !== message.date"
-                    class="my-1 self-center text-xs text-muted-foreground"
+                    class="my-1 self-center text-muted-foreground"
+                    :class="isPatient ? 'text-base' : 'text-xs'"
                 >
                     {{ message.date }}
                 </p>
@@ -248,16 +259,19 @@ async function scrollToBottom(): Promise<void> {
                     data-test="chat-message"
                 >
                     <p
-                        class="rounded-2xl px-3 py-2 text-sm wrap-anywhere whitespace-pre-wrap"
+                        class="rounded-2xl px-3 py-2 wrap-anywhere whitespace-pre-wrap"
                         :class="
                             message.sender_id === me
-                                ? 'bg-primary text-primary-foreground'
-                                : 'bg-muted'
+                                ? 'rounded-br-md bg-primary text-primary-foreground'
+                                : 'rounded-bl-md bg-muted'
                         "
                     >
                         {{ message.body }}
                     </p>
-                    <p class="text-xs text-muted-foreground">
+                    <p
+                        class="text-muted-foreground"
+                        :class="isPatient ? 'text-base' : 'text-xs'"
+                    >
                         {{ message.time }}
                         <template v-if="message.sender_id === me">
                             · {{ message.read ? 'Прочитано' : 'Отправлено' }}
@@ -267,38 +281,49 @@ async function scrollToBottom(): Promise<void> {
             </template>
         </div>
 
-        <form class="flex flex-col gap-2" @submit.prevent="send">
-            <Label for="chat-body" class="sr-only">Сообщение</Label>
-            <Textarea
-                id="chat-body"
-                v-model="form.body"
-                name="body"
-                rows="2"
-                class="max-h-40"
-                :placeholder="placeholder"
-                :aria-invalid="form.errors.body ? true : undefined"
-                @keydown.enter.ctrl.exact.prevent="send"
-                @keydown.enter.meta.exact.prevent="send"
-            />
-            <InputError :message="form.errors.body" />
-
-            <div class="flex items-center justify-between gap-3">
-                <p class="text-xs text-muted-foreground">
-                    <span v-if="tooLong" class="text-destructive">
-                        {{ form.body.length }} из {{ MAX_LENGTH }} символов
-                    </span>
-                    <span v-else class="hidden md:inline">
-                        Ctrl+Enter — отправить
-                    </span>
-                </p>
+        <!--
+            «Отправить» в одной строке с полем: когда на телефоне открыта клавиатура, браузер
+            показывает поле, и кнопка рядом с ним тоже видна.
+        -->
+        <form class="flex flex-col gap-1" @submit.prevent="send">
+            <div class="flex items-end gap-2">
+                <Label for="chat-body" class="sr-only">Сообщение</Label>
+                <Textarea
+                    id="chat-body"
+                    v-model="form.body"
+                    name="body"
+                    rows="1"
+                    class="max-h-40 min-h-11 flex-1"
+                    :placeholder="placeholder"
+                    :aria-invalid="form.errors.body ? true : undefined"
+                    aria-describedby="chat-body-error"
+                    @keydown.enter.ctrl.exact.prevent="send"
+                    @keydown.enter.meta.exact.prevent="send"
+                />
                 <Button
                     type="submit"
+                    :size="isPatient ? 'lg' : 'default'"
                     :disabled="form.processing"
                     data-test="send-message"
                 >
                     Отправить
                 </Button>
             </div>
+            <InputError id="chat-body-error" :message="form.errors.body" />
+
+            <p
+                v-if="tooLong"
+                class="text-destructive"
+                :class="isPatient ? 'text-base' : 'text-xs'"
+            >
+                {{ form.body.length }} из {{ MAX_LENGTH }} символов
+            </p>
+            <p
+                v-else-if="!isPatient"
+                class="hidden text-xs text-muted-foreground md:block"
+            >
+                Ctrl+Enter — отправить
+            </p>
         </form>
     </div>
 </template>

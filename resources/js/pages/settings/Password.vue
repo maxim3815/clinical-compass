@@ -48,6 +48,7 @@ defineOptions({
                 'current_password',
             ]"
             class="space-y-6"
+            novalidate
             v-slot="{ errors, processing }"
         >
             <div class="grid gap-2">
@@ -55,10 +56,14 @@ defineOptions({
                 <PasswordInput
                     id="current_password"
                     name="current_password"
-                    class="mt-1 block w-full"
+                    :aria-invalid="errors.current_password ? true : undefined"
+                    aria-describedby="current_password-error"
                     autocomplete="current-password"
                 />
-                <InputError :message="errors.current_password" />
+                <InputError
+                    id="current_password-error"
+                    :message="errors.current_password"
+                />
             </div>
 
             <div class="grid gap-2">
@@ -66,11 +71,12 @@ defineOptions({
                 <PasswordInput
                     id="password"
                     name="password"
-                    class="mt-1 block w-full"
+                    :aria-invalid="errors.password ? true : undefined"
+                    aria-describedby="password-error"
                     autocomplete="new-password"
                     :passwordrules="passwordRules"
                 />
-                <InputError :message="errors.password" />
+                <InputError id="password-error" :message="errors.password" />
             </div>
 
             <div class="grid gap-2">
@@ -78,21 +84,27 @@ defineOptions({
                 <PasswordInput
                     id="password_confirmation"
                     name="password_confirmation"
-                    class="mt-1 block w-full"
+                    :aria-invalid="
+                        errors.password_confirmation ? true : undefined
+                    "
+                    aria-describedby="password_confirmation-error"
                     autocomplete="new-password"
                     :passwordrules="passwordRules"
                 />
-                <InputError :message="errors.password_confirmation" />
+                <InputError
+                    id="password_confirmation-error"
+                    :message="errors.password_confirmation"
+                />
             </div>
 
-            <div class="flex items-center gap-4">
-                <Button
-                    :disabled="processing"
-                    data-test="update-password-button"
-                >
-                    Сохранить
-                </Button>
-            </div>
+            <Button
+                size="lg"
+                class="w-full sm:w-auto"
+                :disabled="processing"
+                data-test="update-password-button"
+            >
+                Сохранить
+            </Button>
         </Form>
     </div>
 </template>

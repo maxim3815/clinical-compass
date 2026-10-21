@@ -24,19 +24,22 @@ test('patient on a phone chooses the time of intakes from the home page', functi
         ->assertValue('#time-morning', '08:00')
         ->assertValue('#time-evening', '20:00')
         ->assertSee('Москва (UTC+3)')
+        // Пришёл с «Сегодня»: назад и после сохранения — туда же.
+        ->assertSeeIn('[data-test="back-link"]', 'Сегодня')
+        ->assertScript(FITS_SCREEN)
         ->fill('#time-evening', '21:30')
         ->click('[data-test="save-intake-times"]')
-        ->assertPathIs('/patient/medications')
+        ->assertPathIs('/patient')
         ->assertSee('Время приёма сохранено.')
+        ->assertDontSee('Настройте время приёма')
+        ->assertNoJavaScriptErrors();
+
+    $page->click('[data-test="tab-medications"]')
+        ->assertPathIs('/patient/medications')
         ->assertSee('Утром, 8:00:')
         ->assertSee('Вечером, 21:30:')
         ->assertSee('Изменить время')
-        ->assertScript('document.documentElement.scrollWidth <= window.innerWidth')
-        ->assertNoJavaScriptErrors();
-
-    $page->click('[data-test="tab-today"]')
-        ->assertPathIs('/patient')
-        ->assertDontSee('Настройте время приёма')
+        ->assertScript(FITS_SCREEN)
         ->assertNoJavaScriptErrors();
 
     // На завтра запланированы оба приёма.

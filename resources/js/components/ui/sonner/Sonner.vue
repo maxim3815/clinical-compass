@@ -15,7 +15,12 @@ const delegatedProps = reactiveOmit(props, "toastOptions")
 // Текст уведомления крупнее, чем по умолчанию: его читают и пациенты.
 const toastOptions = computed(() => ({
   ...props.toastOptions,
-  classes: { title: "text-[0.9375rem] leading-snug font-medium", ...props.toastOptions?.classes },
+  classes: {
+    title: "text-[0.9375rem] leading-snug font-medium",
+    // Кнопка в уведомлении («Понятно») под палец: 44 px.
+    actionButton: "!h-11 !rounded-lg !bg-primary !px-4 !text-base !font-medium !text-primary-foreground",
+    ...props.toastOptions?.classes,
+  },
 }))
 </script>
 

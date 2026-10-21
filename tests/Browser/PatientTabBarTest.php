@@ -47,12 +47,12 @@ test('patient moves between sections with the tab bar on a phone', function () {
         ->assertPathIs('/patient/medications')
         ->assertAttribute('[data-test="tab-medications"]', 'aria-current', 'page')
         ->assertAttributeMissing('[data-test="tab-today"]', 'aria-current')
-        // Вложенная страница остаётся в своём разделе, назад ведёт шапка.
+        // На форме панели вкладок нет: случайное касание не уносит введённое. Назад ведёт шапка.
         ->click('[data-test="add-medication-button"]')
         ->assertPathIs('/patient/medications/create')
-        ->assertAttribute('[data-test="tab-medications"]', 'aria-current', 'page')
+        ->assertMissing('[data-test="tab-bar"]')
         ->assertSeeIn('[data-test="back-link"]', 'Мои препараты')
-        ->assertScript(ABOVE_TAB_BAR)
+        ->assertScript(FITS_SCREEN)
         ->click('[data-test="back-link"]')
         ->assertPathIs('/patient/medications')
         ->click('[data-test="tab-chat"]')

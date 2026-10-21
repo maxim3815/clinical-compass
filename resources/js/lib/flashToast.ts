@@ -11,6 +11,16 @@ export function initializeFlashToast(): void {
             return;
         }
 
-        toast[data.type](data.message);
+        // Ошибку пациент может не успеть прочитать за 4 секунды: она висит, пока её не закроют
+        // крупной кнопкой «Понятно».
+        toast[data.type](
+            data.message,
+            data.type === 'error'
+                ? {
+                      duration: Infinity,
+                      action: { label: 'Понятно', onClick: () => {} },
+                  }
+                : {},
+        );
     });
 }

@@ -12,11 +12,12 @@ const delegatedProps = reactiveOmit(props, "class")
 const forwardedProps = useForwardProps(delegatedProps)
 </script>
 
+<!-- Отступы под крестик окна: на телефоне заголовок по центру, крестик справа. -->
 <template>
   <DialogTitle
     data-slot="dialog-title"
     v-bind="forwardedProps"
-    :class="cn('text-lg leading-snug font-semibold', props.class)"
+    :class="cn('px-8 text-lg leading-snug font-semibold sm:px-0 sm:pr-8', props.class)"
   >
     <slot />
   </DialogTitle>

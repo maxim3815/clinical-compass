@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { Head, usePage } from '@inertiajs/vue3';
 import { BellRing } from '@lucide/vue';
-import { computed } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import IosInstallSteps from '@/components/IosInstallSteps.vue';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
+import { isIos, isStandalone } from '@/composables/useInstallApp';
 import { usePushNotifications } from '@/composables/usePushNotifications';
 import { edit } from '@/routes/notifications';
 
@@ -24,6 +26,38 @@ const page = usePage();
 const isPatient = computed(() => page.props.auth.user.role === 'patient');
 
 const { state, busy, error, enable, disable } = usePushNotifications();
+
+// Где разрешать уведомления: сначала инструкция для этого устройства, остальные свёрнуты.
+type Device = 'browser' | 'android' | 'ios';
+
+const device = ref<Device>('browser');
+
+onMounted(() => {
+    device.value = isIos() ? 'ios' : isStandalone() ? 'android' : 'browser';
+});
+
+const steps: Record<Device, string> = {
+    browser:
+        'В браузере нажмите значок слева от адреса сайта, затем «Разрешения» или «Уведомления» и выберите «Разрешить».',
+    android:
+        'Удерживайте значок приложения на экране телефона, откройте «О приложении», затем «Уведомления» и включите их.',
+    ios: 'Откройте «Настройки» телефона, затем «Уведомления», выберите «Компас» и включите «Допуск уведомлений».',
+};
+
+const otherDevices = computed(() =>
+    (Object.keys(steps) as Device[]).filter((key) => key !== device.value),
+);
+
+const deviceNames: Record<Device, string> = {
+    browser: 'В браузере',
+    android: 'В приложении на Android',
+    ios: 'На iPhone',
+};
+
+// В установленном приложении нет кнопки браузера «Обновить».
+function reload(): void {
+    window.location.reload();
+}
 </script>
 
 <template>
@@ -42,15 +76,23 @@ const { state, busy, error, enable, disable } = usePushNotifications();
             "
         />
 
+        <p
+            v-if="state === 'loading'"
+            class="flex items-center gap-2 text-muted-foreground"
+        >
+            <Spinner class="size-5" />
+            Проверяем уведомления на этом устройстве…
+        </p>
+
         <div
-            v-if="state !== 'loading'"
-            class="flex flex-col items-start gap-3 text-sm"
+            v-else
+            class="flex flex-col items-start gap-3"
             data-test="push-settings"
             :data-state="state"
         >
             <template v-if="state === 'on'">
                 <p class="flex items-center gap-2 font-medium">
-                    <BellRing class="size-4 text-success" />
+                    <BellRing class="size-5 text-success" />
                     Уведомления включены на этом устройстве
                 </p>
                 <p v-if="isPatient" class="text-muted-foreground">
@@ -60,7 +102,9 @@ const { state, busy, error, enable, disable } = usePushNotifications();
                 </p>
                 <Button
                     variant="outline"
+                    size="lg"
                     :disabled="busy"
+                    :aria-busy="busy"
                     data-test="push-disable"
                     @click="disable"
                 >
@@ -80,19 +124,50 @@ const { state, busy, error, enable, disable } = usePushNotifications();
                     устройстве отдельно.
                 </p>
                 <Button
+                    size="lg"
                     :disabled="busy"
+                    :aria-busy="busy"
                     data-test="push-enable"
                     @click="enable"
                 >
+                    <Spinner v-if="busy" class="size-5" />
                     Включить
                 </Button>
             </template>
 
-            <p v-else-if="state === 'denied'" data-test="push-denied">
-                Уведомления для этого сайта запрещены в настройках браузера.
-                Разрешите их в настройках сайта (значок слева от адреса) или в
-                настройках приложения на телефоне, затем обновите страницу.
-            </p>
+            <div
+                v-else-if="state === 'denied'"
+                class="flex flex-col items-start gap-3"
+                data-test="push-denied"
+            >
+                <p>
+                    Уведомления на этом устройстве запрещены. Чтобы их
+                    разрешить:
+                </p>
+                <p class="font-medium">{{ steps[device] }}</p>
+                <p>Потом обновите эту страницу.</p>
+                <Button variant="outline" size="lg" @click="reload">
+                    Обновить страницу
+                </Button>
+                <details class="w-full">
+                    <summary
+                        class="flex min-h-11 cursor-pointer items-center rounded-lg font-medium text-primary outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring focus-visible:outline-solid"
+                    >
+                        Другое устройство
+                    </summary>
+                    <ul class="flex flex-col gap-2 pt-1">
+                        <li v-for="other in otherDevices" :key="other">
+                            <span class="font-medium"
+                                >{{ deviceNames[other] }}:</span
+                            >
+                            {{
+                                steps[other].charAt(0).toLowerCase() +
+                                steps[other].slice(1)
+                            }}
+                        </li>
+                    </ul>
+                </details>
+            </div>
 
             <template v-else-if="state === 'install'">
                 <p>
