@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import ClinicalButton from './ClinicalButton.vue';
+import ClinicalSelect from './ClinicalSelect.vue';
 
 interface Props {
     drugName?: string;
@@ -54,19 +55,11 @@ const reasons = [
             </button>
         </div>
 
-        <div class="flex flex-col gap-1.5">
-            <label class="text-xs font-semibold text-[#1E293B]"
-                >Причина завершения:</label
-            >
-            <select
-                v-model="selectedReason"
-                class="h-11 w-full rounded-xl border border-[#E2E8F0] bg-white px-3.5 text-sm text-[#1E293B] outline-none focus:border-[#235347] focus:ring-2 focus:ring-[#E8F2EC]"
-            >
-                <option v-for="r in reasons" :key="r" :value="r">
-                    {{ r }}
-                </option>
-            </select>
-        </div>
+        <ClinicalSelect
+            v-model="selectedReason"
+            label="Причина завершения:"
+            :options="reasons"
+        />
 
         <div class="flex flex-col gap-1.5">
             <label class="text-xs font-semibold text-[#1E293B]"

@@ -2,6 +2,10 @@ export { default as ClinicalButton } from './ClinicalButton.vue';
 export { default as ClinicalBadge } from './ClinicalBadge.vue';
 export { default as ClinicalSegmentedSwitch } from './ClinicalSegmentedSwitch.vue';
 export { default as ClinicalInput } from './ClinicalInput.vue';
+export {
+    default as ClinicalSelect,
+    type SelectOption,
+} from './ClinicalSelect.vue';
 export { default as ClinicalSearch } from './ClinicalSearch.vue';
 export { default as ClinicalPinInput } from './ClinicalPinInput.vue';
 export { default as ClinicalDosageStepper } from './ClinicalDosageStepper.vue';

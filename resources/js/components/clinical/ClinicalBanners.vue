@@ -55,8 +55,12 @@ const displayDescription = computed(() => {
                 🔔
             </div>
             <div>
-                <h4 class="text-sm font-bold text-[#1E293B]">{{ displayTitle }}</h4>
-                <p class="mt-0.5 text-xs text-[#64748B]">{{ displayDescription }}</p>
+                <h4 class="text-sm font-bold text-[#1E293B]">
+                    {{ displayTitle }}
+                </h4>
+                <p class="mt-0.5 text-xs text-[#64748B]">
+                    {{ displayDescription }}
+                </p>
             </div>
         </div>
 

@@ -6,6 +6,7 @@ import {
     ClinicalBadge,
     ClinicalSegmentedSwitch,
     ClinicalInput,
+    ClinicalSelect,
     ClinicalSearch,
     ClinicalPinInput,
     ClinicalDosageStepper,
@@ -42,6 +43,13 @@ import {
 const searchVal = ref('');
 const textVal = ref('Aviandr (Maritupirdine)');
 const focusedVal = ref('20 mg');
+const selectVal = ref('once_daily_morning');
+const frequencyOptions = [
+    { value: 'once_daily_morning', label: 'Once daily (Morning 8:00 AM)' },
+    { value: 'twice_daily', label: 'Twice daily (8:00 AM / 8:00 PM)' },
+    { value: 'three_times', label: 'Three times daily with meals' },
+    { value: 'as_needed', label: 'As needed (PRN, max 20mg/day)' },
+];
 const pinVal = ref('8419');
 const stepperVal = ref(1);
 const timeSwitch = ref('morning');
@@ -268,6 +276,12 @@ const multiMedList = ref([
                             placeholder="e.g. Aviandr"
                             hint="Введите торговое или международное наименование"
                         />
+                        <ClinicalSelect
+                            v-model="selectVal"
+                            label="Intake Frequency (Селект / Выпадающий список)"
+                            :options="frequencyOptions"
+                            hint="Симметричные скругления rounded-xl и выровненный шеврон"
+                        />
                         <ClinicalInput
                             v-model="focusedVal"
                             label="Daily Dosage"
@@ -283,6 +297,29 @@ const multiMedList = ref([
                     <div
                         class="flex flex-col justify-between gap-6 rounded-3xl border border-[#E2E8F0] bg-white p-6 shadow-xs"
                     >
+                        <div>
+                            <span
+                                class="mb-2 block text-xs font-bold text-[#64748B]"
+                            >
+                                Compact / Small Select (Размер sm для таблиц):
+                            </span>
+                            <ClinicalSelect
+                                model-value="active"
+                                size="sm"
+                                :options="[
+                                    { value: 'active', label: '🟢 Активен' },
+                                    {
+                                        value: 'paused',
+                                        label: '🟡 Приостановлен',
+                                    },
+                                    {
+                                        value: 'completed',
+                                        label: '⚪ Завершён',
+                                    },
+                                ]"
+                            />
+                        </div>
+
                         <div>
                             <span
                                 class="mb-2 block text-xs font-bold text-[#64748B]"
