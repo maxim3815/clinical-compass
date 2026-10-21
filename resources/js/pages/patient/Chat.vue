@@ -32,9 +32,16 @@ defineOptions({
 <template>
     <Head title="Чат с врачом" />
 
-    <div class="flex max-w-2xl flex-col gap-4 p-4">
+    <!--
+        Чат высотой с экран без шапки и панели вкладок (--patient-chrome в PatientLayout).
+        Если на узком экране или с крупным шрифтом всё не помещается, прокручивается сам чат,
+        и поле с кнопкой «Отправить» не уходят под панель.
+    -->
+    <div
+        class="flex h-[calc(100svh-var(--patient-chrome))] max-w-2xl flex-col gap-4 overflow-y-auto p-4"
+    >
         <div
-            class="flex items-start gap-3 rounded-lg border border-amber-500/50 bg-amber-50 p-3 text-sm"
+            class="flex items-start gap-3 rounded-xl border border-warning-border bg-warning-subtle p-3 text-sm"
             role="note"
             data-test="emergency-note"
         >

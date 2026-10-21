@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\SendMessage;
 use App\Models\User;
 
 test('doctor finds a patient and gives a password reset link, the patient sets a new password', function () {
@@ -28,6 +29,7 @@ test('doctor finds a patient and gives a password reset link, the patient sets a
 
     $page->click('[data-test="sidebar-menu-button"]')
         ->click('Выйти')
+        ->click('[data-test="confirm-logout"]')
         ->assertPathIs('/login')
         ->navigate($link)
         ->assertSee('Новый пароль')
@@ -37,12 +39,34 @@ test('doctor finds a patient and gives a password reset link, the patient sets a
         ->press('Сохранить пароль')
         ->assertPathIs('/patient')
         ->assertSee('Пароль изменён.')
-        ->click('[data-test="sidebar-menu-button"]')
-        ->click('Выйти')
+        ->click('[data-test="tab-settings"]')
+        ->click('[data-test="settings-logout"]')
+        ->assertSee('Напоминания и уведомления на этом устройстве перестанут приходить')
+        ->click('[data-test="confirm-logout"]')
         ->assertPathIs('/login')
         ->fill('login', 'ivanov')
         ->fill('password', 'new-secret-password')
         ->press('Войти')
         ->assertPathIs('/patient')
+        ->assertNoJavaScriptErrors();
+});
+
+test('doctor on a phone sees that the hidden menu has news', function () {
+    $doctor = User::factory()->doctor()->create(['login' => 'doctor']);
+    $patient = User::factory()->patientOf($doctor)->create();
+    app(SendMessage::class)->handle(careBetween($doctor, $patient), $patient, 'Добрый день! Можно вопрос?');
+
+    visit(route('login'))
+        ->on()->mobile()
+        ->fill('login', 'doctor')
+        ->fill('password', 'password')
+        ->press('Войти')
+        ->assertPathIs('/doctor/patients')
+        ->assertPresent('[data-test="menu-news"]')
+        ->click('[data-sidebar="trigger"]')
+        ->assertSeeIn('[data-test="nav-badge"]', '1')
+        ->click('Сообщения')
+        ->assertPathIs('/doctor/messages')
+        ->assertScript(FITS_SCREEN)
         ->assertNoJavaScriptErrors();
 });

@@ -168,8 +168,7 @@ test('settings say the app is installed when it is opened from the home screen',
         ->press('Войти')
         ->assertPathIs('/patient')
         ->assertMissing('[data-test="install-banner"]')
-        ->click('[data-sidebar="trigger"]')
-        ->click('Настройки')
+        ->click('[data-test="tab-settings"]')
         ->assertPathIs('/settings/profile')
         ->click('[href$="/settings/app"]')
         ->assertPathIs('/settings/app')
@@ -190,7 +189,7 @@ test('doctor sees neither the banner nor the app section of settings', function 
     offerInstall($page)->assertMissing('[data-test="install-banner"]');
 
     $page->navigate(route('profile.edit'))
-        ->assertSee('Профиль, пароль и уведомления')
+        ->assertSeeIn('nav[aria-label="Настройки"]', 'Уведомления')
         ->assertNotPresent('[href$="/settings/app"]')
         ->assertNoJavaScriptErrors();
 });

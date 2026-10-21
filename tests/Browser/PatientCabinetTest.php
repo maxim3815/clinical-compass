@@ -3,8 +3,6 @@
 use App\Enums\RussianTimezone;
 use App\Models\User;
 
-const FITS_SCREEN = 'document.documentElement.scrollWidth <= window.innerWidth';
-
 test('patient on a phone sees the doctor and changes the timezone', function () {
     $doctor = User::factory()->doctor()->create(['name' => 'Смирнова Анна Сергеевна']);
     $patient = User::factory()->patientOf($doctor)->create(['name' => 'Иванов Пётр Алексеевич', 'login' => 'ivanov']);
@@ -19,8 +17,7 @@ test('patient on a phone sees the doctor and changes the timezone', function () 
         ->assertSee('Смирнова Анна Сергеевна')
         ->assertSee('Психиатр')
         ->assertScript(FITS_SCREEN)
-        ->click('[data-sidebar="trigger"]')
-        ->click('Настройки')
+        ->click('[data-test="tab-settings"]')
         ->assertPathIs('/settings/profile')
         ->assertScript(FITS_SCREEN)
         ->select('timezone', 'Asia/Yekaterinburg')

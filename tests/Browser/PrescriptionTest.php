@@ -33,6 +33,7 @@ test('doctor prescribes aviandr twice a day and the patient sees it on a phone',
 
     $page->click('[data-test="sidebar-menu-button"]')
         ->click('Выйти')
+        ->click('[data-test="confirm-logout"]')
         ->assertPathIs('/login');
 
     visit(route('login'))
@@ -41,8 +42,7 @@ test('doctor prescribes aviandr twice a day and the patient sees it on a phone',
         ->fill('password', 'password')
         ->press('Войти')
         ->assertPathIs('/patient')
-        ->click('[data-sidebar="trigger"]')
-        ->click('Мои препараты')
+        ->click('[data-test="tab-medications"]')
         ->assertPathIs('/patient/medications')
         ->assertSee('Авиандр, 20 мг')
         ->assertSee('Утром: 1 таблетка, 20 мг')

@@ -71,6 +71,9 @@ expect()->extend('toBeOne', function () {
     return $this->toBe(1);
 });
 
+// Страница помещается в ширину экрана, горизонтальной прокрутки нет (browser-тесты на телефоне).
+const FITS_SCREEN = 'document.documentElement.scrollWidth <= window.innerWidth';
+
 /*
 |--------------------------------------------------------------------------
 | Functions

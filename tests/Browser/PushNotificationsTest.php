@@ -185,6 +185,7 @@ test('doctor turns push on from the banner and loses it on logout', function () 
     // На общем устройстве после выхода пуши врача сюда больше не приходят.
     $page->click('[data-test="sidebar-menu-button"]')
         ->click('Выйти')
+        ->click('[data-test="confirm-logout"]')
         ->assertPathIs('/login')
         ->assertNoJavaScriptErrors();
 
@@ -263,7 +264,9 @@ test('a message in a hidden chat tab stays unread until the tab is shown', funct
             ->press('Войти')
             ->assertPathIs('/patient')
             ->navigate(route('patient.chat.show'))
-            ->assertSee('Чат не для экстренной помощи');
+            ->assertSee('Чат не для экстренной помощи')
+            // Тестовый сервер отвечает, только пока тест ждёт: даём странице подписаться на канал.
+            ->wait(1);
 
         // Пациент свернул вкладку.
         $page->script(<<<'JS'

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { usePage } from '@inertiajs/vue3';
 import { ChevronsUpDown } from '@lucide/vue';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
+import SignOutDialog from '@/components/SignOutDialog.vue';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -19,6 +20,8 @@ import UserMenuContent from '@/components/UserMenuContent.vue';
 const page = usePage();
 const user = computed(() => page.props.auth.user);
 const { isMobile, state } = useSidebar();
+
+const signOutOpen = ref(false);
 </script>
 
 <template>
@@ -28,11 +31,13 @@ const { isMobile, state } = useSidebar();
                 <DropdownMenuTrigger as-child>
                     <SidebarMenuButton
                         size="lg"
-                        class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                        class="text-sidebar-accent-foreground data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                         data-test="sidebar-menu-button"
                     >
                         <UserInfo :user="user" />
-                        <ChevronsUpDown class="ml-auto size-4" />
+                        <ChevronsUpDown
+                            class="ml-auto size-4 text-sidebar-muted-foreground"
+                        />
                     </SidebarMenuButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
@@ -47,9 +52,13 @@ const { isMobile, state } = useSidebar();
                     align="end"
                     :side-offset="4"
                 >
-                    <UserMenuContent :user="user" />
+                    <UserMenuContent
+                        :user="user"
+                        @sign-out="signOutOpen = true"
+                    />
                 </DropdownMenuContent>
             </DropdownMenu>
+            <SignOutDialog v-model:open="signOutOpen" />
         </SidebarMenuItem>
     </SidebarMenu>
 </template>

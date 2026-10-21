@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Link, router } from '@inertiajs/vue3';
+import { Link } from '@inertiajs/vue3';
 import { LogOut, Settings } from '@lucide/vue';
 import {
     DropdownMenuGroup,
@@ -8,8 +8,6 @@ import {
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import UserInfo from '@/components/UserInfo.vue';
-import { unsubscribeBeforeLogout } from '@/lib/push';
-import { logout } from '@/routes';
 import { edit } from '@/routes/profile';
 import type { User } from '@/types';
 
@@ -17,15 +15,12 @@ type Props = {
     user: User;
 };
 
-// Сначала снимаем подписку на пуши этого браузера: на общем устройстве уведомления
-// не должны приходить прежнему пользователю.
-async function handleLogout(): Promise<void> {
-    await unsubscribeBeforeLogout();
-    router.flushAll();
-    router.visit(logout());
-}
-
 defineProps<Props>();
+
+// Выход переспрашивает окно в NavUser: меню при выборе пункта закрывается.
+const emit = defineEmits<{
+    signOut: [];
+}>();
 </script>
 
 <template>
@@ -47,7 +42,7 @@ defineProps<Props>();
     <DropdownMenuItem
         class="w-full cursor-pointer"
         data-test="logout-button"
-        @select="handleLogout"
+        @select="emit('signOut')"
     >
         <LogOut class="mr-2 h-4 w-4" />
         Выйти

@@ -6,7 +6,7 @@ test('pages stay light when the phone has the dark theme', function () {
     $doctor = User::factory()->doctor()->create();
     User::factory()->patientOf($doctor)->create(['login' => 'ivanov']);
 
-    $light = "!document.documentElement.classList.contains('dark') && getComputedStyle(document.body).backgroundColor === 'rgb(255, 255, 255)'";
+    $light = "!document.documentElement.classList.contains('dark') && getComputedStyle(document.body).backgroundColor === 'rgb(251, 249, 245)'";
 
     visit(route('login'))
         ->inDarkMode()
@@ -18,10 +18,9 @@ test('pages stay light when the phone has the dark theme', function () {
         ->press('Войти')
         ->assertPathIs('/patient')
         ->assertScript($light)
-        ->click('[data-sidebar="trigger"]')
-        ->click('Настройки')
+        ->click('[data-test="tab-settings"]')
         ->assertPathIs('/settings/profile')
-        ->assertSee('Профиль, пароль, уведомления и приложение')
+        ->assertSeeIn('nav[aria-label="Настройки"]', 'Приложение')
         ->assertDontSee('Оформление')
         ->assertScript($light)
         ->assertNoJavaScriptErrors();

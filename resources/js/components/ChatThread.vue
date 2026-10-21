@@ -201,10 +201,14 @@ async function scrollToBottom(): Promise<void> {
 </script>
 
 <template>
-    <div class="flex flex-col gap-3">
+    <!--
+        Лента растягивается на всё место, которое страница отвела чату: страница чата
+        высотой с экран, поэтому поле и кнопка «Отправить» видны без прокрутки.
+    -->
+    <div class="flex min-h-0 flex-1 flex-col gap-3">
         <div
             ref="list"
-            class="flex h-[55svh] min-h-64 flex-col gap-2 overflow-y-auto rounded-lg border p-3"
+            class="flex min-h-40 flex-1 flex-col gap-2 overflow-y-auto rounded-lg border bg-card p-3"
             aria-live="polite"
             data-test="chat-messages"
         >

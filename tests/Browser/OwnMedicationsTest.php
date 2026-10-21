@@ -21,8 +21,7 @@ test('patient on a phone adds another drug and marks it on the today screen', fu
         ->fill('password', 'password')
         ->press('Войти')
         ->assertPathIs('/patient')
-        ->click('[data-sidebar="trigger"]')
-        ->click('Мои препараты')
+        ->click('[data-test="tab-medications"]')
         ->assertPathIs('/patient/medications')
         ->assertSee('Добавленные мной')
         ->click('[data-test="add-medication-button"]')
@@ -44,8 +43,7 @@ test('patient on a phone adds another drug and marks it on the today screen', fu
         ->assertScript('document.documentElement.scrollWidth <= window.innerWidth')
         ->assertNoJavaScriptErrors();
 
-    $page->click('[data-sidebar="trigger"]')
-        ->click('Сегодня')
+    $page->click('[data-test="tab-today"]')
         ->assertPathIs('/patient')
         ->assertSee('Фенибут')
         ->assertSee('1 таблетка 250 мг')

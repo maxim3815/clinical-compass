@@ -36,7 +36,10 @@ defineOptions({
 <template>
     <Head :title="`Чат: ${patient.name}`" />
 
-    <div class="flex max-w-2xl flex-col gap-4 p-4">
+    <!-- Чат высотой с экран без шапки (h-14 и рамка). -->
+    <div
+        class="flex h-[calc(100svh-3.5rem-1px)] min-h-[28rem] max-w-2xl flex-col gap-4 p-4"
+    >
         <div class="flex flex-wrap items-center justify-between gap-2">
             <h1 class="text-xl font-semibold tracking-tight">
                 {{ patient.name }}

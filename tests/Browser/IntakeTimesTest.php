@@ -34,8 +34,7 @@ test('patient on a phone chooses the time of intakes from the home page', functi
         ->assertScript('document.documentElement.scrollWidth <= window.innerWidth')
         ->assertNoJavaScriptErrors();
 
-    $page->click('[data-sidebar="trigger"]')
-        ->click('Сегодня')
+    $page->click('[data-test="tab-today"]')
         ->assertPathIs('/patient')
         ->assertDontSee('Настройте время приёма')
         ->assertNoJavaScriptErrors();
