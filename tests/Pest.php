@@ -4,9 +4,13 @@ use App\Enums\DoseSkipReason;
 use App\Enums\PrescriptionCloseReason;
 use App\Models\AsNeededDose;
 use App\Models\CareRelationship;
+use App\Models\Diagnosis;
 use App\Models\DoseEvent;
 use App\Models\Drug;
 use App\Models\DrugStrength;
+use App\Models\Icd10Code;
+use App\Models\Observation;
+use App\Models\ObservationType;
 use App\Models\Prescription;
 use App\Models\PrescriptionIntake;
 use App\Models\User;
@@ -15,6 +19,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Routing\Events\RouteMatched;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Session;
@@ -370,4 +375,68 @@ function careBetween(User $doctor, User $patient): CareRelationship
 function subscribeToPush(User $user): PushSubscription
 {
     return $user->updatePushSubscription('https://fcm.googleapis.com/fcm/send/'.Str::random(40), 'p256dh-key', 'auth-token', 'aes128gcm');
+}
+
+/**
+ * Справочник препаратов, виды фактов и правила проверки из файлов приложения, как на стенде.
+ * Находки у уже существующих назначений после этого пересчитаны.
+ */
+function loadSafetyRules(): void
+{
+    expect(Artisan::call('app:drugs:import'))->toBe(0)
+        ->and(Artisan::call('app:rules:import'))->toBe(0);
+}
+
+/**
+ * Диагноз пациента по МКБ-10 сегодняшним числом, поставил его лечащий врач. Справочник МКБ-10
+ * в тестах не загружается: код создаётся, если его нет. Находки не пересчитываются.
+ */
+function diagnose(User $patient, string $code, bool $main = true): Diagnosis
+{
+    Icd10Code::query()->firstOrCreate(['code' => $code], ['name' => 'Диагноз '.$code]);
+
+    return $patient->diagnoses()->create([
+        'icd10_code' => $code,
+        'is_main' => $main,
+        'established_on' => DisplayTime::today()->toDateString(),
+        'created_by_id' => clinician($patient)->id,
+    ]);
+}
+
+/**
+ * Факт о пациенте по коду вида на сегодня, внёс лечащий врач. Нужны загруженные виды фактов
+ * (loadSafetyRules). Находки не пересчитываются.
+ */
+function observe(User $patient, string $type, bool|int|float|string $value, ?string $comment = null, ?string $on = null): Observation
+{
+    $observationType = ObservationType::query()->where('code', $type)->sole();
+
+    return $patient->observations()->create([
+        'observation_type_id' => $observationType->id,
+        $observationType->value_type->column() => $value,
+        'comment' => $comment,
+        'observed_on' => $on ?? DisplayTime::today()->toDateString(),
+        'recorded_by_id' => clinician($patient)->id,
+    ]);
+}
+
+/**
+ * Лечащий врач пациента, а если его нет — новый врач.
+ */
+function clinician(User $patient): User
+{
+    return $patient->currentDoctor ?? User::factory()->doctor()->create();
+}
+
+/**
+ * Назначение врача на препарат справочника по коду (самая малая дозировка, утром) или свой
+ * препарат пациента. Нужен загруженный справочник. Находки не пересчитываются.
+ */
+function takes(User $patient, string $drug, bool $own = false): Prescription
+{
+    $catalog = Drug::query()->where('code', $drug)->sole();
+
+    return $own
+        ? ownPrescription($patient, $catalog)
+        : timedPrescription($patient, $catalog->strengths()->orderBy('mg')->firstOrFail(), attributes: ['prescriber_id' => clinician($patient)->id]);
 }

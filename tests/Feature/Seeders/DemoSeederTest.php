@@ -9,11 +9,14 @@ use App\Models\DoseEvent;
 use App\Models\Drug;
 use App\Models\Message;
 use App\Models\Prescription;
+use App\Models\SafetyFinding;
 use App\Models\User;
 use App\Notifications\DoseReminder;
 use App\Support\Adherence\AdherenceSignals;
 use App\Support\Adherence\PatientAdherence;
 use App\Support\DisplayTime;
+use App\Support\PatientSignals;
+use App\Support\Safety\SafetyPresenter;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DemoSeeder;
 use Illuminate\Support\Facades\Hash;
@@ -43,7 +46,40 @@ test('demo seeder builds the planned doctors, patients and courses and can be ru
         ->and($doctor2->can('view', $patient('patient')))->toBeFalse()
         ->and(Drug::query()->active()->count())->toBe(5)
         ->and(AccessLink::query()->count())->toBe(1)
-        ->and(AdherenceSignals::count($doctor))->toBe(3);
+        ->and(AdherenceSignals::count($doctor))->toBe(3)
+        // Плюс Кузнецова с противопоказанием без решения; у второго врача — Николаев.
+        ->and(PatientSignals::count($doctor))->toBe(4)
+        ->and(PatientSignals::count($doctor2))->toBe(1);
+
+    // Клинический профиль у всех: пол и действующий диагноз.
+    $patients = User::query()->where('role', UserRole::Patient)->with('patientProfile')->get();
+
+    expect($patients->every(fn (User $user): bool => $user->patientProfile?->sex !== null && $user->diagnoses()->active()->exists()))->toBeTrue()
+        ->and($patient('patient_4b')->diagnoses()->active()->pluck('icd10_code')->all())->toBe(['F31.0'])
+        ->and($patient('patient_4b')->diagnoses()->whereNotNull('resolved_on')->pluck('icd10_code')->all())->toBe(['F32.1'])
+        ->and($patient('patient_2b')->observations()->with('type')->sole()->describe())->toStartWith('СКФ 52 мл/мин/1,73 м²')
+        ->and($patient('patient_2c')->observations()->sole()->comment)->toBe('7 недель');
+
+    // Находки: QT у своих препаратов Кузнецовой и сертралин вне показаний у Николаева ждут
+    // решения врача; у «Авиандра» Кузнецовой три жёлтые.
+    $findings = SafetyFinding::query()->with(['rule', 'patient'])->get()
+        ->map(fn (SafetyFinding $finding): string => $finding->patient->login.' '.$finding->rule->code.' '.$finding->level->value)
+        ->sort()->values()->all();
+
+    expect($findings)->toBe([
+        'patient2 escitalopram.qt_drugs contraindicated',
+        'patient2 hydroxyzine.qt_drugs contraindicated',
+        'patient2 maritupirdine.cyp2d6 caution',
+        'patient2 maritupirdine.sedative caution',
+        'patient2 maritupirdine.serotonergic caution',
+        'patient_4b sertraline.indications contraindicated',
+        'patient_4b sertraline.mania caution',
+    ]);
+
+    // У «Авиандра» Иванова ни находок, ни «Не проверено».
+    $ivanov = app(SafetyPresenter::class)->card($patient('patient'));
+
+    expect(array_values($ivanov))->toBe([['findings' => [], 'unchecked' => [], 'unknown_drugs' => []]]);
 
     // «Авиандр» у трети пациентов, в демо-данных все препараты справочника.
     $prescribed = fn (string $drug): array => Prescription::query()
@@ -124,7 +160,7 @@ test('demo seeder builds the planned doctors, patients and courses and can be ru
         );
 });
 
-test('only the planned patients have an adherence signal at any time of day', function (string $time) {
+test('only the planned patients have an adherence signal and the counters are the same at any time of day', function (string $time) {
     $this->travelTo(CarbonImmutable::parse(DisplayTime::today()->toDateString().' '.$time, DisplayTime::TIMEZONE));
     $this->seed(DemoSeeder::class);
 
@@ -140,7 +176,9 @@ test('only the planned patients have an adherence signal at any time of day', fu
         ->and($signals['patient3']->isLowShare())->toBeTrue()
         ->and($signals['patient_3c']->hasConsecutiveMisses())->toBeTrue()
         ->and(AdherenceSignals::count($doctor))->toBe(3)
-        ->and(AdherenceSignals::count($doctor2))->toBe(0);
+        ->and(AdherenceSignals::count($doctor2))->toBe(0)
+        ->and(PatientSignals::count($doctor))->toBe(4)
+        ->and(PatientSignals::count($doctor2))->toBe(1);
 })->with([
     'утром до приёмов' => '07:00',
     'поздно вечером' => '23:30',

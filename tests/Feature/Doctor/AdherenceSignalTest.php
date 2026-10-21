@@ -8,7 +8,7 @@ use App\Enums\DoseEventStatus;
 use App\Enums\DoseSkipReason;
 use App\Enums\PrescriptionCloseReason;
 use App\Enums\RussianTimezone;
-use App\Events\AdherenceSignalsChanged;
+use App\Events\PatientSignalsChanged;
 use App\Http\Controllers\Doctor\PatientController;
 use App\Models\CareRelationship;
 use App\Models\DoseEvent;
@@ -313,11 +313,11 @@ test('the counter counts patients with a signal and a dose not taken that the do
 
     $this->actingAs($this->doctor)
         ->get(route('doctor.patients.index'))
-        ->assertInertia(fn (Assert $page) => $page->where('adherenceSignals', 1));
+        ->assertInertia(fn (Assert $page) => $page->where('patientSignals', 1));
 
     $this->actingAs($this->patient)
         ->get(route('patient.home'))
-        ->assertInertia(fn (Assert $page) => $page->where('adherenceSignals', 0));
+        ->assertInertia(fn (Assert $page) => $page->where('patientSignals', 0));
 });
 
 test('opening the card hides the patient from the counter until the next dose is not taken', function () {
@@ -326,7 +326,7 @@ test('opening the card hides the patient from the counter until the next dose is
 
     $this->actingAs($this->doctor)
         ->get(route('doctor.patients.show', $this->patient))
-        ->assertInertia(fn (Assert $page) => $page->where('adherenceSignals', 0));
+        ->assertInertia(fn (Assert $page) => $page->where('patientSignals', 0));
 
     expect(careBetween($this->doctor, $this->patient)->adherence_seen_at?->eq(now()))->toBeTrue();
 
@@ -348,11 +348,11 @@ test('opening the card hides the patient from the counter until the next dose is
 });
 
 test('the counter goes to the doctor channel and is counted when broadcast', function () {
-    $event = new AdherenceSignalsChanged($this->doctor);
+    $event = new PatientSignalsChanged($this->doctor);
     morningDoses(adherenceCourse($this->doctor, $this->patient, $this->aviandr, '2026-10-01'), ['missed', 'missed']);
 
     expect($event->broadcastOn()->name)->toBe('private-App.Models.User.'.$this->doctor->id)
-        ->and($event->broadcastAs())->toBe('adherence.changed')
+        ->and($event->broadcastAs())->toBe('patient-signals.changed')
         ->and($event->broadcastWith())->toBe(['count' => 1])
         ->and(is_subclass_of($event, ShouldDispatchAfterCommit::class))->toBeTrue()
         ->and(is_subclass_of($event, ShouldBroadcastNow::class))->toBeFalse();
@@ -366,7 +366,7 @@ test('patient marks notify the doctor after commit', function (Closure $mark) {
     $mark($this->patient, $dose);
 
     Queue::assertPushed(BroadcastEvent::class, 1);
-    Queue::assertPushed(BroadcastEvent::class, fn (BroadcastEvent $job) => $job->event instanceof AdherenceSignalsChanged
+    Queue::assertPushed(BroadcastEvent::class, fn (BroadcastEvent $job) => $job->event instanceof PatientSignalsChanged
         && $job->event->doctor->is($this->doctor));
 })->with([
     'taken' => fn (User $patient, DoseEvent $dose) => app(TakeDose::class)->handle($patient, $dose),
@@ -403,7 +403,7 @@ test('opening the card notifies the doctor', function () {
 
     $this->actingAs($this->doctor)->get(route('doctor.patients.show', $this->patient))->assertOk();
 
-    Queue::assertPushed(BroadcastEvent::class, fn (BroadcastEvent $job) => $job->event instanceof AdherenceSignalsChanged
+    Queue::assertPushed(BroadcastEvent::class, fn (BroadcastEvent $job) => $job->event instanceof PatientSignalsChanged
         && $job->event->doctor->is($this->doctor));
 });
 
@@ -425,7 +425,7 @@ test('marking missed doses notifies each doctor once', function () {
         ->assertSuccessful();
 
     Queue::assertPushed(BroadcastEvent::class, 1);
-    Queue::assertPushed(BroadcastEvent::class, fn (BroadcastEvent $job) => $job->event instanceof AdherenceSignalsChanged
+    Queue::assertPushed(BroadcastEvent::class, fn (BroadcastEvent $job) => $job->event instanceof PatientSignalsChanged
         && $job->event->doctor->is($this->doctor));
     expect(DoseEvent::query()->where('status', DoseEventStatus::Missed)->count())->toBe(4);
 

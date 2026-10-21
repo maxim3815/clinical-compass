@@ -19,6 +19,7 @@ function drugRecord(array $overrides = []): array
         'name' => 'Сертралин',
         'inn' => 'сертралин',
         'atc' => 'N06AB06',
+        'groups' => ['serotonergic'],
         'dosage_form' => 'таблетки, покрытые плёночной оболочкой',
         'strengths' => [
             ['mg' => 50, 'divisible' => true],
