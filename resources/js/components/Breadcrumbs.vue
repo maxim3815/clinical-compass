@@ -18,20 +18,31 @@ defineProps<Props>();
 </script>
 
 <template>
-    <Breadcrumb>
-        <BreadcrumbList>
+    <Breadcrumb class="min-w-0">
+        <BreadcrumbList class="flex-nowrap">
+            <!-- На телефоне — только раздел и текущая страница: иначе крошки не помещаются в строку. -->
             <template v-for="(item, index) in breadcrumbs" :key="index">
-                <BreadcrumbItem>
+                <BreadcrumbItem
+                    class="min-w-0"
+                    :class="{ 'max-md:hidden': index < breadcrumbs.length - 2 }"
+                >
                     <template v-if="index === breadcrumbs.length - 1">
-                        <BreadcrumbPage>{{ item.title }}</BreadcrumbPage>
+                        <BreadcrumbPage class="truncate">{{
+                            item.title
+                        }}</BreadcrumbPage>
                     </template>
                     <template v-else>
                         <BreadcrumbLink as-child>
-                            <Link :href="item.href">{{ item.title }}</Link>
+                            <Link :href="item.href" class="truncate">{{
+                                item.title
+                            }}</Link>
                         </BreadcrumbLink>
                     </template>
                 </BreadcrumbItem>
-                <BreadcrumbSeparator v-if="index !== breadcrumbs.length - 1" />
+                <BreadcrumbSeparator
+                    v-if="index !== breadcrumbs.length - 1"
+                    :class="{ 'max-md:hidden': index < breadcrumbs.length - 2 }"
+                />
             </template>
         </BreadcrumbList>
     </Breadcrumb>

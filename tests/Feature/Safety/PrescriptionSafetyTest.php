@@ -1,6 +1,8 @@
 <?php
 
+use App\Actions\CancelPrescription;
 use App\Actions\SyncSafetyFindings;
+use App\Enums\PrescriptionCancelReason;
 use App\Enums\SafetyDecisionKind;
 use App\Enums\Sex;
 use App\Models\AuditLog;
@@ -213,4 +215,42 @@ test('check is available only to the treating doctor', function () {
     $this->actingAs(User::factory()->doctor()->create())->getJson($url)->assertNotFound();
     $this->actingAs($this->patient)->getJson($url)->assertForbidden();
     $this->actingAs($this->doctor)->getJson(route('doctor.patients.safety-check.show', $this->patient))->assertUnprocessable();
+});
+
+test('new prescription form shows the check result of every drug before the choice', function () {
+    diagnose($this->patient, 'F41.1');
+    observe($this->patient, 'gfr', 52);
+    takes($this->patient, 'escitalopram', own: true);
+    $id = fn (string $code): int => Drug::query()->where('code', $code)->value('id');
+
+    $this->actingAs($this->doctor)
+        ->get(route('doctor.patients.prescriptions.create', $this->patient))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('drugSafety.'.$id('maritupirdine'), ['level' => 'contraindicated', 'label' => 'Противопоказано', 'reason' => 'СКФ 52 мл/мин/1,73 м² на '.now()->format('d.m.Y')])
+            ->where('drugSafety.'.$id('paroxetine'), ['level' => 'caution', 'label' => 'С осторожностью', 'reason' => 'Принимает Эсциталопрам (добавил пациент)'])
+            ->has('drugSafety', Drug::query()->where('is_active', true)->count())
+            // Что уже было с препаратом у пациента.
+            ->where('drugHistory', [$id('escitalopram') => 'Принимает, добавил пациент']),
+        );
+
+    $prescription = takes($this->patient, 'maritupirdine');
+
+    $this->get(route('doctor.patients.prescriptions.edit', [$this->patient, $prescription]))
+        ->assertInertia(fn (Assert $page) => $page->where('drugSafety', [])->where('drugHistory', []));
+});
+
+test('drug choice shows what happened to the drug before and why it is outside the indications', function () {
+    diagnose($this->patient, 'Z73.0');
+    $escitalopram = takes($this->patient, 'escitalopram');
+    app(CancelPrescription::class)->handle($this->doctor, $escitalopram, PrescriptionCancelReason::AdverseEvents, null);
+    takes($this->patient, 'maritupirdine');
+    $id = fn (string $code): int => Drug::query()->where('code', $code)->value('id');
+
+    $this->actingAs($this->doctor)
+        ->get(route('doctor.patients.prescriptions.create', $this->patient))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('drugHistory.'.$id('escitalopram'), 'Отменён '.DisplayTime::today()->format('d.m.Y').': нежелательные явления')
+            ->where('drugHistory.'.$id('maritupirdine'), 'Уже назначен с '.DisplayTime::today()->format('d.m.Y'))
+            ->where('drugSafety.'.$id('sertraline').'.reason', 'Вне зарегистрированных показаний'),
+        );
 });

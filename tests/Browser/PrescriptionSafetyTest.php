@@ -33,21 +33,29 @@ test('doctor prescribes aviandr despite a contraindication only with a justifica
 
     $page = openPatientCard($this->patient)
         ->click('[data-test="prescribe-button"]')
-        ->select('drug_id', 'Авиандр');
+        // Итог проверки виден в списке препаратов ещё до выбора.
+        ->assertSeeIn('[data-drug="maritupirdine"]', 'Противопоказано')
+        ->click('[data-drug="maritupirdine"]');
 
-    waitForText($page, 'Противопоказано');
+    waitForText($page, 'Противопоказан при почечной');
 
     $page->assertSee('Противопоказан при почечной недостаточности средней и тяжёлой степени')
         ->assertSee('СКФ 52 мл/мин/1,73 м²')
         ->assertSee('Источник: ОХЛП «Авиандр», реестр ЕАЭС, 4.3. Противопоказания')
         ->assertSee('Не проверено')
         ->press('Назначить')
+        ->assertSee('Добавьте хотя бы один приём.')
+        ->check('[data-test="intake-morning"]')
+        ->press('Назначить')
         ->assertSee('Есть противопоказание: напишите обоснование назначения вопреки предупреждению.')
+        // Фокус переходит к полю обоснования.
+        ->assertScript('document.activeElement.id', 'justification')
         ->fill('justification', 'Альтернативы исчерпаны, согласовано с нефрологом')
         ->press('Назначить')
         ->assertPathIs("/doctor/patients/{$this->patient->id}")
         ->assertSee('Препарат назначен.')
         ->assertSeeIn('[data-test="prescription-safety"]', 'Назначено вопреки предупреждению')
+        ->assertSeeIn('[data-test="prescription-safety"]', 'решение принято')
         ->assertSeeIn('[data-test="prescription-safety"]', 'Альтернативы исчерпаны, согласовано с нефрологом')
         ->assertMissing('[data-test="nav-badge"]')
         ->assertNoJavaScriptErrors();
@@ -66,7 +74,10 @@ test('doctor continues an ongoing combination with a justification and the mark 
         ->press('Войти')
         ->assertSeeIn('[data-test="nav-badge"]', '1')
         ->assertSeeIn('[data-test="contraindication-mark"]', 'Противопоказание без решения')
+        // Очередь называет препараты, по которым врач не решил.
+        ->assertSeeIn('[data-test="attention-contraindication"]', 'Гидроксизин, Эсциталопрам')
         ->click($this->patient->name)
+        ->assertSeeIn('[data-test="card-contraindication"]', 'Гидроксизин, Эсциталопрам')
         ->assertSee('Противопоказан вместе с препаратами, удлиняющими интервал QT')
         ->click('[data-test="own-medications"] [data-test="prescription"]:last-of-type [data-test="continue-finding-button"]')
         ->assertSee('Решение относится и к находке у препарата')
@@ -75,6 +86,7 @@ test('doctor continues an ongoing combination with a justification and the mark 
         ->assertSee('Решение сохранено, приём продолжается.')
         ->assertMissing('[data-test="continue-finding-button"]')
         ->assertSee('Приём продолжен')
+        ->assertMissing('[data-test="card-contraindication"]')
         ->assertMissing('[data-test="nav-badge"]')
         ->assertNoJavaScriptErrors();
 });
@@ -90,7 +102,8 @@ test('doctor fills in the clinical profile and sees it in the card', function ()
         ->assertSeeIn('[data-test="clinical-profile"]', 'Пол: не указан')
         ->click('[data-test="edit-clinical-profile"]')
         ->assertSee('Только у женщин: беременность, грудное вскармливание.')
-        ->select('sex', 'female')
+        ->assertMissing('[data-test="save-sex"]')
+        ->click('input[name="sex"][value="female"]')
         ->click('[data-test="save-sex"]')
         ->assertSee('Пол сохранён.')
         ->assertDontSee('Только у женщин')
@@ -98,14 +111,18 @@ test('doctor fills in the clinical profile and sees it in the card', function ()
 
     waitForText($page, 'Генерализованное тревожное расстройство');
 
-    $page->click('[data-test="icd10-results"] button')
+    $page->click('[data-test="icd10-results"] [role="option"]')
         ->assertSeeIn('[data-test="chosen-diagnosis"]', 'F41.1')
         ->click('[data-test="save-diagnosis"]')
         ->assertSee('Диагноз добавлен.')
         ->assertSeeIn('[data-test="diagnosis"]', 'основной')
         ->fill('[data-fact="gfr"] input[type="number"]', '52')
-        ->click('[data-fact="gfr"] [data-test="save-observation"]')
-        ->assertSee('Факт сохранён.')
+        ->click('[data-fact="epilepsy"] input[value="0"]')
+        ->assertSeeIn('[data-test="facts-save-bar"]', 'СКФ — 52 мл/мин/1,73 м², Эпилепсия или органическое поражение головного мозга — нет')
+        ->click('[data-test="save-observations"]')
+        ->assertSee('Факты сохранены.')
+        ->assertMissing('[data-test="facts-save-bar"]')
+        ->assertSeeIn('[data-fact="epilepsy"] [data-test="observation-current"]', 'нет')
         ->assertSeeIn('[data-fact="gfr"] [data-test="observation-current"]', '52 мл/мин/1,73 м²')
         ->click('К карточке пациента')
         ->assertSeeIn('[data-test="clinical-profile"]', 'Пол: Женский')
@@ -124,7 +141,7 @@ test('safety check fits a phone screen', function () {
         ->fill('password', 'password')
         ->press('Войти')
         ->navigate(route('doctor.patients.prescriptions.create', $this->patient))
-        ->select('drug_id', 'Авиандр');
+        ->click('[data-drug="maritupirdine"]');
 
     waitForText($page, 'Назначение вне зарегистрированных показаний');
 

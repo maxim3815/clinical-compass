@@ -33,7 +33,7 @@ test('doctor sets sex, diagnoses and facts and the card shows the current values
     $this->post(route('doctor.patients.diagnoses.store', $this->patient), ['icd10_code' => 'F45.3', 'is_main' => false, 'established_on' => $this->today]);
 
     $gfr = ObservationType::query()->where('code', 'gfr')->sole();
-    $observe = fn (array $data) => $this->post(route('doctor.patients.observations.store', $this->patient), ['observation_type_id' => $gfr->id, 'observed_on' => $this->today, ...$data]);
+    $observe = fn (array $data) => $this->post(route('doctor.patients.observations.store', $this->patient), ['observations' => [['observation_type_id' => $gfr->id, 'observed_on' => $this->today, ...$data]]]);
     $observe(['value' => '58'])->assertRedirect($edit)->assertSessionHasNoErrors();
     $observe(['value' => '52', 'comment' => 'CKD-EPI'])->assertSessionHasNoErrors();
 
@@ -95,8 +95,10 @@ test('profile input is validated', function (Closure $request, string $field, st
     'same diagnosis twice' => [fn ($test) => $test->post(route('doctor.patients.diagnoses.store', $test->patient), ['icd10_code' => 'F41.1', 'is_main' => false, 'established_on' => $test->today]), 'icd10_code', 'Этот диагноз у пациента уже стоит.'],
     'unknown code' => [fn ($test) => $test->post(route('doctor.patients.diagnoses.store', $test->patient), ['icd10_code' => 'X99.9', 'is_main' => false, 'established_on' => $test->today]), 'icd10_code', 'Выберите диагноз из справочника МКБ-10.'],
     'future diagnosis' => [fn ($test) => $test->post(route('doctor.patients.diagnoses.store', $test->patient), ['icd10_code' => 'F45.3', 'is_main' => false, 'established_on' => DisplayTime::today()->addDay()->toDateString()]), 'established_on', 'Дата установления не может быть позже сегодняшнего дня.'],
-    'number out of range' => [fn ($test) => $test->post(route('doctor.patients.observations.store', $test->patient), ['observation_type_id' => ObservationType::query()->where('code', 'gfr')->value('id'), 'value' => '520', 'observed_on' => $test->today]), 'value', 'Значение не больше 200.'],
-    'unknown option' => [fn ($test) => $test->post(route('doctor.patients.observations.store', $test->patient), ['observation_type_id' => ObservationType::query()->where('code', 'hepatic_impairment')->value('id'), 'value' => 'd', 'observed_on' => $test->today]), 'value', 'Укажите значение.'],
+    'number out of range' => [fn ($test) => $test->post(route('doctor.patients.observations.store', $test->patient), ['observations' => [['observation_type_id' => ObservationType::query()->where('code', 'gfr')->value('id'), 'value' => '520', 'observed_on' => $test->today]]]), 'observations.0.value', 'Значение не больше 200.'],
+    'unknown option' => [fn ($test) => $test->post(route('doctor.patients.observations.store', $test->patient), ['observations' => [['observation_type_id' => ObservationType::query()->where('code', 'hepatic_impairment')->value('id'), 'value' => 'd', 'observed_on' => $test->today]]]), 'observations.0.value', 'Укажите значение.'],
+    'no facts' => [fn ($test) => $test->post(route('doctor.patients.observations.store', $test->patient), ['observations' => []]), 'observations', 'Выберите значение хотя бы у одного факта.'],
+    'same fact twice' => [fn ($test) => $test->post(route('doctor.patients.observations.store', $test->patient), ['observations' => array_fill(0, 2, ['observation_type_id' => ObservationType::query()->where('code', 'gfr')->value('id'), 'value' => '50', 'observed_on' => $test->today])]), 'observations.1.observation_type_id', 'Один факт внесён дважды.'],
     'unknown sex' => [fn ($test) => $test->put(route('doctor.patients.clinical-profile.sex', $test->patient), ['sex' => 'other']), 'sex', 'Выберите пол из списка.'],
 ]);
 
@@ -110,7 +112,7 @@ test('only the treating doctor sees and changes the profile', function () {
         fn () => $this->put(route('doctor.patients.clinical-profile.sex', $this->patient), ['sex' => 'male']),
         fn () => $this->post(route('doctor.patients.diagnoses.store', $this->patient), ['icd10_code' => 'F45.3', 'is_main' => false, 'established_on' => $this->today]),
         fn () => $this->post(route('doctor.patients.diagnoses.resolve', [$this->patient, $diagnosis]), ['resolved_on' => $this->today]),
-        fn () => $this->post(route('doctor.patients.observations.store', $this->patient), ['observation_type_id' => $gfr, 'value' => '50', 'observed_on' => $this->today]),
+        fn () => $this->post(route('doctor.patients.observations.store', $this->patient), ['observations' => [['observation_type_id' => $gfr, 'value' => '50', 'observed_on' => $this->today]]]),
     ];
 
     foreach ($requests as $request) {
@@ -146,4 +148,29 @@ test('icd10 search finds codes by code and by name', function () {
     $this->getJson(route('doctor.icd10.index', ['search' => 'F']))->assertExactJson(['codes' => []]);
 
     $this->actingAs($this->patient)->getJson(route('doctor.icd10.index', ['search' => 'F41']))->assertForbidden();
+});
+
+test('several facts are saved at once as separate records, or none if one is wrong', function () {
+    $this->patient->patientProfile?->update(['sex' => Sex::Female]);
+    $type = fn (string $code): int => ObservationType::query()->where('code', $code)->value('id');
+    $this->actingAs($this->doctor);
+
+    $this->post(route('doctor.patients.observations.store', $this->patient), ['observations' => [
+        ['observation_type_id' => $type('pregnancy'), 'value' => '1', 'comment' => ' 7 недель ', 'observed_on' => $this->today],
+        ['observation_type_id' => $type('epilepsy'), 'value' => '0', 'observed_on' => $this->today],
+        ['observation_type_id' => $type('gfr'), 'value' => '520', 'observed_on' => $this->today],
+    ]])->assertSessionHasErrors(['observations.2.value' => 'Значение не больше 200.']);
+
+    expect($this->patient->observations()->count())->toBe(0);
+
+    $this->post(route('doctor.patients.observations.store', $this->patient), ['observations' => [
+        ['observation_type_id' => $type('pregnancy'), 'value' => '1', 'comment' => ' 7 недель ', 'observed_on' => $this->today],
+        ['observation_type_id' => $type('epilepsy'), 'value' => '0', 'observed_on' => $this->today],
+    ]])->assertSessionHasNoErrors()->assertRedirect(route('doctor.patients.clinical-profile.edit', $this->patient));
+
+    $observations = $this->patient->observations()->with('type')->orderBy('id')->get();
+
+    expect($observations->map(fn ($observation) => [$observation->type->code, $observation->value(), $observation->comment])->all())
+        ->toBe([['pregnancy', true, '7 недель'], ['epilepsy', false, null]])
+        ->and(AuditLog::query()->where('action', 'observation.recorded')->count())->toBe(2);
 });

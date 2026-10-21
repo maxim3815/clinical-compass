@@ -56,7 +56,8 @@ test('doctor sees a new signal without reloading the list and opens the card', f
         ->assertSee('Приём за 7 дней')
         ->assertSee('90%')
         ->assertMissing('[data-test="nav-badge"]')
-        ->assertMissing('[data-signal]');
+        ->assertMissing('[data-signal]')
+        ->assertPresent('[data-test="attention-empty"]');
 
     // Сегодня утром пациент не принял препарат: второй непринятый приём подряд.
     visit(route('login'))
@@ -74,6 +75,8 @@ test('doctor sees a new signal without reloading the list and opens the card', f
 
     // Список и счётчик обновились событием, без перезагрузки страницы.
     waitForText($doctorPage, 'Пропуски подряд: 2')
+        ->assertSeeIn('[data-test="attention-row"]', 'Иванов Пётр Алексеевич')
+        ->assertSeeIn('[data-test="attention-row"]', 'новые пропуски')
         ->assertSeeIn('[data-signal]', 'Иванов Пётр Алексеевич')
         ->assertSeeIn('[data-signal]', '81%')
         ->assertSeeIn('[data-test="nav-badge"]', '1')

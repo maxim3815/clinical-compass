@@ -50,9 +50,11 @@ test('patient row shows age and the date the observation started', function () {
             'id' => $patient->id,
             'name' => 'Иванов Пётр Алексеевич',
             'age' => 42,
+            'diagnosis' => null,
             'started_at' => '01.10.2026',
             'adherence' => ['share' => null, 'low_share' => false, 'consecutive_misses' => null, 'raised' => false],
             'contraindications' => 0,
+            'unread' => 0,
         ]));
 });
 

@@ -3,6 +3,7 @@ export * from './auth';
 export * from './chat';
 export * from './doses';
 export * from './navigation';
+export * from './patients';
 export * from './prescriptions';
 export * from './safety';
 export * from './ui';

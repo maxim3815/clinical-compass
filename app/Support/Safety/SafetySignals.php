@@ -53,4 +53,27 @@ final class SafetySignals
             ->map(fn (mixed $count): int => (int) $count)
             ->all();
     }
+
+    /**
+     * Препараты с красной находкой без решения у каждого из пациентов: причина в очереди
+     * «Требуют внимания».
+     *
+     * @param  array<int, int>  $patientIds
+     * @return array<int, list<string>> id пациента => названия препаратов по алфавиту
+     */
+    public static function awaitingDrugs(array $patientIds): array
+    {
+        return SafetyFinding::query()
+            ->awaitingDecision()
+            ->whereIn('patient_id', $patientIds)
+            ->with('prescription.drug')
+            ->get()
+            ->groupBy('patient_id')
+            ->map(fn (Collection $findings): array => array_values($findings
+                ->map(fn (SafetyFinding $finding): string => $finding->prescription->drugName())
+                ->unique()
+                ->sort()
+                ->all()))
+            ->all();
+    }
 }

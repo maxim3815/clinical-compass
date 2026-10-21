@@ -12,12 +12,14 @@ use App\Models\User;
 use App\Support\Adherence\AdherenceSignal;
 use App\Support\Adherence\AdherenceSignals;
 use App\Support\Adherence\PatientAdherence;
+use App\Support\AttentionQueue;
 use App\Support\DisplayTime;
 use App\Support\PrescriptionPresenter;
 use App\Support\Safety\ClinicalProfilePresenter;
 use App\Support\Safety\SafetyAcknowledgement;
 use App\Support\Safety\SafetyPresenter;
 use App\Support\Safety\SafetySignals;
+use App\Support\UnreadMessages;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -53,19 +55,28 @@ class PatientController extends Controller
             ->paginate(self::PER_PAGE)
             ->withQueryString();
 
+        /** @var User $doctor */
+        $doctor = $request->user();
+        $ids = $patients->getCollection()->map(fn (CareRelationship $care): int => $care->patient_id);
         $misses = AdherenceSignals::consecutiveMisses($patients->getCollection()->map(fn (CareRelationship $care): User => $care->patient));
-        $awaiting = SafetySignals::awaitingCounts($patients->getCollection()->map(fn (CareRelationship $care): int => $care->patient_id));
+        $awaiting = SafetySignals::awaitingCounts($ids);
+        $unread = UnreadMessages::byPatient($doctor, $ids->all());
+        $diagnoses = ClinicalProfilePresenter::mainDiagnoses($ids->all());
 
         return Inertia::render('doctor/patients/Index', [
             'patients' => $patients->through(fn (CareRelationship $care): array => [
                 'id' => $care->patient->id,
                 'name' => $care->patient->name,
                 'age' => $care->patient->patientProfile?->age(),
+                'diagnosis' => $diagnoses[$care->patient_id] ?? null,
                 'started_at' => DisplayTime::formatDate($care->started_at),
                 'adherence' => (new AdherenceSignal($care->adherence_share, $misses[$care->patient_id] ?? 0))->toArray(),
                 // Красные находки проверки безопасности без решения врача.
                 'contraindications' => $awaiting[$care->patient_id] ?? 0,
+                'unread' => $unread[$care->patient_id] ?? 0,
             ]),
+            // Кого врачу посмотреть первым. При поиске врач ищет конкретного пациента, очередь не нужна.
+            'attention' => fn (): array => $search === '' ? AttentionQueue::present($doctor) : [],
             'search' => $search,
             'sort' => $sort,
         ]);
@@ -126,6 +137,8 @@ class PatientController extends Controller
                 ->values(),
             'adherence' => PatientAdherence::present($patient, $today),
             'adherenceSignal' => AdherenceSignals::forPatient($patient)->toArray(),
+            // Непрочитанные сообщения пациента: число на кнопке «Написать».
+            'unread' => UnreadMessages::byPatient($doctor, [$patient->id])[$patient->id] ?? 0,
             'cancelReasons' => PrescriptionCancelReason::options(),
             'clinicalProfile' => ClinicalProfilePresenter::present($patient),
             // Находки и «Не проверено» по id назначения, у назначений врача и своих препаратов пациента.

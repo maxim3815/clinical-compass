@@ -91,7 +91,7 @@ Route::middleware('auth')->group(function () {
                 ->name('patients.diagnoses.store');
             Route::post('patients/{patient}/diagnoses/{diagnosis}/resolve', [ClinicalProfileController::class, 'resolveDiagnosis'])
                 ->name('patients.diagnoses.resolve');
-            Route::post('patients/{patient}/observations', [ClinicalProfileController::class, 'storeObservation'])
+            Route::post('patients/{patient}/observations', [ClinicalProfileController::class, 'storeObservations'])
                 ->name('patients.observations.store');
         });
         Route::get('icd10', [Icd10Controller::class, 'index'])->name('icd10.index');

@@ -14,6 +14,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import type { SafetyFinding } from '@/types';
 
@@ -74,6 +75,8 @@ function submit(): void {
             onSuccess: () => {
                 finding.value = null;
             },
+            onError: () =>
+                document.getElementById('continue_justification')?.focus(),
         },
     );
 }
@@ -82,7 +85,11 @@ function submit(): void {
 <template>
     <Dialog v-model:open="open">
         <DialogContent data-test="continue-finding-dialog">
-            <form class="flex flex-col gap-4" @submit.prevent="submit">
+            <form
+                class="flex flex-col gap-4"
+                novalidate
+                @submit.prevent="submit"
+            >
                 <DialogHeader>
                     <DialogTitle>Продолжить приём?</DialogTitle>
                     <DialogDescription v-if="finding">
@@ -91,19 +98,33 @@ function submit(): void {
                 </DialogHeader>
 
                 <div class="grid gap-2">
-                    <Label for="continue_justification"> Обоснование </Label>
+                    <Label for="continue_justification">
+                        Обоснование (обязательно)
+                    </Label>
                     <Textarea
                         id="continue_justification"
                         v-model="form.justification"
                         name="justification"
                         rows="4"
+                        required
                         :maxlength="maxLength"
-                        placeholder="Например: написал пациентке прекратить гидроксизин, контроль ЭКГ"
+                        :aria-invalid="
+                            form.errors.justification ? true : undefined
+                        "
+                        aria-describedby="continue_justification-hint continue_justification-error"
                     />
-                    <p class="text-sm text-muted-foreground">
-                        Обоснование сохранится в находке и в журнале аудита.
+                    <p
+                        id="continue_justification-hint"
+                        class="text-sm text-muted-foreground"
+                    >
+                        Например: попросил прекратить второй препарат, назначил
+                        ЭКГ. Обоснование сохранится в находке и в журнале
+                        аудита.
                     </p>
-                    <InputError :message="form.errors.justification" />
+                    <InputError
+                        id="continue_justification-error"
+                        :message="form.errors.justification"
+                    />
                 </div>
 
                 <DialogFooter>
@@ -115,8 +136,10 @@ function submit(): void {
                     <Button
                         type="submit"
                         :disabled="form.processing"
+                        :aria-busy="form.processing"
                         data-test="confirm-continue"
                     >
+                        <Spinner v-if="form.processing" />
                         Продолжить приём
                     </Button>
                 </DialogFooter>

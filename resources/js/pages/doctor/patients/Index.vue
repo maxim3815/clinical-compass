@@ -1,34 +1,36 @@
 <script setup lang="ts">
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
-import { ArrowDown, ArrowUp, ArrowUpDown, Search, UserPlus } from '@lucide/vue';
+import {
+    ArrowDown,
+    ArrowUp,
+    ArrowUpDown,
+    MessageCircle,
+    OctagonAlert,
+    Search,
+    UserPlus,
+} from '@lucide/vue';
 import { computed, ref } from 'vue';
 import AdherenceSignal from '@/components/AdherenceSignal.vue';
-import Heading from '@/components/Heading.vue';
+import AttentionQueue from '@/components/AttentionQueue.vue';
 import ListPagination from '@/components/ListPagination.vue';
 import PushBanner from '@/components/PushBanner.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NativeSelect } from '@/components/ui/native-select';
 import { useRealtime } from '@/composables/useRealtime';
-import { formatAge } from '@/lib/plural';
+import { formatAge, plural } from '@/lib/plural';
 import { index as invitations } from '@/routes/doctor/invitations';
 import { index, show } from '@/routes/doctor/patients';
-import type { AdherenceSignal as Signal, Paginated } from '@/types';
-
-type PatientRow = {
-    id: number;
-    name: string;
-    age: number | null;
-    started_at: string;
-    adherence: Signal;
-    // Красные находки проверки безопасности без решения врача.
-    contraindications: number;
-};
+import { show as chat } from '@/routes/doctor/patients/chat';
+import type { AttentionPatient, Paginated, PatientRow } from '@/types';
 
 // По доле за 7 дней: сначала самые низкие или самые высокие. null — по ФИО.
 type Sort = 'adherence' | '-adherence' | null;
 
 const props = defineProps<{
     patients: Paginated<PatientRow>;
+    // Очередь «Требуют внимания»; при поиске пустая.
+    attention: AttentionPatient[];
     search: string;
     sort: Sort;
 }>();
@@ -64,6 +66,15 @@ const adherenceAriaSort = computed(() =>
           : undefined,
 );
 
+// На телефоне заголовков таблицы нет: сортировка — списком над ней.
+const sortChoice = computed({
+    get: () => props.sort ?? 'name',
+    set: (value: string) =>
+        router.visit(sorted(value === 'name' ? null : (value as Sort)), {
+            preserveScroll: true,
+        }),
+});
+
 function submit(): void {
     const search = query.value.trim();
 
@@ -77,32 +88,50 @@ function submit(): void {
     );
 }
 
+function messages(count: number): string {
+    return `${count} ${plural(count, ['новое', 'новых', 'новых'])}`;
+}
+
+const channel = `App.Models.User.${page.props.auth.user.id}`;
+
 // Пациент отметил приём или добавил препарат, scheduler отметил пропуск: доли, сигналы
-// и отметки о противопоказаниях в строках меняются.
-useRealtime(
-    `App.Models.User.${page.props.auth.user.id}`,
-    'patient-signals.changed',
-    () => router.reload({ only: ['patients'] }),
+// и отметки о противопоказаниях в строках и в очереди меняются.
+useRealtime(channel, 'patient-signals.changed', () =>
+    router.reload({ only: ['patients', 'attention'] }),
+);
+
+// Новое или прочитанное сообщение меняет число непрочитанных у пациента.
+useRealtime(channel, 'unread.changed', () =>
+    router.reload({ only: ['patients', 'attention'] }),
 );
 </script>
 
 <template>
     <Head title="Пациенты" />
 
-    <div class="flex max-w-3xl flex-col gap-6 p-4">
-        <Heading
-            title="Пациенты"
-            description="Пациенты, которых вы сейчас ведёте."
-        />
+    <div class="@container flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">
+        <header class="flex flex-wrap items-center justify-between gap-3">
+            <h1 class="text-2xl font-semibold tracking-tight">Пациенты</h1>
+            <Button
+                v-if="patients.total > 0 || search"
+                variant="outline"
+                as-child
+            >
+                <Link :href="invitations()">
+                    <UserPlus />
+                    Пригласить пациента
+                </Link>
+            </Button>
+        </header>
 
         <PushBanner />
 
         <div
             v-if="patients.total === 0 && !search"
-            class="flex flex-col items-start gap-4 rounded-lg border border-dashed p-6"
+            class="flex flex-col items-start gap-4 rounded-xl border border-dashed bg-card p-6"
             data-test="patients-empty"
         >
-            <p class="text-sm text-muted-foreground">
+            <p class="text-muted-foreground">
                 Пациентов пока нет. Пригласите пациента: он зарегистрируется по
                 ссылке и появится в этом списке.
             </p>
@@ -115,140 +144,251 @@ useRealtime(
         </div>
 
         <template v-else>
-            <form role="search" class="flex gap-2" @submit.prevent="submit">
-                <Input
-                    v-model="query"
-                    type="search"
-                    name="search"
-                    placeholder="Поиск по ФИО"
-                    aria-label="Поиск по ФИО"
-                />
-                <Button type="submit" variant="outline">
-                    <Search />
-                    Найти
-                </Button>
-            </form>
+            <AttentionQueue v-if="!search" :patients="attention" />
 
-            <p
-                v-if="patients.total === 0"
-                class="text-sm text-muted-foreground"
+            <section
+                class="flex flex-col gap-3"
+                aria-labelledby="all-patients-title"
             >
-                По запросу «{{ search }}» никого не нашли.
-                <Link
-                    :href="index()"
-                    class="text-foreground underline underline-offset-4"
-                >
-                    Показать всех
-                </Link>
-            </p>
-
-            <div v-else class="overflow-x-auto rounded-lg border">
-                <table class="w-full text-left text-sm">
-                    <thead class="bg-muted/50 text-muted-foreground">
-                        <tr>
-                            <th
-                                class="px-3 py-2 font-medium"
-                                :aria-sort="
-                                    sort === null ? 'ascending' : undefined
-                                "
-                            >
-                                <Link
-                                    :href="byName"
-                                    preserve-scroll
-                                    class="inline-flex items-center gap-1 hover:text-foreground"
-                                    data-test="sort-name"
-                                >
-                                    ФИО
-                                    <ArrowUp
-                                        v-if="sort === null"
-                                        class="size-3.5"
-                                    />
-                                </Link>
-                            </th>
-                            <th
-                                class="px-3 py-2 font-medium"
-                                :aria-sort="adherenceAriaSort"
-                            >
-                                <Link
-                                    :href="byAdherence"
-                                    preserve-scroll
-                                    class="inline-flex items-center gap-1 whitespace-nowrap hover:text-foreground"
-                                    data-test="sort-adherence"
-                                >
-                                    Приём за 7 дней
-                                    <ArrowUp
-                                        v-if="sort === 'adherence'"
-                                        class="size-3.5"
-                                    />
-                                    <ArrowDown
-                                        v-else-if="sort === '-adherence'"
-                                        class="size-3.5"
-                                    />
-                                    <ArrowUpDown v-else class="size-3.5" />
-                                </Link>
-                            </th>
-                            <th class="px-3 py-2 font-medium">Возраст</th>
-                            <th class="px-3 py-2 font-medium">
-                                Под наблюдением с
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr
-                            v-for="patient in patients.data"
-                            :key="patient.id"
-                            class="border-t"
-                            :class="{
-                                'bg-destructive/5':
-                                    patient.adherence.raised ||
-                                    patient.contraindications > 0,
-                            }"
-                            data-test="patient-row"
-                            :data-signal="patient.adherence.raised || undefined"
-                            :data-contraindication="
-                                patient.contraindications > 0 || undefined
-                            "
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <h2 id="all-patients-title" class="text-lg font-semibold">
+                        {{ search ? 'Результаты поиска' : 'Все пациенты' }}
+                        <span class="font-normal text-muted-foreground"
+                            >· {{ patients.total }}</span
                         >
-                            <td class="px-3 py-2">
-                                <Link
-                                    :href="show(patient.id)"
-                                    class="font-medium underline-offset-4 hover:underline"
-                                >
-                                    {{ patient.name }}
-                                </Link>
-                            </td>
-                            <td class="px-3 py-2">
-                                <span
-                                    class="inline-flex flex-wrap items-center gap-1.5"
-                                >
-                                    <AdherenceSignal
-                                        :signal="patient.adherence"
-                                    />
-                                    <span
-                                        v-if="patient.contraindications > 0"
-                                        class="rounded-md bg-destructive/10 px-1.5 py-0.5 font-medium whitespace-nowrap text-destructive"
-                                        data-test="contraindication-mark"
-                                    >
-                                        Противопоказание без решения
-                                    </span>
-                                </span>
-                            </td>
-                            <td class="px-3 py-2 whitespace-nowrap">
-                                {{
-                                    patient.age === null
-                                        ? '—'
-                                        : formatAge(patient.age)
-                                }}
-                            </td>
-                            <td class="px-3 py-2 whitespace-nowrap">
-                                {{ patient.started_at }}
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+                    </h2>
+                    <form
+                        role="search"
+                        class="flex w-full gap-2 sm:w-auto"
+                        @submit.prevent="submit"
+                    >
+                        <Input
+                            v-model="query"
+                            type="search"
+                            name="search"
+                            class="sm:w-72"
+                            placeholder="Поиск по ФИО"
+                            aria-label="Поиск по ФИО"
+                        />
+                        <Button type="submit" variant="outline">
+                            <Search />
+                            Найти
+                        </Button>
+                    </form>
+                </div>
 
-            <ListPagination :page="patients" />
+                <p v-if="patients.total === 0" class="text-muted-foreground">
+                    По запросу «{{ search }}» никого не нашли.
+                    <Link
+                        :href="index()"
+                        class="text-foreground underline underline-offset-4"
+                    >
+                        Показать всех
+                    </Link>
+                </p>
+
+                <template v-else>
+                    <div class="flex items-center gap-2 @2xl:hidden">
+                        <label
+                            for="patients-sort"
+                            class="shrink-0 text-sm text-muted-foreground"
+                            >Сортировка</label
+                        >
+                        <NativeSelect id="patients-sort" v-model="sortChoice">
+                            <option value="name">По ФИО</option>
+                            <option value="adherence">
+                                Сначала низкий приём
+                            </option>
+                            <option value="-adherence">
+                                Сначала высокий приём
+                            </option>
+                        </NativeSelect>
+                    </div>
+
+                    <!-- На телефоне строка таблицы складывается в карточку. -->
+                    <div
+                        class="rounded-xl border bg-card shadow-xs @2xl:overflow-x-auto"
+                    >
+                        <table
+                            class="w-full text-left text-sm @max-2xl:block @2xl:table-fixed"
+                        >
+                            <thead class="@max-2xl:sr-only">
+                                <tr class="border-b text-muted-foreground">
+                                    <th
+                                        class="w-[31%] px-4 py-3 font-medium"
+                                        :aria-sort="
+                                            sort === null
+                                                ? 'ascending'
+                                                : undefined
+                                        "
+                                    >
+                                        <Link
+                                            :href="byName"
+                                            preserve-scroll
+                                            class="inline-flex items-center gap-1 hover:text-foreground"
+                                            data-test="sort-name"
+                                        >
+                                            Пациент
+                                            <ArrowUp
+                                                v-if="sort === null"
+                                                class="size-3.5"
+                                            />
+                                        </Link>
+                                    </th>
+                                    <th
+                                        class="w-[18%] px-4 py-3 font-medium"
+                                        :aria-sort="adherenceAriaSort"
+                                    >
+                                        <Link
+                                            :href="byAdherence"
+                                            preserve-scroll
+                                            class="inline-flex items-center gap-1 whitespace-nowrap hover:text-foreground"
+                                            data-test="sort-adherence"
+                                        >
+                                            Приём за 7 дней
+                                            <ArrowUp
+                                                v-if="sort === 'adherence'"
+                                                class="size-3.5"
+                                            />
+                                            <ArrowDown
+                                                v-else-if="
+                                                    sort === '-adherence'
+                                                "
+                                                class="size-3.5"
+                                            />
+                                            <ArrowUpDown
+                                                v-else
+                                                class="size-3.5"
+                                            />
+                                        </Link>
+                                    </th>
+                                    <th class="px-4 py-3 font-medium">
+                                        Отметки
+                                    </th>
+                                    <th class="w-[9%] px-4 py-3 font-medium">
+                                        Возраст
+                                    </th>
+                                    <th class="w-[16%] px-4 py-3 font-medium">
+                                        Под наблюдением с
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody class="@max-2xl:block">
+                                <tr
+                                    v-for="patient in patients.data"
+                                    :key="patient.id"
+                                    class="relative border-t transition-colors first:border-t-0 hover:bg-accent/50 @max-2xl:flex @max-2xl:flex-wrap @max-2xl:items-center @max-2xl:gap-x-3 @max-2xl:gap-y-1 @max-2xl:p-4"
+                                    data-test="patient-row"
+                                    :data-signal="
+                                        patient.adherence.raised || undefined
+                                    "
+                                    :data-contraindication="
+                                        patient.contraindications > 0 ||
+                                        undefined
+                                    "
+                                >
+                                    <td
+                                        class="px-4 py-3 @max-2xl:w-full @max-2xl:min-w-0 @max-2xl:p-0"
+                                    >
+                                        <!-- Ссылка растянута на всю строку: карточка открывается щелчком в любом месте. -->
+                                        <Link
+                                            :href="show(patient.id)"
+                                            class="font-medium underline-offset-4 after:absolute after:inset-0 hover:underline"
+                                        >
+                                            {{ patient.name }}
+                                        </Link>
+                                        <p
+                                            class="truncate text-muted-foreground"
+                                            :title="
+                                                patient.diagnosis
+                                                    ? `${patient.diagnosis.code} ${patient.diagnosis.name}`
+                                                    : undefined
+                                            "
+                                        >
+                                            <span
+                                                v-if="patient.age !== null"
+                                                class="@2xl:hidden"
+                                                >{{ formatAge(patient.age) }} ·
+                                            </span>
+                                            <template v-if="patient.diagnosis"
+                                                >{{ patient.diagnosis.code }}
+                                                {{
+                                                    patient.diagnosis.name
+                                                }}</template
+                                            >
+                                        </p>
+                                    </td>
+                                    <td class="px-4 py-3 @max-2xl:p-0">
+                                        <span
+                                            class="mr-1 text-muted-foreground @2xl:hidden"
+                                            >Приём за 7 дней:</span
+                                        >
+                                        <AdherenceSignal
+                                            :signal="patient.adherence"
+                                        />
+                                    </td>
+                                    <td
+                                        class="px-4 py-3 @max-2xl:w-full @max-2xl:p-0 @max-2xl:empty:hidden"
+                                    >
+                                        <span
+                                            v-if="
+                                                patient.contraindications > 0 ||
+                                                patient.unread > 0
+                                            "
+                                            class="inline-flex flex-wrap items-center gap-1.5"
+                                        >
+                                            <span
+                                                v-if="
+                                                    patient.contraindications >
+                                                    0
+                                                "
+                                                class="inline-flex items-start gap-1 rounded-md border border-danger-border bg-danger-subtle px-1.5 py-0.5 font-medium text-danger"
+                                                data-test="contraindication-mark"
+                                            >
+                                                <OctagonAlert
+                                                    class="mt-0.5 size-3.5 shrink-0"
+                                                />
+                                                Противопоказание без решения
+                                            </span>
+                                            <Link
+                                                v-if="patient.unread > 0"
+                                                :href="chat(patient.id)"
+                                                class="relative z-10 inline-flex items-center gap-1 rounded-md bg-secondary px-1.5 py-0.5 font-medium whitespace-nowrap text-secondary-foreground hover:bg-secondary-hover pointer-coarse:min-h-11 pointer-coarse:px-3"
+                                                :aria-label="`Сообщения: ${messages(patient.unread)}, ${patient.name}`"
+                                                data-test="unread-mark"
+                                            >
+                                                <MessageCircle
+                                                    class="size-3.5 shrink-0"
+                                                />
+                                                {{ messages(patient.unread) }}
+                                            </Link>
+                                        </span>
+                                    </td>
+                                    <td
+                                        class="px-4 py-3 whitespace-nowrap @max-2xl:hidden"
+                                    >
+                                        {{
+                                            patient.age === null
+                                                ? '—'
+                                                : formatAge(patient.age)
+                                        }}
+                                    </td>
+                                    <td
+                                        class="px-4 py-3 whitespace-nowrap @max-2xl:p-0 @max-2xl:text-muted-foreground"
+                                    >
+                                        <span class="@2xl:hidden"
+                                            >под наблюдением с
+                                        </span>
+                                        {{ patient.started_at }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <ListPagination :page="patients" />
+                </template>
+            </section>
         </template>
     </div>
 </template>

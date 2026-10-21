@@ -10,7 +10,7 @@ test('doctor logs in and sees the doctor cabinet', function () {
         ->fill('password', 'password')
         ->press('Войти')
         ->assertPathIs('/doctor/patients')
-        ->assertSee('Пациенты, которых вы сейчас ведёте.')
+        ->assertSee('Пациентов пока нет. Пригласите пациента')
         ->assertNoJavaScriptErrors();
 });
 

@@ -172,7 +172,13 @@
 
 @layer base {
     * {
-        @apply border-border outline-ring/50;
+        @apply border-border outline-ring;
+    }
+    /* Ссылки без своих классов фокуса: та же обводка, что у кнопок, контраст не ниже 3:1. */
+    a:focus-visible,
+    summary:focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 2px;
     }
     html {
         /* Системные радиокнопки, флажки и ползунки — в цвет приложения, а не синие. */
@@ -183,6 +189,14 @@
         /* viewport-fit=cover: в альбомной ориентации iPhone текст не уходит под вырез экрана. */
         padding-left: env(safe-area-inset-left);
         padding-right: env(safe-area-inset-right);
+    }
+    /*
+     * Закреплённые строки внизу формы назначения и профиля не закрывают поле, к которому
+     * браузер прокручивает при переходе по Tab.
+     */
+    html:has([data-test='prescription-summary']),
+    html:has([data-test='facts-save-bar']) {
+        scroll-padding-bottom: 8rem;
     }
     /* Tailwind 4 убрал указатель у кнопок, а для кликабельного он привычнее. */
     button:not(:disabled),

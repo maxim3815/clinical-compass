@@ -2,6 +2,8 @@
 
 namespace App\Support\Safety;
 
+use App\Enums\SafetyLevel;
+use App\Enums\SafetyRuleType;
 use App\Models\Prescription;
 use App\Models\SafetyFinding;
 use App\Models\SafetyRule;
@@ -38,6 +40,49 @@ final readonly class SafetyPresenter
             'unknown_drugs' => $report->unknownDrugs,
             'requires_justification' => $report->requiringJustification() !== [],
         ];
+    }
+
+    /**
+     * Итог проверки препарата для выбора препарата в форме: самый серьёзный уровень среди находок
+     * у него и у других препаратов пациента и коротко — почему: данные пациента или препарат,
+     * у которого появится находка.
+     *
+     * @return array{level: string, label: string, reason: string|null}
+     */
+    public static function summary(SafetyReport $report): array
+    {
+        foreach ([SafetyLevel::Contraindicated, SafetyLevel::Caution] as $level) {
+            $own = array_values(array_filter($report->results, fn (RuleResult $result): bool => $result->rule->level === $level));
+            $caused = array_values(array_filter($report->caused, fn (RuleResult $result): bool => $result->rule->level === $level));
+
+            if ($own !== [] || $caused !== []) {
+                return [
+                    'level' => $level->value,
+                    'label' => $level->label(),
+                    'reason' => $own !== []
+                        ? implode('; ', array_unique(array_map(self::reason(...), $own)))
+                        : 'у препарата '.implode(', ', array_unique(array_map(fn (RuleResult $result): string => $result->target->name, $caused))),
+                ];
+            }
+        }
+
+        // Без находок — не «безопасно»: сколько данных правилам не хватило, видно сразу.
+        return $report->hasRules
+            ? ['level' => 'clear', 'label' => 'По внесённым данным противопоказаний нет', 'reason' => $report->unchecked === [] ? null : 'Не проверено, нет данных: '.count($report->unchecked)]
+            : ['level' => 'no_rules', 'label' => 'Правил проверки нет', 'reason' => null];
+    }
+
+    /**
+     * Почему сработало правило, коротко: данные пациента, а у показаний — что препарат вне них
+     * (список диагнозов здесь ничего не объясняет).
+     */
+    private static function reason(RuleResult $result): string
+    {
+        return match (true) {
+            $result->rule->type === SafetyRuleType::Indication => 'Вне зарегистрированных показаний',
+            $result->evidence === [] => $result->rule->type->label(),
+            default => implode('; ', $result->evidence),
+        };
     }
 
     /**

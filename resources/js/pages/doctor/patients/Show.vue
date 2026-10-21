@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { Form, Head, Link, usePage } from '@inertiajs/vue3';
-import { KeyRound, MessageCircle, Pencil, Plus } from '@lucide/vue';
+import {
+    ArrowDown,
+    KeyRound,
+    MessageCircle,
+    OctagonAlert,
+    Pencil,
+    Plus,
+    TriangleAlert,
+} from '@lucide/vue';
 import { computed, ref } from 'vue';
 import ClinicalProfileController from '@/actions/App/Http/Controllers/Doctor/ClinicalProfileController';
 import PasswordResetLinkController from '@/actions/App/Http/Controllers/Doctor/PasswordResetLinkController';
@@ -10,12 +18,13 @@ import AdherenceSignal from '@/components/AdherenceSignal.vue';
 import CancelPrescriptionDialog from '@/components/CancelPrescriptionDialog.vue';
 import ClinicalProfileSummary from '@/components/ClinicalProfileSummary.vue';
 import ContinueFindingDialog from '@/components/ContinueFindingDialog.vue';
-import Heading from '@/components/Heading.vue';
 import OneTimeLink from '@/components/OneTimeLink.vue';
 import PrescriptionDetails from '@/components/PrescriptionDetails.vue';
+import PrescriptionHistory from '@/components/PrescriptionHistory.vue';
 import PrescriptionSafety from '@/components/PrescriptionSafety.vue';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { formatAge } from '@/lib/plural';
+import { formatAge, plural } from '@/lib/plural';
 import { index, show } from '@/routes/doctor/patients';
 import { show as chat } from '@/routes/doctor/patients/chat';
 import type {
@@ -50,6 +59,8 @@ const props = defineProps<{
     // Находки и «Не проверено» по id назначения.
     safety: Record<number, SafetyCard>;
     justificationLimit: number;
+    // Непрочитанные сообщения пациента.
+    unread: number;
 }>();
 
 defineOptions({
@@ -86,226 +97,494 @@ const hasCourses = computed(
         props.adherence.own.length > 0,
 );
 
-const details = computed(() => [
-    {
-        label: 'Дата рождения',
-        value:
-            props.patient.birth_date === null
-                ? 'не указана'
-                : props.patient.age === null
-                  ? props.patient.birth_date
-                  : `${props.patient.birth_date} (${formatAge(props.patient.age)})`,
-    },
-    { label: 'Логин', value: props.patient.login },
-    { label: 'Под наблюдением с', value: props.patient.started_at },
-    { label: 'Часовой пояс', value: props.patient.timezone ?? '—' },
-]);
-</script>
+// Кто пациент одной строкой: пол, возраст и дата рождения, с какого числа под наблюдением.
+const summary = computed(() => {
+    const { birth_date, age, started_at } = props.patient;
+    const parts: string[] = [];
 
+    if (props.clinicalProfile.sex !== null) {
+        parts.push(
+            props.clinicalProfile.sex === 'female' ? 'Женщина' : 'Мужчина',
+        );
+    }
+
+    if (birth_date !== null) {
+        parts.push(
+            age === null ? birth_date : `${formatAge(age)} (${birth_date})`,
+        );
+    }
+
+    parts.push(`под наблюдением с ${started_at}`);
+
+    return parts.join(' · ');
+});
+
+const mainDiagnoses = computed(() =>
+    props.clinicalProfile.diagnoses.filter((diagnosis) => diagnosis.is_main),
+);
+
+// Препараты с противопоказанием, по которому врач ещё не решил: ссылка ведёт к первому.
+const awaiting = computed(() =>
+    [...props.prescriptions, ...props.ownMedications].filter((prescription) =>
+        props.safety[prescription.id]?.findings.some(
+            (finding) => finding.awaits_decision,
+        ),
+    ),
+);
+
+function awaitsDecision(prescription: Prescription): boolean {
+    return awaiting.value.includes(prescription);
+}
+
+const profileHref = computed(() =>
+    ClinicalProfileController.edit(props.patient.id),
+);
+// Ссылки к разделу профиля, где вносят недостающее.
+const factsHref = computed(
+    () => `${ClinicalProfileController.edit.url(props.patient.id)}#facts`,
+);
+const diagnosesHref = computed(
+    () => `${ClinicalProfileController.edit.url(props.patient.id)}#diagnoses`,
+);
+
+// Чем закончились прежние назначения врача: отмена с причиной видна рядом с текущими.
+const closedEarlier = computed(() =>
+    props.prescriptionHistory.filter(
+        (prescription) =>
+            prescription.source === 'doctor' &&
+            (prescription.status === 'cancelled' ||
+                prescription.status === 'completed'),
+    ),
+);
+
+function closing(prescription: Prescription): string {
+    if (prescription.status === 'completed') {
+        return 'курс завершён';
+    }
+
+    return prescription.cancel_reason === null
+        ? `отменено ${prescription.closed_at?.split(' ')[0]}`
+        : `отменено ${prescription.closed_at?.split(' ')[0]}: ${prescription.cancel_reason.toLowerCase()}`;
+}
+
+const unreadLabel = computed(
+    () =>
+        `${props.unread} ${plural(props.unread, ['новое', 'новых', 'новых'])}`,
+);
+</script>
 <template>
     <Head :title="patient.name" />
 
-    <div class="flex max-w-3xl flex-col gap-8 p-4">
-        <Heading :title="patient.name" description="Карточка пациента" />
-
-        <dl
-            class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-[max-content_1fr]"
+    <div class="@container flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">
+        <header
+            class="flex flex-col gap-3 rounded-2xl border bg-card p-5 shadow-xs"
             data-test="patient-details"
         >
-            <template v-for="item in details" :key="item.label">
-                <dt class="text-muted-foreground">{{ item.label }}</dt>
-                <dd class="-mt-2 font-medium sm:mt-0">{{ item.value }}</dd>
-            </template>
-        </dl>
-
-        <Button variant="outline" class="self-start" as-child>
-            <Link :href="chat(patient.id)" data-test="chat-button">
-                <MessageCircle />
-                Написать
-            </Link>
-        </Button>
-
-        <section
-            class="flex flex-col gap-3"
-            data-test="clinical-profile-section"
-        >
-            <div class="flex flex-wrap items-center justify-between gap-2">
-                <Heading
-                    variant="small"
-                    title="Клинический профиль"
-                    description="Пол, диагнозы и факты, по которым проверяется безопасность назначений."
-                />
-                <Button variant="outline" size="sm" as-child>
-                    <Link
-                        :href="ClinicalProfileController.edit(patient.id)"
-                        data-test="edit-clinical-profile"
-                    >
-                        <Pencil />
-                        Изменить профиль
-                    </Link>
-                </Button>
-            </div>
-
-            <ClinicalProfileSummary :profile="clinicalProfile" />
-        </section>
-
-        <section class="flex flex-col gap-3" data-test="prescriptions">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-                <Heading variant="small" title="Назначения" />
-                <Button size="sm" as-child>
-                    <Link
-                        :href="PrescriptionController.create(patient.id)"
-                        data-test="prescribe-button"
-                    >
-                        <Plus />
-                        Назначить
-                    </Link>
-                </Button>
-            </div>
-
-            <p
-                v-if="prescriptions.length === 0"
-                class="text-sm text-muted-foreground"
-            >
-                Назначений пока нет.
-            </p>
-
-            <PrescriptionDetails
-                v-for="prescription in prescriptions"
-                :key="prescription.id"
-                :prescription="prescription"
-                for-doctor
-            >
-                <template v-if="safety[prescription.id]" #safety>
-                    <PrescriptionSafety
-                        :card="safety[prescription.id]"
-                        @continue="
-                            (finding) => continueDespite(prescription, finding)
-                        "
-                    />
-                </template>
-                <template v-if="prescription.can_change" #actions>
-                    <Button variant="outline" size="sm" as-child>
-                        <Link
-                            :href="
-                                PrescriptionController.edit({
-                                    patient: patient.id,
-                                    prescription: prescription.id,
-                                })
-                            "
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="flex min-w-0 flex-col gap-1">
+                    <h1 class="text-2xl font-semibold tracking-tight">
+                        {{ patient.name }}
+                    </h1>
+                    <p class="text-muted-foreground">{{ summary }}</p>
+                </div>
+                <Button variant="outline" as-child>
+                    <Link :href="chat(patient.id)" data-test="chat-button">
+                        <MessageCircle />
+                        Написать
+                        <span
+                            v-if="unread > 0"
+                            class="rounded-full bg-secondary px-2 text-sm font-semibold text-secondary-foreground"
+                            >{{ unreadLabel }}</span
                         >
-                            Изменить
-                        </Link>
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        data-test="cancel-prescription-button"
-                        @click="cancelling = prescription"
+                    </Link>
+                </Button>
+            </div>
+
+            <p v-if="mainDiagnoses.length > 0" class="flex flex-wrap gap-2">
+                <span
+                    v-for="diagnosis in mainDiagnoses"
+                    :key="diagnosis.id"
+                    class="rounded-lg bg-secondary px-2.5 py-1 text-sm text-secondary-foreground"
+                >
+                    <span class="font-semibold">{{ diagnosis.code }}</span>
+                    {{ diagnosis.name }}
+                </span>
+            </p>
+            <p v-else class="text-sm text-muted-foreground">
+                Основной диагноз не указан: показания к назначению не
+                проверяются.
+                <Link
+                    :href="diagnosesHref"
+                    class="text-primary underline underline-offset-4"
+                    >Указать</Link
+                >
+            </p>
+
+            <!-- Что требует внимания: ссылки ведут к назначению и к приёму в этой карточке. -->
+            <ul
+                v-if="awaiting.length > 0 || adherenceSignal.raised"
+                class="flex flex-wrap gap-2 text-sm"
+                aria-label="Требует внимания"
+            >
+                <li v-if="awaiting.length > 0">
+                    <a
+                        :href="`#prescription-${awaiting[0].id}-title`"
+                        class="inline-flex items-start gap-1.5 rounded-md border border-danger-border bg-danger-subtle px-2 py-1 font-medium text-danger hover:underline pointer-coarse:min-h-11 pointer-coarse:items-center"
+                        data-test="card-contraindication"
                     >
-                        Отменить
-                    </Button>
-                </template>
-            </PrescriptionDetails>
-        </section>
+                        <OctagonAlert class="mt-0.5 size-4 shrink-0" />
+                        Противопоказание без решения:
+                        {{
+                            awaiting
+                                .map((prescription) => prescription.drug.name)
+                                .join(', ')
+                        }}
+                        <ArrowDown class="mt-0.5 size-4 shrink-0" />
+                    </a>
+                </li>
+                <li v-if="adherenceSignal.raised">
+                    <a
+                        href="#adherence"
+                        class="inline-flex items-center gap-1.5 rounded-md hover:underline pointer-coarse:min-h-11"
+                    >
+                        <TriangleAlert class="size-4 shrink-0 text-warning" />
+                        <AdherenceSignal :signal="adherenceSignal" card />
+                        <ArrowDown class="size-4 shrink-0 text-warning" />
+                    </a>
+                </li>
+            </ul>
+        </header>
 
-        <section
-            v-if="ownMedications.length > 0"
-            class="flex flex-col gap-3"
-            data-test="own-medications"
+        <!--
+            На широком экране две колонки: лечение и приём слева, профиль и доступ справа.
+            На узком колонки растворяются (contents), и разделы идут по порядку order.
+        -->
+        <div
+            class="grid grid-cols-[minmax(0,1fr)] items-start gap-6 @4xl:grid-cols-[minmax(0,1fr)_20rem]"
         >
-            <Heading
-                variant="small"
-                title="Добавил пациент"
-                description="Препараты от других врачей, которые пациент добавил сам. Изменить их может только пациент."
-            />
+            <div class="flex flex-col gap-6 @max-4xl:contents">
+                <section
+                    class="order-1 flex scroll-mt-20 flex-col gap-3"
+                    aria-labelledby="prescriptions-title"
+                    data-test="prescriptions"
+                >
+                    <div
+                        class="flex flex-wrap items-center justify-between gap-2"
+                    >
+                        <h2
+                            id="prescriptions-title"
+                            class="text-lg font-semibold"
+                        >
+                            Назначения
+                        </h2>
+                        <Button as-child>
+                            <Link
+                                :href="
+                                    PrescriptionController.create(patient.id)
+                                "
+                                data-test="prescribe-button"
+                            >
+                                <Plus />
+                                Назначить
+                            </Link>
+                        </Button>
+                    </div>
 
-            <PrescriptionDetails
-                v-for="prescription in ownMedications"
-                :key="prescription.id"
-                :prescription="prescription"
-                for-doctor
-            >
-                <template v-if="safety[prescription.id]" #safety>
-                    <PrescriptionSafety
-                        :card="safety[prescription.id]"
-                        @continue="
-                            (finding) => continueDespite(prescription, finding)
-                        "
+                    <p
+                        v-if="prescriptions.length === 0"
+                        class="rounded-xl border border-dashed bg-card p-4 text-sm text-muted-foreground"
+                    >
+                        Назначений пока нет.
+                    </p>
+
+                    <PrescriptionDetails
+                        v-for="prescription in prescriptions"
+                        :key="prescription.id"
+                        :prescription="prescription"
+                        :attention="awaitsDecision(prescription)"
+                        for-doctor
+                    >
+                        <template v-if="safety[prescription.id]" #safety>
+                            <PrescriptionSafety
+                                :card="safety[prescription.id]"
+                                :changeable="prescription.can_change"
+                                :profile-href="factsHref"
+                                :chat-href="chat(patient.id)"
+                                :edit-href="
+                                    PrescriptionController.edit({
+                                        patient: patient.id,
+                                        prescription: prescription.id,
+                                    })
+                                "
+                                @continue="
+                                    (finding) =>
+                                        continueDespite(prescription, finding)
+                                "
+                                @cancel="cancelling = prescription"
+                            />
+                        </template>
+                        <template v-if="prescription.can_change" #actions>
+                            <Button variant="ghost" size="sm" as-child>
+                                <Link
+                                    :href="
+                                        PrescriptionController.edit({
+                                            patient: patient.id,
+                                            prescription: prescription.id,
+                                        })
+                                    "
+                                    :aria-describedby="`prescription-${prescription.id}-title`"
+                                >
+                                    <Pencil />
+                                    Изменить
+                                </Link>
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                :aria-describedby="`prescription-${prescription.id}-title`"
+                                data-test="cancel-prescription-button"
+                                @click="cancelling = prescription"
+                            >
+                                Отменить назначение
+                            </Button>
+                        </template>
+                    </PrescriptionDetails>
+                </section>
+
+                <p
+                    v-if="closedEarlier.length > 0"
+                    class="order-1 -mt-3 text-sm text-muted-foreground"
+                    data-test="closed-earlier"
+                >
+                    Ранее:
+                    {{
+                        closedEarlier
+                            .map(
+                                (prescription) =>
+                                    `${prescription.drug.name} — ${closing(prescription)}`,
+                            )
+                            .join('; ')
+                    }}.
+                    <a
+                        href="#history"
+                        class="text-primary underline underline-offset-4"
+                        >История назначений</a
+                    >
+                </p>
+
+                <section
+                    v-if="ownMedications.length > 0"
+                    class="order-2 flex flex-col gap-3"
+                    aria-labelledby="own-medications-title"
+                    data-test="own-medications"
+                >
+                    <div>
+                        <h2
+                            id="own-medications-title"
+                            class="text-lg font-semibold"
+                        >
+                            Добавил пациент
+                        </h2>
+                        <p class="text-sm text-muted-foreground">
+                            Препараты от других врачей. Изменить их может только
+                            пациент.
+                        </p>
+                    </div>
+
+                    <PrescriptionDetails
+                        v-for="prescription in ownMedications"
+                        :key="prescription.id"
+                        :prescription="prescription"
+                        :attention="awaitsDecision(prescription)"
+                        for-doctor
+                    >
+                        <template v-if="safety[prescription.id]" #safety>
+                            <PrescriptionSafety
+                                :card="safety[prescription.id]"
+                                :changeable="false"
+                                :profile-href="factsHref"
+                                :chat-href="chat(patient.id)"
+                                @continue="
+                                    (finding) =>
+                                        continueDespite(prescription, finding)
+                                "
+                            />
+                        </template>
+                    </PrescriptionDetails>
+                </section>
+
+                <section
+                    id="adherence"
+                    class="order-3 flex scroll-mt-20 flex-col gap-3"
+                    aria-labelledby="adherence-title"
+                    data-test="adherence"
+                >
+                    <div>
+                        <h2 id="adherence-title" class="text-lg font-semibold">
+                            Приём препаратов
+                        </h2>
+                        <p class="text-sm text-muted-foreground">
+                            Доля принятых по контрольным периодам курса: дни
+                            1–7, 8–14, 15–28, дальше каждые 28 дней.
+                        </p>
+                    </div>
+
+                    <p
+                        v-if="adherenceSignal.raised"
+                        class="flex items-center gap-2 text-sm"
+                        data-test="adherence-signal"
+                    >
+                        <TriangleAlert class="size-4 shrink-0 text-warning" />
+                        <AdherenceSignal :signal="adherenceSignal" card />
+                    </p>
+
+                    <p
+                        v-if="adherence.timezone"
+                        class="text-sm text-muted-foreground"
+                        data-test="adherence-timezone"
+                    >
+                        Время пациента: {{ adherence.timezone }}
+                    </p>
+
+                    <p
+                        v-if="!hasCourses"
+                        class="rounded-xl border border-dashed bg-card p-4 text-sm text-muted-foreground"
+                    >
+                        Пациент пока не принимает препараты по назначению.
+                    </p>
+
+                    <AdherenceCourse
+                        v-for="course in adherence.courses"
+                        :key="course.id"
+                        :course="course"
                     />
-                </template>
-            </PrescriptionDetails>
-        </section>
 
-        <section class="flex flex-col gap-3" data-test="adherence">
-            <Heading
-                variant="small"
-                title="Приём препаратов"
-                description="Доля принятых приёмов по контрольным периодам курса: дни 1–7, 8–14, 15–28, дальше каждые 28 дней."
-            />
+                    <AdherenceCourse
+                        v-for="course in adherence.own"
+                        :key="course.id"
+                        :course="course"
+                    />
 
-            <p
-                v-if="adherenceSignal.raised"
-                class="text-sm"
-                data-test="adherence-signal"
-            >
-                <AdherenceSignal :signal="adherenceSignal" card />
-            </p>
+                    <template v-if="adherence.finished.length > 0">
+                        <h3 class="mt-2 font-semibold text-muted-foreground">
+                            Завершённые курсы
+                        </h3>
+                        <AdherenceCourse
+                            v-for="course in adherence.finished"
+                            :key="course.id"
+                            :course="course"
+                        />
+                    </template>
+                </section>
 
-            <p
-                v-if="adherence.timezone"
-                class="text-sm text-muted-foreground"
-                data-test="adherence-timezone"
-            >
-                Время пациента: {{ adherence.timezone }}
-            </p>
+                <section
+                    v-if="prescriptionHistory.length > 0"
+                    id="history"
+                    class="order-5 flex scroll-mt-20 flex-col gap-3"
+                    aria-labelledby="history-title"
+                    data-test="prescription-history"
+                >
+                    <div>
+                        <h2 id="history-title" class="text-lg font-semibold">
+                            История назначений
+                        </h2>
+                        <p class="text-sm text-muted-foreground">
+                            Прежние версии изменённых назначений, отменённые и
+                            завершённые назначения.
+                        </p>
+                    </div>
 
-            <p v-if="!hasCourses" class="text-sm text-muted-foreground">
-                Пациент пока не принимает препараты по назначению.
-            </p>
+                    <PrescriptionHistory :prescriptions="prescriptionHistory" />
+                </section>
+            </div>
 
-            <AdherenceCourse
-                v-for="course in adherence.courses"
-                :key="course.id"
-                :course="course"
-            />
+            <div class="flex flex-col gap-6 @max-4xl:contents">
+                <section
+                    class="order-4 flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-xs"
+                    aria-labelledby="clinical-profile-title"
+                    data-test="clinical-profile-section"
+                >
+                    <div
+                        class="flex flex-wrap items-start justify-between gap-2"
+                    >
+                        <div>
+                            <h2
+                                id="clinical-profile-title"
+                                class="text-lg font-semibold"
+                            >
+                                Клинический профиль
+                            </h2>
+                            <p class="text-sm text-muted-foreground">
+                                По нему проверяется безопасность назначений.
+                            </p>
+                        </div>
+                        <Button variant="outline" size="sm" as-child>
+                            <Link
+                                :href="profileHref"
+                                data-test="edit-clinical-profile"
+                            >
+                                <Pencil />
+                                Изменить профиль
+                            </Link>
+                        </Button>
+                    </div>
 
-            <template v-if="adherence.finished.length > 0">
-                <h3 class="mt-2 text-sm font-medium text-muted-foreground">
-                    Завершённые курсы
-                </h3>
-                <AdherenceCourse
-                    v-for="course in adherence.finished"
-                    :key="course.id"
-                    :course="course"
-                />
-            </template>
+                    <ClinicalProfileSummary :profile="clinicalProfile" />
+                </section>
 
-            <AdherenceCourse
-                v-for="course in adherence.own"
-                :key="course.id"
-                :course="course"
-            />
-        </section>
+                <section
+                    class="order-6 flex flex-col gap-3 rounded-xl border bg-card p-4 text-sm shadow-xs"
+                    aria-labelledby="access-title"
+                >
+                    <h2 id="access-title" class="text-lg font-semibold">
+                        Вход в кабинет
+                    </h2>
+                    <p>
+                        <span class="text-muted-foreground">Логин: </span>
+                        <span class="font-medium">{{ patient.login }}</span>
+                    </p>
+                    <p
+                        v-if="!adherence.timezone && patient.timezone"
+                        class="text-muted-foreground"
+                    >
+                        Часовой пояс: {{ patient.timezone }}
+                    </p>
+                    <p class="text-muted-foreground">
+                        Если пациент забыл пароль, дайте ему ссылку: по ней он
+                        задаст новый. Ссылка действует 24 часа и срабатывает
+                        один раз, новая отменяет прежнюю.
+                    </p>
 
-        <section
-            v-if="prescriptionHistory.length > 0"
-            class="flex flex-col gap-3"
-            data-test="prescription-history"
-        >
-            <Heading
-                variant="small"
-                title="История назначений"
-                description="Прежние версии изменённых назначений, отменённые и завершённые назначения."
-            />
+                    <Form
+                        v-bind="
+                            PasswordResetLinkController.store.form(patient.id)
+                        "
+                        :options="{ preserveScroll: true }"
+                        v-slot="{ processing }"
+                    >
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            :disabled="processing"
+                            data-test="password-reset-link-button"
+                        >
+                            <KeyRound />
+                            Ссылка для смены пароля
+                        </Button>
+                    </Form>
 
-            <PrescriptionDetails
-                v-for="prescription in prescriptionHistory"
-                :key="prescription.id"
-                :prescription="prescription"
-                for-doctor
-            />
-        </section>
+                    <OneTimeLink
+                        v-if="passwordResetUrl"
+                        :url="passwordResetUrl"
+                        label="Ссылка для смены пароля"
+                        data-test="password-reset-link"
+                    >
+                        Отправьте ссылку пациенту. Больше она не покажется: если
+                        потеряете, создайте новую.
+                    </OneTimeLink>
+                </section>
+            </div>
+        </div>
 
         <CancelPrescriptionDialog
             v-model:prescription="cancelling"
@@ -318,38 +597,5 @@ const details = computed(() => [
             :patient-id="patient.id"
             :max-length="justificationLimit"
         />
-
-        <section class="flex flex-col gap-3">
-            <Heading
-                variant="small"
-                title="Забыл пароль"
-                description="Пациент откроет ссылку и сам задаст новый пароль. Ссылка действует 24 часа и срабатывает один раз, новая ссылка отменяет прежнюю."
-            />
-
-            <Form
-                v-bind="PasswordResetLinkController.store.form(patient.id)"
-                :options="{ preserveScroll: true }"
-                v-slot="{ processing }"
-            >
-                <Button
-                    variant="outline"
-                    :disabled="processing"
-                    data-test="password-reset-link-button"
-                >
-                    <KeyRound />
-                    Ссылка для смены пароля
-                </Button>
-            </Form>
-
-            <OneTimeLink
-                v-if="passwordResetUrl"
-                :url="passwordResetUrl"
-                label="Ссылка для смены пароля"
-                data-test="password-reset-link"
-            >
-                Отправьте ссылку пациенту. Больше она не покажется: если
-                потеряете, создайте новую.
-            </OneTimeLink>
-        </section>
     </div>
 </template>

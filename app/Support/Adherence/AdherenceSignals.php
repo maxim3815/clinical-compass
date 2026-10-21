@@ -10,6 +10,7 @@ use App\Models\Prescription;
 use App\Models\User;
 use App\Support\DisplayTime;
 use Carbon\CarbonImmutable;
+use Closure;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -170,10 +171,35 @@ final class AdherenceSignals
      */
     public static function unseenPatientIds(User $doctor): array
     {
+        return array_keys(self::raisedAmong($doctor, function (Builder $query): void {
+            self::notTaken($query);
+            self::unseen($query);
+        }));
+    }
+
+    /**
+     * Сигналы всех пациентов врача, у которых он есть: для очереди «Требуют внимания».
+     *
+     * @return array<int, AdherenceSignal> id пациента => сигнал
+     */
+    public static function raised(User $doctor): array
+    {
+        return self::raisedAmong($doctor, fn (Builder $query) => self::notTaken($query));
+    }
+
+    /**
+     * Сигналы пациентов врача, у которых есть непринятый приём из условия: без него сигнала
+     * не бывает, а доля и пропуски подряд считаются только для таких пациентов.
+     *
+     * @param  Closure(Builder): void  $notTaken
+     * @return array<int, AdherenceSignal> id пациента => сигнал
+     */
+    private static function raisedAmong(User $doctor, Closure $notTaken): array
+    {
         $candidates = CareRelationship::query()
             ->active()
             ->where('doctor_id', $doctor->id)
-            ->whereExists(fn (Builder $query) => self::unseenMisses($query))
+            ->whereExists($notTaken)
             ->select('care_relationships.patient_id')
             ->selectSub(self::shareQuery('care_relationships.patient_id'), 'adherence_share')
             ->with('patient.patientProfile')
@@ -181,30 +207,39 @@ final class AdherenceSignals
 
         $misses = self::consecutiveMisses($candidates->map(fn (CareRelationship $care): User => $care->patient));
 
-        return array_values($candidates
-            ->filter(fn (CareRelationship $care): bool => (new AdherenceSignal($care->adherence_share, $misses[$care->patient_id] ?? 0))->isRaised())
-            ->map(fn (CareRelationship $care): int => $care->patient_id)
-            ->all());
+        return $candidates
+            ->mapWithKeys(fn (CareRelationship $care): array => [
+                $care->patient_id => new AdherenceSignal($care->adherence_share, $misses[$care->patient_id] ?? 0),
+            ])
+            ->filter(fn (AdherenceSignal $signal): bool => $signal->isRaised())
+            ->all();
     }
 
     /**
-     * Непринятый приём регулярного назначения врача, который врач ещё не видел: стал непринятым
-     * позже, чем врач последний раз открывал карточку. «Не принял» — в момент отметки,
-     * пропущенный — когда закрылось окно приёма.
+     * Непринятый приём регулярного назначения врача у пациента из внешнего запроса: не принят
+     * или пропущен.
      */
-    private static function unseenMisses(Builder $query): void
+    private static function notTaken(Builder $query): void
     {
         $query->select(DB::raw(1))
             ->from('dose_events')
             ->join('prescriptions', 'prescriptions.id', '=', 'dose_events.prescription_id')
             ->whereColumn('dose_events.patient_id', 'care_relationships.patient_id')
             ->where('prescriptions.source', PrescriptionSource::Doctor->value)
-            ->whereIn('dose_events.status', [DoseEventStatus::Skipped->value, DoseEventStatus::Missed->value])
-            ->where(fn (Builder $query) => $query
-                ->whereNull('care_relationships.adherence_seen_at')
-                ->orWhereRaw(
-                    'CASE dose_events.status WHEN ? THEN dose_events.marked_at ELSE dose_events.window_closes_at END > care_relationships.adherence_seen_at',
-                    [DoseEventStatus::Skipped->value],
-                ));
+            ->whereIn('dose_events.status', [DoseEventStatus::Skipped->value, DoseEventStatus::Missed->value]);
+    }
+
+    /**
+     * Непринятый приём, который врач ещё не видел: стал непринятым позже, чем врач последний раз
+     * открывал карточку. «Не принял» — в момент отметки, пропущенный — когда закрылось окно приёма.
+     */
+    private static function unseen(Builder $query): void
+    {
+        $query->where(fn (Builder $query) => $query
+            ->whereNull('care_relationships.adherence_seen_at')
+            ->orWhereRaw(
+                'CASE dose_events.status WHEN ? THEN dose_events.marked_at ELSE dose_events.window_closes_at END > care_relationships.adherence_seen_at',
+                [DoseEventStatus::Skipped->value],
+            ));
     }
 }

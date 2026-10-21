@@ -74,6 +74,26 @@ final class ClinicalProfilePresenter
     }
 
     /**
+     * Действующий основной диагноз каждого из пациентов: по нему врач узнаёт пациента в списке.
+     *
+     * @param  array<int, int>  $patientIds
+     * @return array<int, array{code: string, name: string}> id пациента => диагноз
+     */
+    public static function mainDiagnoses(array $patientIds): array
+    {
+        return Diagnosis::query()
+            ->active()
+            ->where('is_main', true)
+            ->whereIn('patient_id', $patientIds)
+            ->with('icd10')
+            ->get()
+            ->mapWithKeys(fn (Diagnosis $diagnosis): array => [
+                $diagnosis->patient_id => ['code' => $diagnosis->icd10_code, 'name' => $diagnosis->icd10->name],
+            ])
+            ->all();
+    }
+
+    /**
      * Записи фактов по порядку: последняя по дате факта — текущая.
      *
      * @return Collection<int, Observation>

@@ -19,7 +19,34 @@ final readonly class SafetyCheck
      */
     public function forCandidate(User $patient, Drug $drug, ?Prescription $replacing = null): SafetyReport
     {
-        $data = PatientSafetyData::load($patient, $replacing?->id);
+        return $this->check(PatientSafetyData::load($patient, $replacing?->id), $drug, $this->decided($patient, $replacing));
+    }
+
+    /**
+     * Проверка каждого препарата для выбора в форме нового назначения: данные пациента
+     * загружаются один раз.
+     *
+     * @param  iterable<Drug>  $drugs
+     * @return array<int, SafetyReport> id препарата => проверка
+     */
+    public function forCandidates(User $patient, iterable $drugs): array
+    {
+        $data = PatientSafetyData::load($patient);
+        $decided = $this->decided($patient, null);
+        $reports = [];
+
+        foreach ($drugs as $drug) {
+            $reports[$drug->id] = $this->check($data, $drug, $decided);
+        }
+
+        return $reports;
+    }
+
+    /**
+     * @param  array<string, true>  $decided
+     */
+    private function check(PatientSafetyData $data, Drug $drug, array $decided): SafetyReport
+    {
         $candidate = Medication::candidate($drug);
         $own = $this->engine->check($data, $candidate, $data->othersThan($candidate));
 
@@ -48,7 +75,7 @@ final readonly class SafetyCheck
                 array_filter($data->medications, fn (Medication $medication): bool => $medication->drug === null),
             ))),
             hasRules: $this->engine->hasRules($candidate),
-            decided: $this->decided($patient, $replacing),
+            decided: $decided,
         );
     }
 

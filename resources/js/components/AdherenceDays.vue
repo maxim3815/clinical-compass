@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { plural } from '@/lib/plural';
+import { cn } from '@/lib/utils';
 import type {
     AdherenceCourse,
     AsNeededDay,
@@ -12,8 +13,14 @@ const props = defineProps<{
     course: AdherenceCourse;
 }>();
 
-// Цвет клетки регулярного курса по итогу дня и подписи для легенды.
-const results: { result: DoseDayResult; label: string; class: string }[] = [
+// Цвет клетки регулярного курса по итогу дня и подписи для легенды. Непринятое отмечено
+// ещё и знаком: точка — часть не принята, черта — ни один. Различие видно и без цвета.
+const results: {
+    result: DoseDayResult;
+    label: string;
+    class: string;
+    mark?: 'dot' | 'bar';
+}[] = [
     {
         result: 'on_time',
         label: 'все вовремя',
@@ -28,11 +35,13 @@ const results: { result: DoseDayResult; label: string; class: string }[] = [
         result: 'partial',
         label: 'часть не принята',
         class: 'bg-warning-subtle text-warning ring-1 ring-warning-border ring-inset',
+        mark: 'dot',
     },
     {
         result: 'none',
         label: 'ни один не принят',
         class: 'bg-danger text-danger-foreground',
+        mark: 'bar',
     },
     {
         result: 'pending',
@@ -49,6 +58,13 @@ const results: { result: DoseDayResult; label: string; class: string }[] = [
 const resultClass = Object.fromEntries(
     results.map((item) => [item.result, item.class]),
 ) as Record<DoseDayResult, string>;
+
+const resultMark = Object.fromEntries(
+    results.map((item) => [item.result, item.mark]),
+) as Record<DoseDayResult, 'dot' | 'bar' | undefined>;
+
+// Выбранный день — рамкой внутри клетки, фокус — обводкой снаружи: их не спутать.
+const SELECTED = 'ring-2 ring-inset ring-foreground';
 
 const selectedDate = ref<string | null>(null);
 
@@ -103,12 +119,14 @@ function asNeededClass(day: AsNeededDay): string {
                 v-for="day in course.days"
                 :key="day.date"
                 type="button"
-                class="flex h-8 items-center justify-center rounded text-xs font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                :class="[
-                    resultClass[day.result],
-                    selectedDate === day.date &&
-                        'ring-2 ring-foreground ring-offset-1 ring-offset-background',
-                ]"
+                class="relative flex h-9 items-center justify-center rounded-md text-sm font-medium tabular-nums outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring focus-visible:outline-solid pointer-coarse:h-11"
+                :class="
+                    cn(
+                        resultClass[day.result],
+                        selectedDate === day.date && SELECTED,
+                    )
+                "
+                :title="day.label"
                 :aria-label="`${day.label}: ${day.result_label}`"
                 :aria-pressed="selectedDate === day.date"
                 :data-date="day.date"
@@ -116,6 +134,16 @@ function asNeededClass(day: AsNeededDay): string {
                 @click="toggle(day.date)"
             >
                 {{ day.day_of_month }}
+                <span
+                    v-if="resultMark[day.result] === 'dot'"
+                    class="absolute top-1 right-1 size-1.5 rounded-full bg-current"
+                    aria-hidden="true"
+                />
+                <span
+                    v-else-if="resultMark[day.result] === 'bar'"
+                    class="absolute inset-x-2 bottom-1 h-0.5 rounded-full bg-current"
+                    aria-hidden="true"
+                />
             </button>
         </div>
 
@@ -124,12 +152,14 @@ function asNeededClass(day: AsNeededDay): string {
                 v-for="day in course.days"
                 :key="day.date"
                 type="button"
-                class="flex h-8 items-center justify-center rounded text-xs font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                :class="[
-                    asNeededClass(day),
-                    selectedDate === day.date &&
-                        'ring-2 ring-foreground ring-offset-1 ring-offset-background',
-                ]"
+                class="flex h-9 items-center justify-center rounded-md text-sm font-medium tabular-nums outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring focus-visible:outline-solid pointer-coarse:h-11"
+                :class="
+                    cn(
+                        asNeededClass(day),
+                        selectedDate === day.date && SELECTED,
+                    )
+                "
+                :title="day.label"
                 :aria-label="asNeededLabel(day)"
                 :aria-pressed="selectedDate === day.date"
                 :data-date="day.date"
@@ -142,25 +172,38 @@ function asNeededClass(day: AsNeededDay): string {
 
         <ul
             v-if="course.kind === 'regular'"
-            class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"
+            class="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground"
         >
             <li
                 v-for="item in results"
                 :key="item.result"
                 class="flex items-center gap-1.5"
             >
-                <span class="size-3 rounded-sm" :class="item.class" />
+                <span
+                    class="relative size-4 shrink-0 rounded-sm"
+                    :class="item.class"
+                >
+                    <span
+                        v-if="item.mark === 'dot'"
+                        class="absolute top-0.5 right-0.5 size-1 rounded-full bg-current"
+                    />
+                    <span
+                        v-else-if="item.mark === 'bar'"
+                        class="absolute inset-x-0.5 bottom-0.5 h-0.5 rounded-full bg-current"
+                    />
+                </span>
                 {{ item.label }}
             </li>
         </ul>
-        <p v-else class="text-xs text-muted-foreground">
+        <p v-else class="text-sm text-muted-foreground">
             В клетке — сколько раз принят препарат за день, красным — больше,
             чем разрешено в сутки.
         </p>
 
         <div
             v-if="selectedRegular"
-            class="flex flex-col gap-2 rounded-md bg-muted/50 p-3 text-sm"
+            class="flex flex-col gap-2 rounded-lg bg-muted/60 p-3 text-sm"
+            aria-live="polite"
             data-test="adherence-day-details"
         >
             <p class="font-medium">
@@ -201,7 +244,7 @@ function asNeededClass(day: AsNeededDay): string {
                     </span>
                     <span
                         v-if="dose.marked_late"
-                        class="block text-xs text-muted-foreground"
+                        class="block text-muted-foreground"
                     >
                         {{
                             dose.marked_at
@@ -215,7 +258,8 @@ function asNeededClass(day: AsNeededDay): string {
 
         <div
             v-if="selectedAsNeeded"
-            class="rounded-md bg-muted/50 p-3 text-sm"
+            class="rounded-lg bg-muted/60 p-3 text-sm"
+            aria-live="polite"
             data-test="adherence-day-details"
         >
             <p class="font-medium">{{ asNeededLabel(selectedAsNeeded) }}</p>

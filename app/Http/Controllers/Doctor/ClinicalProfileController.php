@@ -18,6 +18,7 @@ use App\Support\Safety\ClinicalProfilePresenter;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -100,48 +101,85 @@ class ClinicalProfileController extends Controller
         return $this->saved($patient, 'Диагноз снят.');
     }
 
-    public function storeObservation(Request $request, User $patient, RecordObservation $recordObservation): RedirectResponse
+    /**
+     * Врач вносит одно или несколько значений фактов разом: каждое — отдельная запись, как и
+     * при внесении по одному. Если одно значение неверно, не сохраняется ни одно.
+     */
+    public function storeObservations(Request $request, User $patient, RecordObservation $recordObservation): RedirectResponse
     {
         Gate::authorize('view', $patient);
 
-        $type = ObservationType::query()->active()->find($request->integer('observation_type_id'));
-        $value = match ($type?->value_type) {
-            ObservationValueType::Boolean => ['required', 'boolean'],
-            ObservationValueType::Number => ['required', 'numeric', 'decimal:0,2', 'min:'.($type->min ?? 0), 'max:'.($type->max ?? 999999)],
-            ObservationValueType::Choice => ['required', Rule::in(array_column($type->options ?? [], 'value'))],
-            null => ['nullable'],
-        };
-
-        $validated = $request->validate([
-            'observation_type_id' => ['required', Rule::exists('observation_types', 'id')->where('is_active', true)],
-            'value' => $value,
-            'comment' => ['nullable', 'string', 'max:'.Observation::MAX_COMMENT_LENGTH],
-            'observed_on' => ['required', 'date_format:Y-m-d', 'before_or_equal:'.$patient->localToday()->toDateString()],
-        ], [
-            'observation_type_id' => 'Выберите, что вносите.',
-            'value.min' => 'Значение не меньше '.ObservationType::number((float) $type?->min).'.',
-            'value.max' => 'Значение не больше '.ObservationType::number((float) $type?->max).'.',
-            'value' => 'Укажите значение.',
-            'comment' => 'Комментарий — не больше '.Observation::MAX_COMMENT_LENGTH.' символов.',
-            'observed_on.before_or_equal' => 'Дата не может быть позже сегодняшнего дня.',
-            'observed_on' => 'Укажите дату.',
-        ]);
-
-        /** @var ObservationType $type */
-        $recordObservation->handle(
-            $this->doctor($request),
-            $patient,
-            $type,
-            match ($type->value_type) {
-                ObservationValueType::Boolean => $request->boolean('value'),
-                ObservationValueType::Number => (float) $validated['value'],
-                ObservationValueType::Choice => (string) $validated['value'],
-            },
-            ($validated['comment'] ?? null) === null ? null : trim((string) $validated['comment']),
-            CarbonImmutable::parse($validated['observed_on']),
+        $request->validate(
+            ['observations' => ['required', 'list']],
+            ['observations' => 'Выберите значение хотя бы у одного факта.'],
         );
 
-        return $this->saved($patient, 'Факт сохранён.');
+        /** @var array<int, mixed> $items */
+        $items = $request->input('observations');
+        $types = ObservationType::query()
+            ->active()
+            ->whereKey(array_map(fn (mixed $item): int => is_array($item) ? (int) ($item['observation_type_id'] ?? 0) : 0, $items))
+            ->get()
+            ->keyBy('id');
+
+        $rules = [];
+        $messages = [];
+        // Факт, который уже есть выше в списке: ошибка у повтора.
+        $seen = [];
+
+        foreach ($items as $index => $item) {
+            $type = $types->get(is_array($item) ? (int) ($item['observation_type_id'] ?? 0) : 0);
+            $field = "observations.{$index}";
+
+            $rules += [
+                "{$field}.observation_type_id" => ['required', Rule::exists('observation_types', 'id')->where('is_active', true), Rule::notIn($seen)],
+                "{$field}.value" => match ($type?->value_type) {
+                    ObservationValueType::Boolean => ['required', 'boolean'],
+                    ObservationValueType::Number => ['required', 'numeric', 'decimal:0,2', 'min:'.($type->min ?? 0), 'max:'.($type->max ?? 999999)],
+                    ObservationValueType::Choice => ['required', Rule::in(array_column($type->options ?? [], 'value'))],
+                    null => ['nullable'],
+                },
+                "{$field}.comment" => ['nullable', 'string', 'max:'.Observation::MAX_COMMENT_LENGTH],
+                "{$field}.observed_on" => ['required', 'date_format:Y-m-d', 'before_or_equal:'.$patient->localToday()->toDateString()],
+            ];
+            $messages += [
+                "{$field}.observation_type_id.not_in" => 'Один факт внесён дважды.',
+                "{$field}.observation_type_id" => 'Выберите, что вносите.',
+                "{$field}.value.min" => 'Значение не меньше '.ObservationType::number((float) $type?->min).'.',
+                "{$field}.value.max" => 'Значение не больше '.ObservationType::number((float) $type?->max).'.',
+                "{$field}.value" => 'Укажите значение.',
+                "{$field}.comment" => 'Комментарий — не больше '.Observation::MAX_COMMENT_LENGTH.' символов.',
+                "{$field}.observed_on.before_or_equal" => 'Дата не может быть позже сегодняшнего дня.',
+                "{$field}.observed_on" => 'Укажите дату.',
+            ];
+            $seen[] = is_array($item) ? (int) ($item['observation_type_id'] ?? 0) : 0;
+        }
+
+        /** @var array{observations: list<array{observation_type_id: int|string, value: mixed, comment?: string|null, observed_on: string}>} $validated */
+        $validated = $request->validate($rules, $messages);
+        $doctor = $this->doctor($request);
+
+        DB::transaction(function () use ($validated, $types, $recordObservation, $doctor, $patient): void {
+            foreach ($validated['observations'] as $item) {
+                /** @var ObservationType $type */
+                $type = $types->get((int) $item['observation_type_id']);
+
+                $recordObservation->handle(
+                    $doctor,
+                    $patient,
+                    $type,
+                    match ($type->value_type) {
+                        ObservationValueType::Boolean => filter_var($item['value'], FILTER_VALIDATE_BOOLEAN),
+                        ObservationValueType::Number => (float) $item['value'],
+                        ObservationValueType::Choice => (string) $item['value'],
+                    },
+                    ($item['comment'] ?? null) === null ? null : trim((string) $item['comment']),
+                    CarbonImmutable::parse($item['observed_on']),
+                );
+            }
+        });
+
+        return $this->saved($patient, count($validated['observations']) === 1 ? 'Факт сохранён.' : 'Факты сохранены.');
     }
 
     private function doctor(Request $request): User

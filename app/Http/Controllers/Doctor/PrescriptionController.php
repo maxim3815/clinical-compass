@@ -8,6 +8,7 @@ use App\Actions\PrescribeDrug;
 use App\Enums\PrescriptionCancelReason;
 use App\Enums\PrescriptionChangeOutcome;
 use App\Enums\PrescriptionSource;
+use App\Enums\PrescriptionStatus;
 use App\Enums\TimeOfDay;
 use App\Exceptions\PrescriptionNotChangeable;
 use App\Http\Controllers\Controller;
@@ -17,6 +18,7 @@ use App\Models\DrugStrength;
 use App\Models\Prescription;
 use App\Models\PrescriptionIntake;
 use App\Models\User;
+use App\Support\DisplayTime;
 use App\Support\Safety\SafetyAcknowledgement;
 use App\Support\Safety\SafetyCheck;
 use App\Support\Safety\SafetyPresenter;
@@ -33,11 +35,18 @@ class PrescriptionController extends Controller
 {
     public const int MAX_CANCEL_COMMENT_LENGTH = 1000;
 
-    public function create(User $patient): Response
+    public function create(User $patient, SafetyCheck $safetyCheck): Response
     {
         Gate::authorize('view', $patient);
 
-        return Inertia::render('doctor/prescriptions/Form', $this->formProps($patient, null, null));
+        $props = $this->formProps($patient, null, null);
+        $drugs = Drug::query()->whereKey(array_column($props['drugs'], 'id'))->get();
+
+        // Итог проверки по каждому препарату: врач видит его в списке ещё до выбора.
+        $props['drugSafety'] = array_map(SafetyPresenter::summary(...), $safetyCheck->forCandidates($patient, $drugs));
+        $props['drugHistory'] = $this->drugHistory($patient);
+
+        return Inertia::render('doctor/prescriptions/Form', $props);
     }
 
     public function store(PrescriptionRequest $request, User $patient, PrescribeDrug $prescribeDrug): RedirectResponse
@@ -169,6 +178,8 @@ class PrescriptionController extends Controller
             'today' => $today->toDateString(),
             'justificationLimit' => SafetyAcknowledgement::MAX_JUSTIFICATION_LENGTH,
             'safety' => $safety,
+            'drugSafety' => (object) [],
+            'drugHistory' => (object) [],
             'prescription' => $prescription === null ? null : [
                 'id' => $prescription->id,
                 'drug_id' => $prescription->drug_id,
@@ -189,6 +200,42 @@ class PrescriptionController extends Controller
                 'has_started' => $prescription->starts_on->lte($today),
             ],
         ];
+    }
+
+    /**
+     * Что уже было с препаратом у пациента, одной строкой для выбора препарата: идёт ли назначение,
+     * принимает ли он препарат сам, чем закончилось последнее назначение врача.
+     *
+     * @return array<int, string> id препарата => строка
+     */
+    private function drugHistory(User $patient): array
+    {
+        $today = $patient->localToday();
+        $history = [];
+
+        $prescriptions = $patient->prescriptions()
+            ->whereNotNull('drug_id')
+            ->orderByDesc('starts_on')
+            ->orderByDesc('id')
+            ->get()
+            ->groupBy('drug_id');
+
+        foreach ($prescriptions as $drugId => $versions) {
+            $current = $versions->first(fn (Prescription $prescription): bool => $prescription->status($today)->isCurrent());
+            $closed = $versions->first(fn (Prescription $prescription): bool => $prescription->source === PrescriptionSource::Doctor
+                && in_array($prescription->status($today), [PrescriptionStatus::Cancelled, PrescriptionStatus::Completed], true));
+
+            $history[(int) $drugId] = match (true) {
+                $current?->source === PrescriptionSource::Doctor => 'Уже назначен с '.$current->starts_on->format('d.m.Y'),
+                $current !== null => 'Принимает, добавил пациент',
+                $closed?->closed_at !== null => 'Отменён '.DisplayTime::formatDate($closed->closed_at)
+                    .($closed->cancel_reason === null ? '' : ': '.mb_strtolower($closed->cancel_reason->label())),
+                $closed !== null => 'Курс завершён '.$closed->ends_on?->format('d.m.Y'),
+                default => null,
+            };
+        }
+
+        return array_filter($history);
     }
 
     /**
@@ -216,6 +263,7 @@ class PrescriptionController extends Controller
             ->filter(fn (Drug $drug): bool => $drug->strengths->isNotEmpty())
             ->map(fn (Drug $drug): array => [
                 'id' => $drug->id,
+                'code' => $drug->code,
                 'name' => $drug->name,
                 'regimen' => $drug->regimen,
                 'patient_instruction' => $drug->patient_instruction,

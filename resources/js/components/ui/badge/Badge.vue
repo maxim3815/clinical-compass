@@ -7,10 +7,11 @@ import { Primitive } from "reka-ui"
 import { cn } from "@/lib/utils"
 import { badgeVariants } from "."
 
-const props = defineProps<PrimitiveProps & {
+// Бейдж строчный: внутри абзаца div разорвал бы разметку и разошёлся бы с SSR.
+const props = withDefaults(defineProps<PrimitiveProps & {
   variant?: BadgeVariants["variant"]
   class?: HTMLAttributes["class"]
-}>()
+}>(), { as: "span" })
 
 const delegatedProps = reactiveOmit(props, "class")
 </script>
