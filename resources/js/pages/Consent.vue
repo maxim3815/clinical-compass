@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
+import ConsentText from '@/components/ConsentText.vue';
 
 defineOptions({
     layout: {
@@ -11,14 +12,5 @@ defineOptions({
 <template>
     <Head title="Согласие на обработку персональных данных" />
 
-    <div class="space-y-3 text-sm text-muted-foreground">
-        <p>
-            Текст согласия готовит команда проекта. До его публикации приложение
-            работает только с демонстрационными данными.
-        </p>
-        <p>
-            Регистрируясь, пациент соглашается на обработку своих персональных
-            данных и сведений о здоровье лечащим врачом для ведения лечения.
-        </p>
-    </div>
+    <ConsentText />
 </template>

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { Form, Head } from '@inertiajs/vue3';
+import { CircleAlert } from '@lucide/vue';
 import InputError from '@/components/InputError.vue';
 import PasswordInput from '@/components/PasswordInput.vue';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -11,7 +13,7 @@ import { store } from '@/routes/login';
 
 defineOptions({
     layout: {
-        title: 'Вход в Клинический компас',
+        title: 'Вход',
         description: 'Введите логин и пароль',
     },
 });
@@ -24,20 +26,36 @@ defineProps<{
 <template>
     <Head title="Вход" />
 
-    <div
+    <p
         v-if="status"
-        class="mb-4 text-center text-sm font-medium text-green-600"
+        class="rounded-lg border border-success-border bg-success-subtle px-4 py-3 text-base font-medium text-success"
     >
         {{ status }}
-    </div>
+    </p>
 
+    <!--
+        Пустые поля ловит сам браузер (подсказка на языке телефона), поэтому с сервера
+        приходит только «Неверный логин или пароль» или лимит попыток: это про оба поля сразу.
+    -->
     <Form
         v-bind="store.form()"
         :reset-on-success="['password']"
         v-slot="{ errors, processing }"
         class="flex flex-col gap-6"
     >
-        <div class="grid gap-6">
+        <!-- «Неверный логин или пароль» относится к обоим полям, поэтому ошибка входа — над ними. -->
+        <Alert
+            v-if="errors.login"
+            variant="destructive"
+            data-test="login-error"
+        >
+            <CircleAlert />
+            <AlertDescription id="login-error" class="text-base">
+                {{ errors.login }}
+            </AlertDescription>
+        </Alert>
+
+        <div class="grid gap-5">
             <div class="grid gap-2">
                 <Label for="login">Логин</Label>
                 <Input
@@ -46,12 +64,12 @@ defineProps<{
                     name="login"
                     required
                     v-focus
-                    :tabindex="1"
                     autocomplete="username"
                     autocapitalize="none"
                     spellcheck="false"
+                    :aria-invalid="errors.login ? true : undefined"
+                    :aria-describedby="errors.login ? 'login-error' : undefined"
                 />
-                <InputError :message="errors.login" />
             </div>
 
             <div class="grid gap-2">
@@ -60,23 +78,33 @@ defineProps<{
                     id="password"
                     name="password"
                     required
-                    :tabindex="2"
                     autocomplete="current-password"
+                    :aria-invalid="
+                        errors.login || errors.password ? true : undefined
+                    "
+                    :aria-describedby="
+                        errors.login
+                            ? 'login-error'
+                            : errors.password
+                              ? 'password-error'
+                              : undefined
+                    "
                 />
-                <InputError :message="errors.password" />
+                <InputError id="password-error" :message="errors.password" />
             </div>
 
-            <div class="flex items-center justify-between">
-                <Label for="remember" class="flex items-center space-x-3">
-                    <Checkbox id="remember" name="remember" :tabindex="3" />
-                    <span>Запомнить меня</span>
-                </Label>
-            </div>
+            <Label
+                for="remember"
+                class="flex min-h-11 items-center gap-3 text-base font-normal"
+            >
+                <Checkbox id="remember" name="remember" />
+                <span>Запомнить меня</span>
+            </Label>
 
             <Button
                 type="submit"
-                class="mt-4 w-full"
-                :tabindex="4"
+                size="lg"
+                class="w-full"
                 :disabled="processing"
                 data-test="login-button"
             >
@@ -85,9 +113,12 @@ defineProps<{
             </Button>
         </div>
 
-        <p class="text-center text-sm text-muted-foreground">
-            Нет учётной записи? Пациент получает ссылку для регистрации от
-            своего врача.
-        </p>
+        <div class="space-y-2 border-t pt-5 text-base text-muted-foreground">
+            <p>
+                Забыли пароль? Попросите у врача ссылку, по которой можно задать
+                новый.
+            </p>
+            <p>Нет учётной записи? Ссылку для регистрации присылает врач.</p>
+        </div>
     </Form>
 </template>

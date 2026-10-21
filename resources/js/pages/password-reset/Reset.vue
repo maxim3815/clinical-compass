@@ -30,6 +30,7 @@ defineOptions({
         :reset-on-error="['password', 'password_confirmation']"
         class="flex flex-col gap-6"
         v-slot="{ errors, processing }"
+        novalidate
     >
         <div class="grid gap-2">
             <Label for="login">Ваш логин</Label>
@@ -49,9 +50,13 @@ defineOptions({
                 required
                 autofocus
                 autocomplete="new-password"
+                :aria-invalid="errors.password ? true : undefined"
+                aria-describedby="password-hint password-error"
             />
-            <p class="text-xs text-muted-foreground">Не короче 8 символов.</p>
-            <InputError :message="errors.password" />
+            <p id="password-hint" class="text-muted-foreground">
+                Не короче 8 символов.
+            </p>
+            <InputError id="password-error" :message="errors.password" />
         </div>
 
         <div class="grid gap-2">
@@ -61,12 +66,18 @@ defineOptions({
                 name="password_confirmation"
                 required
                 autocomplete="new-password"
+                :aria-invalid="errors.password_confirmation ? true : undefined"
+                aria-describedby="password-confirmation-error"
             />
-            <InputError :message="errors.password_confirmation" />
+            <InputError
+                id="password-confirmation-error"
+                :message="errors.password_confirmation"
+            />
         </div>
 
         <Button
             type="submit"
+            size="lg"
             class="w-full"
             :disabled="processing"
             data-test="reset-password-button"

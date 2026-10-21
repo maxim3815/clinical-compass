@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
-import TextLink from '@/components/TextLink.vue';
+import { Head, Link } from '@inertiajs/vue3';
+import { Button } from '@/components/ui/button';
 import { login } from '@/routes';
 
 defineOptions({
@@ -15,8 +15,10 @@ defineOptions({
 <template>
     <Head title="Ссылка недействительна" />
 
-    <p class="text-center text-sm text-muted-foreground">
-        Уже зарегистрированы?
-        <TextLink :href="login()">Войти</TextLink>
-    </p>
+    <div class="flex flex-col gap-3">
+        <p class="text-base text-muted-foreground">Уже зарегистрированы?</p>
+        <Button variant="outline" size="lg" class="w-full" as-child>
+            <Link :href="login()">Войти</Link>
+        </Button>
+    </div>
 </template>

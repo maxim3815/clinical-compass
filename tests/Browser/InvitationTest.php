@@ -21,6 +21,7 @@ test('doctor invites a patient who registers by the link and sees the cabinet', 
 
     $page->click('[data-test="sidebar-menu-button"]')
         ->click('Выйти')
+        ->click('[data-test="confirm-logout"]')
         ->assertPathIs('/login')
         ->navigate($link)
         ->assertSee('Регистрация пациента')
@@ -28,7 +29,17 @@ test('doctor invites a patient who registers by the link and sees the cabinet', 
         ->fill('login', 'novikov')
         ->fill('password', 'secret-password')
         ->fill('password_confirmation', 'secret-password')
-        ->click('#consent')
+        // Сначала без согласия: ошибка с сервера, введённое не пропало.
+        ->press('Зарегистрироваться')
+        ->assertSee('Без согласия на обработку персональных данных зарегистрироваться нельзя.')
+        ->assertAttribute('#consent', 'aria-invalid', 'true')
+        ->assertValue('login', 'novikov')
+        ->assertValue('password', 'secret-password')
+        // Текст согласия открывается в окне на этой же странице, «Согласен» ставит галочку.
+        ->click('[data-test="consent-text-button"]')
+        ->assertSee('Регистрируясь, пациент соглашается на обработку своих персональных данных')
+        ->click('[data-test="consent-agree"]')
+        ->assertAttribute('#consent', 'aria-checked', 'true')
         ->press('Зарегистрироваться')
         ->assertPathIs('/patient')
         ->assertSee('Здравствуйте, Артём Сергеевич!')
