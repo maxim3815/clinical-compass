@@ -48,3 +48,7 @@ test('shared user data has only public fields', function () {
             ]),
         );
 });
+
+test('the design showcase is not published', function () {
+    $this->get('/design-system')->assertNotFound();
+});
