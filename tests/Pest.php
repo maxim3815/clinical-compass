@@ -74,6 +74,47 @@ expect()->extend('toBeOne', function () {
 // Страница помещается в ширину экрана, горизонтальной прокрутки нет (browser-тесты на телефоне).
 const FITS_SCREEN = 'document.documentElement.scrollWidth <= window.innerWidth';
 
+// Установка приложения и пуши (InstallableAppTest и PushNotificationsTest): Safari на iPhone.
+const IPHONE_SAFARI = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1';
+
+/**
+ * Ждёт, пока service worker установится: предкэш идёт через тестовый сервер несколько секунд.
+ */
+function waitForServiceWorker(mixed $page): mixed
+{
+    for ($attempt = 0; $attempt < 20; $attempt++) {
+        $state = $page->script('() => navigator.serviceWorker.getRegistration().then((registration) => registration?.active?.state ?? null)');
+
+        if ($state === 'activated') {
+            return $page;
+        }
+
+        $page->wait(0.5);
+    }
+
+    throw new RuntimeException('Service worker не активировался за 10 секунд.');
+}
+
+/**
+ * Chromium в тестах сам не предлагает установку: присылаем событие beforeinstallprompt,
+ * как Chrome на Android. Пациент в системном диалоге соглашается.
+ */
+function offerInstall(mixed $page): mixed
+{
+    $page->script(<<<'JS'
+        () => {
+            const event = new Event('beforeinstallprompt', { cancelable: true });
+            event.prompt = async () => {
+                window.installDialogShown = true;
+            };
+            event.userChoice = Promise.resolve({ outcome: 'accepted' });
+            window.dispatchEvent(event);
+        }
+        JS);
+
+    return $page;
+}
+
 /*
 |--------------------------------------------------------------------------
 | Functions
