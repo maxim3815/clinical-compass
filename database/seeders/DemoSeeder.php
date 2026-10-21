@@ -5,9 +5,9 @@ namespace Database\Seeders;
 use App\Actions\CreateDoctor;
 use App\Actions\InvitePatient;
 use App\Enums\AccessLinkPurpose;
-use App\Events\AdherenceSignalsChanged;
 use App\Events\MessageSent;
 use App\Events\MessagesRead;
+use App\Events\PatientSignalsChanged;
 use App\Events\UnreadMessagesChanged;
 use App\Models\AccessLink;
 use App\Models\User;
@@ -23,8 +23,9 @@ use Illuminate\Support\Facades\Notification;
 use RuntimeException;
 
 /**
- * Демо-данные для локальной разработки и показа: справочник препаратов, два врача и 15 пациентов
- * с назначениями, историей приёмов и перепиской (план — в DemoPatients). История строится
+ * Демо-данные для локальной разработки и показа: справочники, правила проверки, два врача
+ * и 15 пациентов с клиническим профилем, назначениями, историей приёмов и перепиской
+ * (план — в DemoPatients). История строится
  * до текущего момента. У всех пользователей пароль `password`.
  * Второй врач со своими пациентами нужен, чтобы показать изоляцию данных.
  * Повторный запуск не создаёт дубликатов: пациент, который уже есть, не меняется.
@@ -42,9 +43,11 @@ class DemoSeeder extends Seeder
 
     public function run(CreateDoctor $createDoctor, DemoHistory $history): void
     {
-        // Справочник препаратов загружается той же командой, что и вне локального окружения.
-        if ($this->command->call('app:drugs:import') !== Command::SUCCESS) {
-            throw new RuntimeException('Справочник препаратов не загружен, ошибки выше.');
+        // Справочники и правила загружаются теми же командами, что и вне локального окружения.
+        foreach (['app:drugs:import' => 'Справочник препаратов', 'app:icd10:import' => 'Справочник МКБ-10', 'app:rules:import' => 'Правила проверки'] as $command => $title) {
+            if ($this->command->call($command) !== Command::SUCCESS) {
+                throw new RuntimeException("Не загружено: {$title}, ошибки выше.");
+            }
         }
 
         $doctors = [
@@ -76,7 +79,7 @@ class DemoSeeder extends Seeder
 
         try {
             Event::fakeFor($callback, [
-                AdherenceSignalsChanged::class,
+                PatientSignalsChanged::class,
                 MessageSent::class,
                 MessagesRead::class,
                 UnreadMessagesChanged::class,

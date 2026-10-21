@@ -2,23 +2,32 @@
 
 namespace Database\Seeders\Demo;
 
+use App\Actions\AddDiagnosis;
 use App\Actions\AddOwnMedication;
 use App\Actions\CancelPrescription;
 use App\Actions\CreatePatient;
 use App\Actions\MarkMessagesRead;
 use App\Actions\PrescribeDrug;
 use App\Actions\RecordAsNeededDose;
+use App\Actions\RecordObservation;
+use App\Actions\ResolveDiagnosis;
 use App\Actions\SendMessage;
 use App\Actions\SetIntakeTimes;
+use App\Actions\SetPatientSex;
 use App\Actions\SkipDose;
 use App\Actions\SyncDoseEvents;
 use App\Actions\TakeDose;
+use App\Enums\ObservationValueType;
 use App\Enums\PrescriptionKind;
+use App\Enums\Sex;
 use App\Enums\TimeOfDay;
 use App\Models\CareRelationship;
+use App\Models\Diagnosis;
 use App\Models\DoseEvent;
 use App\Models\Drug;
+use App\Models\Icd10Code;
 use App\Models\Message;
+use App\Models\ObservationType;
 use App\Models\Prescription;
 use App\Models\User;
 use App\Support\DisplayTime;
@@ -31,7 +40,8 @@ use Illuminate\Support\Carbon;
 
 /**
  * Проигрывает историю демо-пациента через действия приложения со сдвинутыми часами: врач
- * назначает препарат, пациент выбирает время и отмечает приёмы, они переписываются. Поэтому
+ * заполняет клинический профиль и назначает препарат, пациент выбирает время и отмечает приёмы,
+ * они переписываются. Поэтому
  * у истории те же поля и правила, что у настоящей. Чего к текущему моменту ещё не случилось,
  * то не происходит: такие приёмы ждут отметки. Пропуски потом отмечает mark-missed.
  */
@@ -58,6 +68,13 @@ final class DemoHistory
      */
     private array $messages = [];
 
+    /**
+     * Диагнозы по коду, когда они уже поставлены.
+     *
+     * @var array<string, Diagnosis>
+     */
+    private array $diagnoses = [];
+
     public function __construct(
         private readonly CreatePatient $createPatient,
         private readonly PrescribeDrug $prescribeDrug,
@@ -70,6 +87,10 @@ final class DemoHistory
         private readonly RecordAsNeededDose $recordAsNeededDose,
         private readonly SendMessage $sendMessage,
         private readonly MarkMessagesRead $markMessagesRead,
+        private readonly SetPatientSex $setPatientSex,
+        private readonly AddDiagnosis $addDiagnosis,
+        private readonly ResolveDiagnosis $resolveDiagnosis,
+        private readonly RecordObservation $recordObservation,
     ) {}
 
     public function play(DemoPatient $plan, User $doctor, string $password): User
@@ -77,6 +98,7 @@ final class DemoHistory
         $this->steps = [];
         $this->prescriptions = [];
         $this->messages = [];
+        $this->diagnoses = [];
         // Часы могли быть сдвинуты и до сидера, например в тесте: их и возвращаем.
         $frozen = CarbonImmutable::getTestNow();
         $now = CarbonImmutable::now();
@@ -96,6 +118,8 @@ final class DemoHistory
                 birthDate: CarbonImmutable::parse($plan->birthDate),
                 consentedAt: now(),
             );
+
+            $this->profile($patient, $doctor, $plan, $today);
 
             foreach ($plan->courses as $index => $course) {
                 $this->course($patient, $doctor, $index, $course, $starts[$index]);
@@ -130,6 +154,51 @@ final class DemoHistory
         $this->syncDoseEvents->handle($patient);
 
         return $patient;
+    }
+
+    /**
+     * Пол, диагнозы и факты врач вносит при заведении пациента, до первого назначения. Смена
+     * диагноза позже — шаг истории вечером в свой день.
+     */
+    private function profile(User $patient, User $doctor, DemoPatient $plan, CarbonImmutable $today): void
+    {
+        $this->setPatientSex->handle($doctor, $patient, Sex::from($plan->sex));
+        $created = $patient->localToday();
+
+        foreach ($plan->diagnoses as $diagnosis) {
+            if ($diagnosis->daysAgo === null) {
+                $this->diagnose($patient, $doctor, $diagnosis, $created);
+            } else {
+                $date = $today->subDays($diagnosis->daysAgo);
+                $this->step($this->moment($date, '19:00'), fn () => $this->diagnose($patient, $doctor, $diagnosis, $date));
+            }
+
+            if ($diagnosis->resolvedDaysAgo !== null) {
+                $date = $today->subDays($diagnosis->resolvedDaysAgo);
+                $this->step($this->moment($date, '18:55'), fn () => $this->resolveDiagnosis->handle($doctor, $this->diagnoses[$diagnosis->code], $date));
+            }
+        }
+
+        foreach ($plan->facts as $code => [$value, $comment]) {
+            $type = ObservationType::query()->where('code', $code)->sole();
+
+            $this->recordObservation->handle($doctor, $patient, $type, match ($type->value_type) {
+                ObservationValueType::Boolean => (bool) $value,
+                ObservationValueType::Number => (float) $value,
+                ObservationValueType::Choice => (string) $value,
+            }, $comment, $created);
+        }
+    }
+
+    private function diagnose(User $patient, User $doctor, DemoDiagnosis $diagnosis, CarbonImmutable $date): void
+    {
+        $this->diagnoses[$diagnosis->code] = $this->addDiagnosis->handle(
+            $doctor,
+            $patient,
+            Icd10Code::query()->whereKey($diagnosis->code)->firstOrFail(),
+            $diagnosis->main,
+            $date,
+        );
     }
 
     private function course(User $patient, User $doctor, int $index, DemoCourse $course, CarbonImmutable $start): void

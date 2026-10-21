@@ -10,6 +10,9 @@ use App\Enums\TimeOfDay;
  * План демо-данных: 15 пациентов из клинических профилей, только то, что умеет этап 1. Номера
  * в комментариях — номера профилей. Шкал, алертов и маршрутизации пока нет, поэтому у части
  * пациентов назначений нет. Чтобы поправить пациента, достаточно поправить его запись здесь.
+ *
+ * Клинический профиль у всех: пол и диагнозы. Факты для проверки безопасности внесены у тех,
+ * на ком её показывают: у Иванова полный набор в норме, у Григорьева СКФ, у Ковалёвой беременность.
  */
 final class DemoPatients
 {
@@ -24,15 +27,15 @@ final class DemoPatients
             self::smirnov(),
             self::fedorova(),
             self::kuznetsova(),
-            new DemoPatient('patient_2b', 'Григорьев Роман Николаевич', '1978-01-30'),
-            new DemoPatient('patient_2c', 'Ковалёва Дарья Владимировна', '2000-08-11'),
+            self::grigoryev(),
+            self::kovaleva(),
             self::sokolov(),
             self::popova(),
             self::lebedev(),
-            new DemoPatient('patient4', 'Морозова Ольга Павловна', '1988-05-19', 'doctor2'),
+            self::morozova(),
             self::nikolaev(),
-            new DemoPatient('patient_4c', 'Зайцева Светлана Юрьевна', '1981-02-22'),
-            new DemoPatient('patient_norm1', 'Белов Иван Максимович', '2002-04-17'),
+            self::zaytseva(),
+            self::belov(),
             self::tarasova(),
         ];
     }
@@ -42,7 +45,18 @@ final class DemoPatients
      */
     private static function ivanov(): DemoPatient
     {
-        return new DemoPatient('patient', 'Иванов Пётр Алексеевич', '1984-03-12', courses: [
+        return new DemoPatient('patient', 'Иванов Пётр Алексеевич', '1984-03-12', 'male', [DemoDiagnosis::main('F41.1')], facts: [
+            // Полный набор в норме: у «Авиандра» ни находок, ни «Не проверено».
+            'gfr' => [95, null],
+            'hepatic_impairment' => ['none', null],
+            'epilepsy' => [false, null],
+            'maoi' => [false, null],
+            'qt_prolongation' => [false, null],
+            'qt_risk_factors' => [false, null],
+            'cardiovascular' => [false, null],
+            'diabetes_endocrine' => [false, null],
+            'substance_dependence' => [false, null],
+        ], courses: [
             DemoCourse::prescribed('maritupirdine', 20, 112, ['morning' => '08:30', 'evening' => '19:30'], fn (int $day, TimeOfDay $time): DemoMark => match (true) {
                 $day === 3 && $time === TimeOfDay::Evening => DemoMark::skipped(DoseSkipReason::Unwell, 'Весь день клонило в сон'),
                 $time === TimeOfDay::Morning && in_array($day, [11, 48, 85], true) => DemoMark::skipped(DoseSkipReason::Forgot),
@@ -63,7 +77,7 @@ final class DemoPatients
      */
     private static function vasilyeva(): DemoPatient
     {
-        return new DemoPatient('patient_1b', 'Васильева Анна Дмитриевна', '1997-09-14', courses: [
+        return new DemoPatient('patient_1b', 'Васильева Анна Дмитриевна', '1997-09-14', 'female', [DemoDiagnosis::main('F41.1')], courses: [
             DemoCourse::prescribed('escitalopram', 10, 56, ['morning' => '09:00'], fn (int $day): DemoMark => match (true) {
                 in_array($day, [9, 23, 38], true) => DemoMark::missed(),
                 $day === 30 => DemoMark::skipped(DoseSkipReason::Forgot),
@@ -78,7 +92,7 @@ final class DemoPatients
      */
     private static function smirnov(): DemoPatient
     {
-        return new DemoPatient('patient_1c', 'Смирнов Алексей Борисович', '1968-06-04', courses: [
+        return new DemoPatient('patient_1c', 'Смирнов Алексей Борисович', '1968-06-04', 'male', [DemoDiagnosis::main('F41.1')], courses: [
             DemoCourse::prescribed('escitalopram', 10, 112, ['morning' => '08:00'], fn (int $day): DemoMark => match (true) {
                 in_array($day, [14, 33, 51, 70, 92], true) => DemoMark::missed(),
                 $day === 60 => DemoMark::skipped(DoseSkipReason::Forgot),
@@ -93,7 +107,7 @@ final class DemoPatients
      */
     private static function fedorova(): DemoPatient
     {
-        return new DemoPatient('patient_1d', 'Фёдорова Мария Сергеевна', '1990-11-18', courses: [
+        return new DemoPatient('patient_1d', 'Фёдорова Мария Сергеевна', '1990-11-18', 'female', [DemoDiagnosis::main('F41.1')], courses: [
             DemoCourse::prescribed('paroxetine', 20, 119, ['morning' => '09:00'], fn (int $day): DemoMark => match ($day) {
                 6, 13, 17 => DemoMark::skipped(DoseSkipReason::Unwell, 'Тошнит после таблетки'),
                 19 => DemoMark::missed(),
@@ -111,11 +125,15 @@ final class DemoPatients
 
     /**
      * 2.1. Переход на «Авиандр», 2-я неделя. Эсциталопрам и гидроксизин назначил невролог,
-     * пациентка добавила их сама.
+     * пациентка добавила их сама. Сочетание эсциталопрама с гидроксизином противопоказано (QT):
+     * красные находки у обоих ждут решения врача.
      */
     private static function kuznetsova(): DemoPatient
     {
-        return new DemoPatient('patient2', 'Кузнецова Елена Викторовна', '1991-07-25', courses: [
+        return new DemoPatient('patient2', 'Кузнецова Елена Викторовна', '1991-07-25', 'female', [
+            DemoDiagnosis::main('F41.1'),
+            DemoDiagnosis::concomitant('F45.3'),
+        ], courses: [
             DemoCourse::prescribed('maritupirdine', 20, 14, ['morning' => '08:00', 'evening' => '20:00'], fn (int $day, TimeOfDay $time): DemoMark => match (true) {
                 $day === 2 && $time === TimeOfDay::Evening => DemoMark::late(),
                 $day === 4 && $time === TimeOfDay::Evening => DemoMark::missed(),
@@ -131,11 +149,33 @@ final class DemoPatients
     }
 
     /**
+     * 2.2. ХБП 3а стадии, СКФ 52: «Авиандр» противопоказан. Назначение вопреки показывают вживую.
+     */
+    private static function grigoryev(): DemoPatient
+    {
+        return new DemoPatient('patient_2b', 'Григорьев Роман Николаевич', '1978-01-30', 'male', [
+            DemoDiagnosis::main('F41.1'),
+            DemoDiagnosis::concomitant('N18.3'),
+        ], facts: ['gfr' => [52, null]]);
+    }
+
+    /**
+     * 2.3. Беременность 7 недель: «Авиандр» противопоказан. Назначение вопреки показывают вживую.
+     */
+    private static function kovaleva(): DemoPatient
+    {
+        return new DemoPatient('patient_2c', 'Ковалёва Дарья Владимировна', '2000-08-11', 'female', [
+            DemoDiagnosis::main('F41.1'),
+            DemoDiagnosis::concomitant('Z34.0'),
+        ], facts: ['pregnancy' => [true, '7 недель']]);
+    }
+
+    /**
      * 3.1. Пропускает вечерний приём «Авиандра», 4-я неделя: утром почти всегда, вечером реже половины.
      */
     private static function sokolov(): DemoPatient
     {
-        return new DemoPatient('patient3', 'Соколов Михаил Игоревич', '1976-11-02', courses: [
+        return new DemoPatient('patient3', 'Соколов Михаил Игоревич', '1976-11-02', 'male', [DemoDiagnosis::main('F41.1')], courses: [
             DemoCourse::prescribed('maritupirdine', 20, 28, ['morning' => '08:00', 'evening' => '20:00'], fn (int $day, TimeOfDay $time): DemoMark => match (true) {
                 $time === TimeOfDay::Morning => in_array($day, [9, 23], true) ? DemoMark::missed() : DemoMark::onTime(10),
                 in_array($day % 7, [1, 3, 5], true) => DemoMark::late(80),
@@ -152,7 +192,7 @@ final class DemoPatients
      */
     private static function popova(): DemoPatient
     {
-        return new DemoPatient('patient_3b', 'Попова Екатерина Александровна', '2004-03-27', courses: [
+        return new DemoPatient('patient_3b', 'Попова Екатерина Александровна', '2004-03-27', 'female', [DemoDiagnosis::main('F41.1')], courses: [
             DemoCourse::prescribed('paroxetine', 20, 21, ['morning' => '09:00'], fn (int $day): DemoMark => in_array($day % 5, [1, 3], true) ? DemoMark::late(330) : DemoMark::missed()),
         ], messages: [
             DemoMessage::doctor(12, '10:05', 'Екатерина Александровна, вижу, что вы принимаете пароксетин не каждый день. Это курсовой препарат: эффект набирается при ежедневном приёме утром во время еды, разовый приём тревогу не снимает.'),
@@ -165,7 +205,7 @@ final class DemoPatients
      */
     private static function lebedev(): DemoPatient
     {
-        return new DemoPatient('patient_3c', 'Лебедев Денис Валентинович', '1985-05-15', courses: [
+        return new DemoPatient('patient_3c', 'Лебедев Денис Валентинович', '1985-05-15', 'male', [DemoDiagnosis::main('F41.1')], courses: [
             DemoCourse::prescribed('maritupirdine', 20, 13, ['morning' => '08:00', 'evening' => '20:00'], fn (int $day, TimeOfDay $time): DemoMark => match (true) {
                 $day >= 10 => DemoMark::missed(),
                 $day === 3 && $time === TimeOfDay::Evening => DemoMark::skipped(DoseSkipReason::Unwell, 'Вялость и сонливость после обеда'),
@@ -176,11 +216,23 @@ final class DemoPatients
     }
 
     /**
-     * 4.2. Сертралин при депрессии, на 14-й день признаки гипомании. Пациент второго врача.
+     * 4.1. Тяжёлая депрессия у второго врача: «Авиандр» ей вне показаний, это показывают вживую.
+     */
+    private static function morozova(): DemoPatient
+    {
+        return new DemoPatient('patient4', 'Морозова Ольга Павловна', '1988-05-19', 'female', [DemoDiagnosis::main('F32.2')], doctor: 'doctor2');
+    }
+
+    /**
+     * 4.2. Сертралин при депрессии, на 14-й день признаки гипомании. Пациент второго врача. Вчера
+     * вечером врач сменил диагноз на F31.0, и сертралин оказался вне показаний [медик].
      */
     private static function nikolaev(): DemoPatient
     {
-        return new DemoPatient('patient_4b', 'Николаев Артём Игоревич', '1994-12-09', 'doctor2', courses: [
+        return new DemoPatient('patient_4b', 'Николаев Артём Игоревич', '1994-12-09', 'male', [
+            DemoDiagnosis::main('F32.1')->resolved(1),
+            DemoDiagnosis::main('F31.0', daysAgo: 1),
+        ], doctor: 'doctor2', courses: [
             DemoCourse::prescribed('sertraline', 50, 15, ['morning' => '09:00'], fn (int $day): DemoMark => $day === 6 ? DemoMark::late() : DemoMark::onTime(10)),
         ], messages: [
             DemoMessage::patient(13, '20:30', 'Начал принимать, пока без изменений.'),
@@ -191,11 +243,27 @@ final class DemoPatients
     }
 
     /**
+     * 4.3. Паническое расстройство с агорафобией. В НСИ нет кода F40.01 из профиля, взяли F40.0 [медик].
+     */
+    private static function zaytseva(): DemoPatient
+    {
+        return new DemoPatient('patient_4c', 'Зайцева Светлана Юрьевна', '1981-02-22', 'female', [DemoDiagnosis::main('F40.0')]);
+    }
+
+    /**
+     * 5.1. Переутомление без психиатрического диагноза: любой препарат вне показаний.
+     */
+    private static function belov(): DemoPatient
+    {
+        return new DemoPatient('patient_norm1', 'Белов Иван Максимович', '2002-04-17', 'male', [DemoDiagnosis::main('Z73.0')]);
+    }
+
+    /**
      * 5.2. Ремиссия на 36-й неделе пароксетина, впереди постепенная отмена, ~97%.
      */
     private static function tarasova(): DemoPatient
     {
-        return new DemoPatient('patient_norm2', 'Тарасова Надежда Константиновна', '1987-10-08', courses: [
+        return new DemoPatient('patient_norm2', 'Тарасова Надежда Константиновна', '1987-10-08', 'female', [DemoDiagnosis::main('F41.1')], courses: [
             DemoCourse::prescribed('paroxetine', 20, 252, ['morning' => '09:00'], fn (int $day): DemoMark => match (true) {
                 $day % 31 === 19 => DemoMark::missed(),
                 $day % 11 === 6 => DemoMark::late(),
