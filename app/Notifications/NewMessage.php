@@ -9,13 +9,16 @@ use App\Support\PersonName;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
-use Illuminate\Support\Str;
 use NotificationChannels\WebPush\WebPushChannel;
 use NotificationChannels\WebPush\WebPushMessage;
 
 /**
  * Пуш собеседнику о новом сообщении. Уходит с задержкой и только если сообщение так и не
  * прочитали: собеседник, который видит открытый чат, читает его сразу и пуша не получает.
+ *
+ * Текста сообщения в пуше нет. Chrome на Android прячет пуши с подозрительным, по мнению
+ * его модели, текстом за предупреждением о спаме, а сообщения о самочувствии и дозах
+ * попадают туда регулярно. И переписка о лечении не видна на заблокированном экране.
  */
 class NewMessage extends Notification implements ShouldQueue
 {
@@ -25,11 +28,6 @@ class NewMessage extends Notification implements ShouldQueue
      * Сколько ждать прочтения в открытом чате.
      */
     public const int DELAY_SECONDS = 15;
-
-    /**
-     * Сколько символов сообщения видно в пуше.
-     */
-    public const int PREVIEW_LENGTH = 100;
 
     public function __construct(public Message $message)
     {
@@ -63,7 +61,7 @@ class NewMessage extends Notification implements ShouldQueue
 
         return (new WebPushMessage)
             ->title($toPatient ? 'Врач '.PersonName::short($sender->name) : $sender->name)
-            ->body(Str::limit($this->message->body, self::PREVIEW_LENGTH))
+            ->body('Новое сообщение')
             ->icon('/pwa-192x192.png')
             ->badge('/notification-badge.png')
             // Сообщения одного диалога сменяют друг друга в одном пуше.

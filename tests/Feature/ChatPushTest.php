@@ -4,7 +4,6 @@ use App\Models\Message;
 use App\Models\User;
 use App\Notifications\NewMessage;
 use Illuminate\Support\Facades\Notification;
-use Illuminate\Support\Str;
 
 beforeEach(function () {
     Notification::fake();
@@ -26,25 +25,25 @@ test('the doctor with push on gets a delayed push about a patient message', func
 
         return $notification->delay?->eq(now()->addSeconds(NewMessage::DELAY_SECONDS))
             && $message['title'] === 'Соколов Игорь Петрович'
-            && $message['body'] === 'Стало хуже спать'
+            && $message['body'] === 'Новое сообщение'
             && $message['tag'] === 'chat-'.$this->care->id
             && $message['data']['url'] === '/doctor/patients/'.$this->patient->id.'/chat';
     });
     Notification::assertNotSentTo($this->patient, NewMessage::class);
 });
 
-test('the patient gets the doctor name with initials and the start of a long message', function () {
+test('the patient gets the doctor name with initials and no message text', function () {
     subscribeToPush($this->patient);
 
     $this->actingAs($this->doctor)
-        ->postJson(route('doctor.patients.chat.store', $this->patient), ['body' => str_repeat('Как самочувствие? ', 10)])
+        ->postJson(route('doctor.patients.chat.store', $this->patient), ['body' => 'Если стало хуже, напишите, обсудим дозу'])
         ->assertCreated();
 
     Notification::assertSentTo($this->patient, NewMessage::class, function (NewMessage $notification): bool {
         $message = $notification->toWebPush($this->patient)->toArray();
 
         return $message['title'] === 'Врач Смирнова А. С.'
-            && $message['body'] === Str::limit(str_repeat('Как самочувствие? ', 10), NewMessage::PREVIEW_LENGTH)
+            && $message['body'] === 'Новое сообщение'
             && $message['data']['url'] === '/patient/chat';
     });
 });
