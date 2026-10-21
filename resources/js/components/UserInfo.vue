@@ -16,8 +16,10 @@ const { getInitials } = useInitials();
 </script>
 
 <template>
-    <Avatar class="h-8 w-8 overflow-hidden rounded-lg">
-        <AvatarFallback class="rounded-lg text-black">
+    <Avatar class="h-8 w-8 overflow-hidden rounded-full">
+        <AvatarFallback
+            class="rounded-full bg-secondary text-xs font-semibold text-secondary-foreground"
+        >
             {{ getInitials(user.name) }}
         </AvatarFallback>
     </Avatar>

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
 
-// Временный знак приложения: компас, как на иконке приложения (public/favicon.svg).
+// Знак приложения — компас: кольцо, засечки сторон света и стрелка. Тот же рисунок
+// в иконке приложения (public/favicon.svg). Цвет берётся из currentColor.
 defineOptions({
     inheritAttrs: false,
 });
@@ -16,7 +17,8 @@ defineProps<Props>();
 <template>
     <svg
         xmlns="http://www.w3.org/2000/svg"
-        viewBox="70 70 372 372"
+        viewBox="64 64 384 384"
+        aria-hidden="true"
         :class="className"
         v-bind="$attrs"
     >
@@ -26,13 +28,19 @@ defineProps<Props>();
             r="172"
             fill="none"
             stroke="currentColor"
-            stroke-width="28"
+            stroke-width="32"
         />
-        <path d="M356 156 280 280 232 232Z" fill="currentColor" />
         <path
-            d="M156 356 232 232 280 280Z"
+            d="M256 100v40M256 372v40M100 256h40M372 256h40"
+            stroke="currentColor"
+            stroke-width="24"
+            stroke-linecap="round"
+        />
+        <path d="M339 173 232 232 280 280Z" fill="currentColor" />
+        <path
+            d="M173 339 232 232 280 280Z"
             fill="currentColor"
-            fill-opacity="0.5"
+            fill-opacity="0.45"
         />
     </svg>
 </template>

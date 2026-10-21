@@ -108,7 +108,7 @@ function cancel(id: number): void {
 
         <p
             class="text-sm"
-            :class="limitReached ? 'text-amber-700' : ''"
+            :class="limitReached ? 'text-warning' : ''"
             data-test="as-needed-counter"
         >
             Сегодня принято {{ prescription.taken_today

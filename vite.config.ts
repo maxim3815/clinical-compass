@@ -13,8 +13,14 @@ export default defineConfig({
             input: ['resources/css/app.css', 'resources/js/app.ts'],
             refresh: true,
             fonts: [
-                bunny('Instrument Sans', {
-                    weights: [400, 500, 600],
+                // Шрифт с кириллицей и табличными цифрами (время, дозы, проценты).
+                bunny('Inter', {
+                    weights: [400, 500, 600, 700],
+                    subsets: ['latin', 'cyrillic'],
+                    // Остальные начертания догружаются по мере надобности.
+                    preload: [{ weight: 400 }, { weight: 600 }],
+                    // Подбор метрик запасного шрифта требует пакета fontaine, без него — предупреждение.
+                    optimizedFallbacks: false,
                 }),
             ],
         }),

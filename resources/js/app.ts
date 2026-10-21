@@ -20,8 +20,6 @@ void createInertiaApp({
             case name.startsWith('password-reset/'):
             case name === 'Consent':
                 return AuthLayout;
-            case name === 'DesignSystemShowcase':
-                return null;
             case name.startsWith('settings/'):
                 return [AppLayout, SettingsLayout];
             default:
@@ -46,7 +44,7 @@ void createInertiaApp({
         });
     },
     progress: {
-        color: '#4B5563',
+        color: 'var(--primary)',
     },
 });
 

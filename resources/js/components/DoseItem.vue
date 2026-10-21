@@ -20,7 +20,7 @@ const isMarked = computed(
 
 const statusClass = computed(() => {
     if (props.dose.status === 'taken') {
-        return props.dose.taken_late ? 'text-amber-700' : 'text-emerald-700';
+        return props.dose.taken_late ? 'text-warning' : 'text-success';
     }
 
     return 'text-destructive';

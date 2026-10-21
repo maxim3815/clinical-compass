@@ -2,15 +2,15 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
         <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 
         {{-- Тема только светлая. «only» просит браузер не перекрашивать страницу при тёмной теме в системе --}}
         <meta name="color-scheme" content="only light">
 
-        {{-- Inline style to set the HTML background color based on our theme in app.css --}}
+        {{-- Фон до загрузки стилей — как --background в app.css, чтобы страница не мигала белым --}}
         <style>
             html {
-                background-color: oklch(1 0 0);
+                background-color: #fbf9f5;
             }
         </style>
 
@@ -21,7 +21,7 @@
         {{-- Приложение на телефоне: манифест, название под иконкой на iPhone и цвет строки состояния по фону --}}
         <link rel="manifest" href="/manifest.webmanifest">
         <meta name="apple-mobile-web-app-title" content="Компас">
-        <meta name="theme-color" content="#ffffff">
+        <meta name="theme-color" content="#fbf9f5">
 
         @fonts
 

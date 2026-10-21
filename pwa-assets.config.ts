@@ -6,7 +6,7 @@ import {
 // Иконки приложения делаются из public/favicon.svg командой npm run icons
 // и коммитятся в public/. Фон квадратных иконок — цвет круга из SVG, а отступ
 // оставляет кольцо компаса внутри безопасной зоны maskable (круг в 80% стороны).
-const background = '#0f766e';
+const background = '#235347';
 const padding = 0.1;
 
 export default defineConfig({

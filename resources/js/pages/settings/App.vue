@@ -39,7 +39,7 @@ const { ready, installed, method, install } = useInstallApp();
                 class="flex items-center gap-2 font-medium"
                 data-test="app-installed"
             >
-                <CircleCheck class="size-4 text-emerald-600" />
+                <CircleCheck class="size-4 text-success" />
                 Приложение установлено
             </p>
 

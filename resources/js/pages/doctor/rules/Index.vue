@@ -64,8 +64,8 @@ defineOptions({
                         <Badge
                             :class="
                                 rule.level === 'contraindicated'
-                                    ? 'border-transparent bg-destructive text-white'
-                                    : 'border-transparent bg-amber-200 text-amber-950'
+                                    ? 'border-danger-border bg-danger-subtle text-danger'
+                                    : 'border-warning-border bg-warning-subtle text-warning'
                             "
                             >{{ rule.level_label }}</Badge
                         >

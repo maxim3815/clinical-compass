@@ -17,22 +17,22 @@ const results: { result: DoseDayResult; label: string; class: string }[] = [
     {
         result: 'on_time',
         label: 'все вовремя',
-        class: 'bg-emerald-600 text-white',
+        class: 'bg-success text-success-foreground',
     },
     {
         result: 'late',
         label: 'все, часть поздно',
-        class: 'bg-emerald-200 text-emerald-950',
+        class: 'bg-success-subtle text-success ring-1 ring-success-border ring-inset',
     },
     {
         result: 'partial',
         label: 'часть не принята',
-        class: 'bg-amber-300 text-amber-950',
+        class: 'bg-warning-subtle text-warning ring-1 ring-warning-border ring-inset',
     },
     {
         result: 'none',
         label: 'ни один не принят',
-        class: 'bg-red-600 text-white',
+        class: 'bg-danger text-danger-foreground',
     },
     {
         result: 'pending',
@@ -80,11 +80,11 @@ function asNeededLabel(day: AsNeededDay): string {
 
 function asNeededClass(day: AsNeededDay): string {
     if (day.over_limit) {
-        return 'bg-red-600 text-white';
+        return 'bg-danger text-danger-foreground';
     }
 
     return day.count > 0
-        ? 'bg-sky-200 text-sky-950'
+        ? 'bg-secondary text-secondary-foreground ring-1 ring-primary/20 ring-inset'
         : 'bg-muted text-muted-foreground';
 }
 </script>

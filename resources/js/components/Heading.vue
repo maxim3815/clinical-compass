@@ -11,17 +11,17 @@ withDefaults(defineProps<Props>(), {
 </script>
 
 <template>
-    <header :class="variant === 'small' ? '' : 'mb-8 space-y-0.5'">
+    <header :class="variant === 'small' ? 'space-y-1' : 'mb-6 space-y-1'">
         <h2
             :class="
                 variant === 'small'
-                    ? 'mb-0.5 text-base font-medium'
-                    : 'text-xl font-semibold tracking-tight'
+                    ? 'text-lg font-semibold'
+                    : 'text-2xl font-semibold tracking-tight'
             "
         >
             {{ title }}
         </h2>
-        <p v-if="description" class="text-sm text-muted-foreground">
+        <p v-if="description" class="text-base text-muted-foreground">
             {{ description }}
         </p>
     </header>

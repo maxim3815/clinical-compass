@@ -50,7 +50,7 @@ const { state, busy, error, enable, disable } = usePushNotifications();
         >
             <template v-if="state === 'on'">
                 <p class="flex items-center gap-2 font-medium">
-                    <BellRing class="size-4 text-emerald-600" />
+                    <BellRing class="size-4 text-success" />
                     Уведомления включены на этом устройстве
                 </p>
                 <p v-if="isPatient" class="text-muted-foreground">

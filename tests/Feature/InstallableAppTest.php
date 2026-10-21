@@ -22,8 +22,9 @@ test('manifest describes the app installed on a phone', function () {
         'start_url' => '/',
         'scope' => '/',
         'display' => 'standalone',
-        'theme_color' => '#ffffff',
-        'background_color' => '#ffffff',
+        // Фон приложения (--background в app.css): заставка и строка состояния без белой вспышки.
+        'theme_color' => '#fbf9f5',
+        'background_color' => '#fbf9f5',
     ]);
 });
 
@@ -50,7 +51,7 @@ test('home screen icon on iphone is 180 pixels', function () {
         ->and([$image[0], $image[1]])->toBe([180, 180]);
 });
 
-test('pages link the manifest and keep the light theme with a white status bar', function (?string $role) {
+test('pages link the manifest and keep the light theme with the app background in the status bar', function (?string $role) {
     if ($role !== null) {
         $this->actingAs(User::factory()->{$role}()->create());
     }
@@ -60,7 +61,7 @@ test('pages link the manifest and keep the light theme with a white status bar',
         ->assertSee('<link rel="manifest" href="/manifest.webmanifest">', false)
         ->assertSee('<meta name="apple-mobile-web-app-title" content="Компас">', false)
         ->assertSee('<meta name="color-scheme" content="only light">', false)
-        ->assertSee('<meta name="theme-color" content="#ffffff">', false)
+        ->assertSee('<meta name="theme-color" content="#fbf9f5">', false)
         ->assertDontSee('prefers-color-scheme', false);
 })->with([
     'guest' => null,
@@ -74,15 +75,15 @@ test('offline page needs nothing from the network and tells how to mark a dose l
         ->toContain('<h1>Нет подключения к интернету</h1>')
         ->toContain('кнопка «Принял в …» на экране «Сегодня»')
         ->toContain('>Повторить</button>')
-        // Стили и скрипт внутри файла, картинка — иконка из предкэша service worker.
+        ->toContain('Страница откроется сама, когда сеть появится.')
+        // Стили, скрипт и знак приложения — внутри файла.
         ->not->toMatch('/<script[^>]+src=/')
         ->not->toContain('rel="stylesheet"')
+        ->not->toContain('<img')
         // Тема только светлая, как в приложении.
         ->toContain('<meta name="color-scheme" content="only light" />')
-        ->toContain('<meta name="theme-color" content="#ffffff" />')
-        ->not->toContain('prefers-color-scheme')
-        ->and(preg_match_all('/<img[^>]+src="([^"]+)"/', $html, $images))->toBe(1)
-        ->and($images[1])->toBe(['/favicon.svg']);
+        ->toContain('<meta name="theme-color" content="#fbf9f5" />')
+        ->not->toContain('prefers-color-scheme');
 });
 
 test('patient opens the app section of settings', function () {

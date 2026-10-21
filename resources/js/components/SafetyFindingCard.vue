@@ -19,15 +19,15 @@ const contraindicated = computed(
         class="flex flex-col gap-2 rounded-md border p-3 text-sm"
         :class="
             contraindicated
-                ? 'border-destructive/40 bg-destructive/5'
-                : 'border-amber-300 bg-amber-50'
+                ? 'border-danger-border bg-danger-subtle'
+                : 'border-warning-border bg-warning-subtle'
         "
         :data-level="finding.level"
         data-test="safety-finding"
     >
         <p
             class="flex items-start gap-2 font-medium"
-            :class="contraindicated ? 'text-destructive' : 'text-amber-900'"
+            :class="contraindicated ? 'text-danger' : 'text-warning'"
         >
             <OctagonAlert
                 v-if="contraindicated"
