@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Doctor;
 
 use App\Enums\PrescriptionCancelReason;
 use App\Enums\PrescriptionSource;
-use App\Events\AdherenceSignalsChanged;
+use App\Events\PatientSignalsChanged;
 use App\Http\Controllers\Controller;
 use App\Models\CareRelationship;
 use App\Models\Prescription;
@@ -14,6 +14,10 @@ use App\Support\Adherence\AdherenceSignals;
 use App\Support\Adherence\PatientAdherence;
 use App\Support\DisplayTime;
 use App\Support\PrescriptionPresenter;
+use App\Support\Safety\ClinicalProfilePresenter;
+use App\Support\Safety\SafetyAcknowledgement;
+use App\Support\Safety\SafetyPresenter;
+use App\Support\Safety\SafetySignals;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -50,6 +54,7 @@ class PatientController extends Controller
             ->withQueryString();
 
         $misses = AdherenceSignals::consecutiveMisses($patients->getCollection()->map(fn (CareRelationship $care): User => $care->patient));
+        $awaiting = SafetySignals::awaitingCounts($patients->getCollection()->map(fn (CareRelationship $care): int => $care->patient_id));
 
         return Inertia::render('doctor/patients/Index', [
             'patients' => $patients->through(fn (CareRelationship $care): array => [
@@ -58,13 +63,15 @@ class PatientController extends Controller
                 'age' => $care->patient->patientProfile?->age(),
                 'started_at' => DisplayTime::formatDate($care->started_at),
                 'adherence' => (new AdherenceSignal($care->adherence_share, $misses[$care->patient_id] ?? 0))->toArray(),
+                // Красные находки проверки безопасности без решения врача.
+                'contraindications' => $awaiting[$care->patient_id] ?? 0,
             ]),
             'search' => $search,
             'sort' => $sort,
         ]);
     }
 
-    public function show(Request $request, User $patient): Response
+    public function show(Request $request, User $patient, SafetyPresenter $safetyPresenter): Response
     {
         Gate::authorize('view', $patient);
 
@@ -79,7 +86,7 @@ class PatientController extends Controller
 
         // Врач видит пропуски пациента: счётчик у пункта меню «Пациенты» их больше не считает.
         $care->update(['adherence_seen_at' => CarbonImmutable::now()]);
-        AdherenceSignalsChanged::dispatch($doctor);
+        PatientSignalsChanged::dispatch($doctor);
 
         $profile = $patient->patientProfile;
         $today = $patient->localToday();
@@ -120,6 +127,10 @@ class PatientController extends Controller
             'adherence' => PatientAdherence::present($patient, $today),
             'adherenceSignal' => AdherenceSignals::forPatient($patient)->toArray(),
             'cancelReasons' => PrescriptionCancelReason::options(),
+            'clinicalProfile' => ClinicalProfilePresenter::present($patient),
+            // Находки и «Не проверено» по id назначения, у назначений врача и своих препаратов пациента.
+            'safety' => (object) $safetyPresenter->card($patient),
+            'justificationLimit' => SafetyAcknowledgement::MAX_JUSTIFICATION_LENGTH,
         ]);
     }
 

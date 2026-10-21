@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import { Form, Head, Link, usePage } from '@inertiajs/vue3';
-import { KeyRound, MessageCircle, Plus } from '@lucide/vue';
+import { KeyRound, MessageCircle, Pencil, Plus } from '@lucide/vue';
 import { computed, ref } from 'vue';
+import ClinicalProfileController from '@/actions/App/Http/Controllers/Doctor/ClinicalProfileController';
 import PasswordResetLinkController from '@/actions/App/Http/Controllers/Doctor/PasswordResetLinkController';
 import PrescriptionController from '@/actions/App/Http/Controllers/Doctor/PrescriptionController';
 import AdherenceCourse from '@/components/AdherenceCourse.vue';
 import AdherenceSignal from '@/components/AdherenceSignal.vue';
 import CancelPrescriptionDialog from '@/components/CancelPrescriptionDialog.vue';
+import ClinicalProfileSummary from '@/components/ClinicalProfileSummary.vue';
+import ContinueFindingDialog from '@/components/ContinueFindingDialog.vue';
 import Heading from '@/components/Heading.vue';
 import OneTimeLink from '@/components/OneTimeLink.vue';
 import PrescriptionDetails from '@/components/PrescriptionDetails.vue';
+import PrescriptionSafety from '@/components/PrescriptionSafety.vue';
 import { Button } from '@/components/ui/button';
 import { formatAge } from '@/lib/plural';
 import { index, show } from '@/routes/doctor/patients';
@@ -17,7 +21,10 @@ import { show as chat } from '@/routes/doctor/patients/chat';
 import type {
     Adherence,
     AdherenceSignal as Signal,
+    ClinicalProfile,
     Prescription,
+    SafetyCard,
+    SafetyFinding,
     SelectOption,
 } from '@/types';
 
@@ -39,6 +46,10 @@ const props = defineProps<{
     adherence: Adherence;
     adherenceSignal: Signal;
     cancelReasons: SelectOption[];
+    clinicalProfile: ClinicalProfile;
+    // Находки и «Не проверено» по id назначения.
+    safety: Record<number, SafetyCard>;
+    justificationLimit: number;
 }>();
 
 defineOptions({
@@ -58,6 +69,14 @@ defineOptions({
 
 const page = usePage();
 const cancelling = ref<Prescription | null>(null);
+const continuing = ref<{ finding: SafetyFinding; drug: string } | null>(null);
+
+function continueDespite(
+    prescription: Prescription,
+    finding: SafetyFinding,
+): void {
+    continuing.value = { finding, drug: prescription.drug.name };
+}
 const passwordResetUrl = computed(() => page.flash.passwordResetUrl);
 
 const hasCourses = computed(
@@ -106,6 +125,30 @@ const details = computed(() => [
             </Link>
         </Button>
 
+        <section
+            class="flex flex-col gap-3"
+            data-test="clinical-profile-section"
+        >
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <Heading
+                    variant="small"
+                    title="Клинический профиль"
+                    description="Пол, диагнозы и факты, по которым проверяется безопасность назначений."
+                />
+                <Button variant="outline" size="sm" as-child>
+                    <Link
+                        :href="ClinicalProfileController.edit(patient.id)"
+                        data-test="edit-clinical-profile"
+                    >
+                        <Pencil />
+                        Изменить профиль
+                    </Link>
+                </Button>
+            </div>
+
+            <ClinicalProfileSummary :profile="clinicalProfile" />
+        </section>
+
         <section class="flex flex-col gap-3" data-test="prescriptions">
             <div class="flex flex-wrap items-center justify-between gap-2">
                 <Heading variant="small" title="Назначения" />
@@ -133,6 +176,14 @@ const details = computed(() => [
                 :prescription="prescription"
                 for-doctor
             >
+                <template v-if="safety[prescription.id]" #safety>
+                    <PrescriptionSafety
+                        :card="safety[prescription.id]"
+                        @continue="
+                            (finding) => continueDespite(prescription, finding)
+                        "
+                    />
+                </template>
                 <template v-if="prescription.can_change" #actions>
                     <Button variant="outline" size="sm" as-child>
                         <Link
@@ -174,7 +225,16 @@ const details = computed(() => [
                 :key="prescription.id"
                 :prescription="prescription"
                 for-doctor
-            />
+            >
+                <template v-if="safety[prescription.id]" #safety>
+                    <PrescriptionSafety
+                        :card="safety[prescription.id]"
+                        @continue="
+                            (finding) => continueDespite(prescription, finding)
+                        "
+                    />
+                </template>
+            </PrescriptionDetails>
         </section>
 
         <section class="flex flex-col gap-3" data-test="adherence">
@@ -251,6 +311,12 @@ const details = computed(() => [
             v-model:prescription="cancelling"
             :patient-id="patient.id"
             :reasons="cancelReasons"
+        />
+
+        <ContinueFindingDialog
+            v-model:finding="continuing"
+            :patient-id="patient.id"
+            :max-length="justificationLimit"
         />
 
         <section class="flex flex-col gap-3">

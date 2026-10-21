@@ -6,6 +6,7 @@ use App\Actions\Concerns\WritesPrescriptions;
 use App\Enums\PrescriptionCancelReason;
 use App\Enums\PrescriptionCloseReason;
 use App\Exceptions\PrescriptionNotChangeable;
+use App\Models\AuditLog;
 use App\Models\Prescription;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +18,10 @@ class CancelPrescription
 {
     use WritesPrescriptions;
 
-    public function __construct(private readonly SyncDoseEvents $syncDoseEvents) {}
+    public function __construct(
+        private readonly SyncDoseEvents $syncDoseEvents,
+        private readonly SyncSafetyFindings $syncSafetyFindings,
+    ) {}
 
     /**
      * @throws PrescriptionNotChangeable
@@ -29,7 +33,10 @@ class CancelPrescription
         DB::transaction(function () use ($doctor, $prescription, $reason, $comment): void {
             $patient = $this->lockPatient($prescription->patient_id);
 
-            $this->lockChangeable($prescription, $patient->localToday())->update([
+            $current = $this->lockChangeable($prescription, $patient->localToday());
+            $before = $current->auditSnapshot();
+
+            $current->update([
                 'closed_at' => now(),
                 'closed_by_id' => $doctor->id,
                 'close_reason' => PrescriptionCloseReason::Cancelled,
@@ -37,8 +44,11 @@ class CancelPrescription
                 'cancel_comment' => $comment,
             ]);
 
-            // Будущие неотмеченные приёмы отменённого назначения удаляются.
+            // Будущие неотмеченные приёмы отменённого назначения удаляются, его находки закрываются.
             $this->syncDoseEvents->handle($patient);
+            $this->syncSafetyFindings->handle($patient);
+
+            AuditLog::record($doctor, 'prescription.cancelled', $patient, $current, $before, $current->auditSnapshot());
         });
     }
 }

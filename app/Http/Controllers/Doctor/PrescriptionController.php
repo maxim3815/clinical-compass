@@ -17,6 +17,9 @@ use App\Models\DrugStrength;
 use App\Models\Prescription;
 use App\Models\PrescriptionIntake;
 use App\Models\User;
+use App\Support\Safety\SafetyAcknowledgement;
+use App\Support\Safety\SafetyCheck;
+use App\Support\Safety\SafetyPresenter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\RedirectResponse;
@@ -34,7 +37,7 @@ class PrescriptionController extends Controller
     {
         Gate::authorize('view', $patient);
 
-        return Inertia::render('doctor/prescriptions/Form', $this->formProps($patient, null));
+        return Inertia::render('doctor/prescriptions/Form', $this->formProps($patient, null, null));
     }
 
     public function store(PrescriptionRequest $request, User $patient, PrescribeDrug $prescribeDrug): RedirectResponse
@@ -42,14 +45,14 @@ class PrescriptionController extends Controller
         /** @var User $doctor */
         $doctor = $request->user();
 
-        $prescribeDrug->handle($doctor, $patient, $request->toData());
+        $prescribeDrug->handle($doctor, $patient, $request->toData(), $request->toAcknowledgement());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Препарат назначен.']);
 
         return to_route('doctor.patients.show', $patient);
     }
 
-    public function edit(User $patient, Prescription $prescription): Response|RedirectResponse
+    public function edit(User $patient, Prescription $prescription, SafetyCheck $safetyCheck): Response|RedirectResponse
     {
         $this->authorizeChange($patient, $prescription);
 
@@ -57,7 +60,10 @@ class PrescriptionController extends Controller
             return $this->notChangeable($patient);
         }
 
-        return Inertia::render('doctor/prescriptions/Form', $this->formProps($patient, $prescription));
+        // Препарат при изменении не меняется, поэтому проверку видно сразу.
+        $safety = $prescription->drug === null ? null : SafetyPresenter::report($safetyCheck->forCandidate($patient, $prescription->drug, $prescription));
+
+        return Inertia::render('doctor/prescriptions/Form', $this->formProps($patient, $prescription, $safety));
     }
 
     public function update(
@@ -70,7 +76,7 @@ class PrescriptionController extends Controller
         $doctor = $request->user();
 
         try {
-            $outcome = $changePrescription->handle($doctor, $prescription, $request->toData());
+            $outcome = $changePrescription->handle($doctor, $prescription, $request->toData(), $request->toAcknowledgement());
         } catch (PrescriptionNotChangeable) {
             return $this->notChangeable($patient);
         }
@@ -139,9 +145,11 @@ class PrescriptionController extends Controller
     }
 
     /**
+     * @param  array<string, mixed>|null  $safety  блок проверки при изменении; новое назначение
+     *                                             форма проверяет запросом при выборе препарата
      * @return array<string, mixed>
      */
-    private function formProps(User $patient, ?Prescription $prescription): array
+    private function formProps(User $patient, ?Prescription $prescription, ?array $safety): array
     {
         $today = $patient->localToday();
 
@@ -159,6 +167,8 @@ class PrescriptionController extends Controller
                 'instruction' => PrescriptionRequest::MAX_INSTRUCTION_LENGTH,
             ],
             'today' => $today->toDateString(),
+            'justificationLimit' => SafetyAcknowledgement::MAX_JUSTIFICATION_LENGTH,
+            'safety' => $safety,
             'prescription' => $prescription === null ? null : [
                 'id' => $prescription->id,
                 'drug_id' => $prescription->drug_id,

@@ -8,6 +8,7 @@ use App\Enums\PrescriptionCloseReason;
 use App\Enums\PrescriptionSource;
 use App\Enums\PrescriptionStatus;
 use App\Exceptions\PrescriptionNotChangeable;
+use App\Models\AuditLog;
 use App\Models\Prescription;
 use App\Models\PrescriptionIntake;
 use App\Models\User;
@@ -25,7 +26,10 @@ class ChangeOwnMedication
 {
     use WritesOwnMedications;
 
-    public function __construct(private readonly SyncDoseEvents $syncDoseEvents) {}
+    public function __construct(
+        private readonly SyncDoseEvents $syncDoseEvents,
+        private readonly SyncSafetyFindings $syncSafetyFindings,
+    ) {}
 
     /**
      * @throws PrescriptionNotChangeable
@@ -50,12 +54,17 @@ class ChangeOwnMedication
                 return PrescriptionChangeOutcome::Unchanged;
             }
 
+            $before = $current->auditSnapshot();
+
             if ($current->status($today) === PrescriptionStatus::Upcoming) {
                 $this->ensureNotPrescribedByDoctor($patient->id, $data, $data->startsOn);
 
                 $current->update($this->versionAttributes($data));
                 $this->syncIntakes($current, $data);
                 $this->syncDoseEvents->handle($patient);
+                $this->syncSafetyFindings->handle($patient);
+
+                AuditLog::record($patient, 'own_medication.changed', $patient, $current, $before, $current->auditSnapshot());
 
                 return PrescriptionChangeOutcome::Edited;
             }
@@ -77,6 +86,9 @@ class ChangeOwnMedication
             ]);
             $this->createIntakes($next, $data, $current);
             $this->syncDoseEvents->handle($patient);
+            $this->syncSafetyFindings->handle($patient);
+
+            AuditLog::record($patient, 'own_medication.changed', $patient, $next, $before, $next->auditSnapshot());
 
             return PrescriptionChangeOutcome::NewVersion;
         });

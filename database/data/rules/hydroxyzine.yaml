@@ -1,0 +1,164 @@
+# Правила проверки назначения гидроксизина. Источник — оригинальный препарат «Атаракс».
+# Загружаются командой `php artisan app:rules:import`, формат и язык условий описаны в README.
+#
+# Источник — общая характеристика (ОХЛП) «Атаракса» из реестра ЕАЭС. Ссылка на сам файл одноразовая,
+# поэтому у правил ссылка на реестр, препарат ищется по названию.
+# Тексты, уровни и коды МКБ-10 показаний проверяет медик команды [медик].
+
+drug: hydroxyzine
+rules:
+  - id: indications
+    type: indication
+    level: contraindicated
+    # «Симптоматическое лечение тревоги» без нозологии: тревожные расстройства F40, F41 и
+    # расстройство приспособительных реакций F43.2. Зуд аллергического происхождения — L29 [медик].
+    codes: [F40, F41, F43.2, L29]
+    text: Назначение вне зарегистрированных показаний. Гидроксизин показан для симптоматического лечения тревоги у взрослых и аллергического зуда.
+    source:
+      document: ОХЛП «Атаракс», реестр ЕАЭС
+      section: 4.1. Показания к применению
+      url: https://lk.regmed.ru/Register/EAEU_SmPC
+      quote: >-
+        Препарат Атаракс показан к применению для симптоматического лечения тревоги у взрослых; симптоматического
+        лечения зуда аллергического происхождения у взрослых и детей в возрасте от 3 до 18 лет.
+
+  - id: age
+    type: contraindication
+    level: contraindicated
+    condition: age() < 3
+    text: Противопоказан детям до 3 лет.
+    source:
+      document: ОХЛП «Атаракс», реестр ЕАЭС
+      section: 4.3. Противопоказания
+      url: https://lk.regmed.ru/Register/EAEU_SmPC
+      quote: Детский возраст до 3 лет.
+
+  - id: qt
+    type: contraindication
+    level: contraindicated
+    condition: fact('qt_prolongation')
+    text: Противопоказан при врождённом или приобретённом удлинении интервала QT в анамнезе.
+    source:
+      document: ОХЛП «Атаракс», реестр ЕАЭС
+      section: 4.3. Противопоказания
+      url: https://lk.regmed.ru/Register/EAEU_SmPC
+      quote: Пациенты с врожденным или приобретенным удлинением интервала QT в анамнезе.
+
+  - id: qt_risk
+    type: contraindication
+    level: contraindicated
+    condition: fact('qt_risk_factors')
+    text: Противопоказан при факторах риска удлинения QT (электролитный дисбаланс, выраженная брадикардия, внезапная сердечная смерть в семье).
+    source:
+      document: ОХЛП «Атаракс», реестр ЕАЭС
+      section: 4.3. Противопоказания
+      url: https://lk.regmed.ru/Register/EAEU_SmPC
+      quote: >-
+        Пациенты с факторами риска развития удлинения интервала QT, в том числе при наличии сердечно-сосудистых
+        заболеваний, выраженного электролитного дисбаланса (гипокалиемии, гипомагниемии), случаев внезапной
+        сердечной смерти в семейном анамнезе, выраженной брадикардии.
+
+  - id: cardiovascular
+    type: contraindication
+    level: contraindicated
+    condition: fact('cardiovascular')
+    text: Противопоказан при сердечно-сосудистых заболеваниях как факторе риска удлинения QT.
+    source:
+      document: ОХЛП «Атаракс», реестр ЕАЭС
+      section: 4.3. Противопоказания
+      url: https://lk.regmed.ru/Register/EAEU_SmPC
+      quote: Пациенты с факторами риска развития удлинения интервала QT, в том числе при наличии сердечно-сосудистых заболеваний…
+
+  - id: qt_drugs
+    type: interaction
+    level: contraindicated
+    condition: taking_group('qt_prolonging')
+    text: Противопоказан вместе с препаратами, удлиняющими интервал QT, в том числе с эсциталопрамом.
+    source:
+      document: ОХЛП «Атаракс», реестр ЕАЭС
+      section: 4.5. Взаимодействие, «Противопоказания к совместному назначению»
+      url: https://lk.regmed.ru/Register/EAEU_SmPC
+      quote: >-
+        Совместное назначение гидроксизина с препаратами, известными своими свойствами удлинять интервал QT и\или
+        вызывать желудочковую тахикардию по типу «пируэт», например… некоторыми антидепрессантами (например,
+        циталопрамом, эсциталопрамом)… противопоказано.
+
+  - id: pregnancy
+    type: contraindication
+    level: contraindicated
+    condition: fact('pregnancy')
+    text: Противопоказан при беременности и в родах.
+    source:
+      document: ОХЛП «Атаракс», реестр ЕАЭС
+      section: 4.3. Противопоказания
+      url: https://lk.regmed.ru/Register/EAEU_SmPC
+      quote: Беременность, период родов или грудного вскармливания.
+
+  - id: lactation
+    type: contraindication
+    level: contraindicated
+    condition: fact('lactation')
+    text: Противопоказан в период грудного вскармливания.
+    source:
+      document: ОХЛП «Атаракс», реестр ЕАЭС
+      section: 4.3. Противопоказания
+      url: https://lk.regmed.ru/Register/EAEU_SmPC
+      quote: Беременность, период родов или грудного вскармливания.
+
+  - id: maoi
+    type: interaction
+    level: caution
+    condition: taking_group('maoi') or fact('maoi')
+    text: Совместного назначения с ингибиторами МАО следует избегать.
+    source:
+      document: ОХЛП «Атаракс», реестр ЕАЭС
+      section: 4.5. Взаимодействие
+      url: https://lk.regmed.ru/Register/EAEU_SmPC
+      quote: Следует избегать одновременного назначения гидроксизина с ингибиторами моноаминоксидазы.
+
+  - id: paroxetine
+    type: interaction
+    level: caution
+    condition: taking('paroxetine')
+    text: Гидроксизин ингибирует CYP2D6 и в высоких дозах может взаимодействовать с его субстратами, в том числе с пароксетином.
+    source:
+      document: ОХЛП «Атаракс», реестр ЕАЭС
+      section: 4.5. Взаимодействие
+      url: https://lk.regmed.ru/Register/EAEU_SmPC
+      quote: >-
+        Гидроксизин… в высоких дозах способен приводить к лекарственному взаимодействию с субстратами CYP2D6
+        (… пароксетин…).
+
+  - id: gfr
+    type: caution
+    level: caution
+    condition: fact('gfr') < 60
+    text: При сниженной функции почек дозу уменьшают.
+    advice: СКФ 30 – <60 мл/мин — 50 % рекомендуемой дозы, < 30 — 25 %, на диализе — 25 % три раза в неделю.
+    source:
+      document: ОХЛП «Атаракс», реестр ЕАЭС
+      section: 4.2. Режим дозирования, «Пациенты с нарушением функции почек»
+      url: https://lk.regmed.ru/Register/EAEU_SmPC
+      quote: Почечная недостаточность средней степени (СКФ 30 – <60 мл/мин) — 50 % рекомендуемой дозы; тяжелая (< 30) — 25 %.
+
+  - id: hepatic
+    type: caution
+    level: caution
+    condition: fact('hepatic_impairment') != 'none'
+    text: При нарушении функции печени суточную дозу снижают на 33 %.
+    source:
+      document: ОХЛП «Атаракс», реестр ЕАЭС
+      section: 4.2. Режим дозирования, «Пациенты с нарушением функции печени»
+      url: https://lk.regmed.ru/Register/EAEU_SmPC
+      quote: При лечении пациентов с нарушением функции печени рекомендуется снижать суточную дозу препарата на 33%.
+
+  - id: elderly
+    type: caution
+    level: caution
+    condition: age() >= 65
+    text: У пожилых максимальная суточная доза 50 мг.
+    source:
+      document: ОХЛП «Атаракс», реестр ЕАЭС
+      section: 4.2. Режим дозирования, «Пациенты пожилого возраста»
+      url: https://lk.regmed.ru/Register/EAEU_SmPC
+      quote: В пожилом возрасте максимальная суточная доза составляет 50 мг.

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\RussianTimezone;
+use App\Enums\Sex;
 use App\Support\DisplayTime;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -13,13 +14,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * @property int $user_id
  * @property CarbonImmutable|null $birth_date
+ * @property Sex|null $sex
  * @property RussianTimezone $timezone
  * @property CarbonImmutable|null $consented_at
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
 #[Table(key: 'user_id', incrementing: false)]
-#[Fillable(['birth_date', 'timezone', 'consented_at'])]
+#[Fillable(['birth_date', 'sex', 'timezone', 'consented_at'])]
 class PatientProfile extends Model
 {
     /**
@@ -60,6 +62,7 @@ class PatientProfile extends Model
     {
         return [
             'birth_date' => 'date',
+            'sex' => Sex::class,
             'timezone' => RussianTimezone::class,
             'consented_at' => 'datetime',
         ];

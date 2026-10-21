@@ -3,7 +3,8 @@
 namespace App\Support;
 
 /**
- * Что изменила загрузка справочника препаратов: коды добавленных, изменённых и выключенных препаратов.
+ * Что изменила загрузка справочника препаратов: коды добавленных, изменённых и выключенных
+ * препаратов и изменились ли группы препаратов.
  */
 final readonly class DrugImportResult
 {
@@ -17,10 +18,11 @@ final readonly class DrugImportResult
         public array $created,
         public array $updated,
         public array $deactivated,
+        public bool $groupsChanged = false,
     ) {}
 
     public function hasChanges(): bool
     {
-        return $this->created !== [] || $this->updated !== [] || $this->deactivated !== [];
+        return $this->created !== [] || $this->updated !== [] || $this->deactivated !== [] || $this->groupsChanged;
     }
 }

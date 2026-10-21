@@ -256,6 +256,40 @@ class Prescription extends Model
     }
 
     /**
+     * Версия назначения для журнала аудита: что назначено, как принимать и чем закончилась.
+     *
+     * @return array<string, mixed>
+     */
+    public function auditSnapshot(): array
+    {
+        return [
+            ...$this->only([
+                'source',
+                'previous_id',
+                'drug_id',
+                'drug_name',
+                'drug_strength_id',
+                'kind',
+                'tablets',
+                'max_daily_doses',
+                'dose',
+                'instruction',
+                'prescribed_by',
+                'close_reason',
+                'cancel_reason',
+                'cancel_comment',
+            ]),
+            'starts_on' => $this->starts_on->toDateString(),
+            'ends_on' => $this->ends_on?->toDateString(),
+            'closed_at' => $this->closed_at?->toIso8601String(),
+            'intakes' => PrescriptionIntake::sortByTimeOfDay($this->intakes()->get())
+                ->map(fn (PrescriptionIntake $intake): array => $intake->only(['time_of_day', 'tablets', 'time']))
+                ->values()
+                ->all(),
+        ];
+    }
+
+    /**
      * Незакрытые версии: не изменены и не отменены. Сюда входят и назначения, завершённые по дате.
      *
      * @param  Builder<self>  $query

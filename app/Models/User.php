@@ -120,6 +120,36 @@ class User extends Authenticatable
     }
 
     /**
+     * Диагнозы пациента, в том числе снятые.
+     *
+     * @return HasMany<Diagnosis, $this>
+     */
+    public function diagnoses(): HasMany
+    {
+        return $this->hasMany(Diagnosis::class, 'patient_id');
+    }
+
+    /**
+     * Факты о пациенте, все записи.
+     *
+     * @return HasMany<Observation, $this>
+     */
+    public function observations(): HasMany
+    {
+        return $this->hasMany(Observation::class, 'patient_id');
+    }
+
+    /**
+     * Находки проверки безопасности по назначениям пациента.
+     *
+     * @return HasMany<SafetyFinding, $this>
+     */
+    public function safetyFindings(): HasMany
+    {
+        return $this->hasMany(SafetyFinding::class, 'patient_id');
+    }
+
+    /**
      * Часовой пояс пациента, у врача — пояс интерфейса.
      */
     public function localTimezone(): string

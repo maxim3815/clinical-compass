@@ -3,7 +3,7 @@
 namespace App\Events;
 
 use App\Models\User;
-use App\Support\Adherence\AdherenceSignals;
+use App\Support\PatientSignals;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
@@ -11,11 +11,12 @@ use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * У пациентов врача мог измениться сигнал о приверженности: scheduler отметил пропуск, пациент
- * отметил приём или врач открыл карточку (в том числе в другой вкладке). Счётчик у пункта меню
+ * У пациентов врача мог измениться сигнал о приверженности или находки проверки безопасности:
+ * scheduler отметил пропуск, пациент отметил приём или добавил препарат, врач открыл карточку
+ * (в том числе в другой вкладке), внёс факт или решил по находке. Счётчик у пункта меню
  * «Пациенты» считается при трансляции, поэтому приходит актуальным.
  */
-class AdherenceSignalsChanged implements ShouldBroadcast, ShouldDispatchAfterCommit
+class PatientSignalsChanged implements ShouldBroadcast, ShouldDispatchAfterCommit
 {
     use Dispatchable, SerializesModels;
 
@@ -40,7 +41,7 @@ class AdherenceSignalsChanged implements ShouldBroadcast, ShouldDispatchAfterCom
 
     public function broadcastAs(): string
     {
-        return 'adherence.changed';
+        return 'patient-signals.changed';
     }
 
     /**
@@ -48,6 +49,6 @@ class AdherenceSignalsChanged implements ShouldBroadcast, ShouldDispatchAfterCom
      */
     public function broadcastWith(): array
     {
-        return ['count' => AdherenceSignals::count($this->doctor)];
+        return ['count' => PatientSignals::count($this->doctor)];
     }
 }

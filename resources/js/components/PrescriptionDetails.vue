@@ -123,6 +123,8 @@ const closing = computed(() => {
             </p>
         </div>
 
+        <slot name="safety" />
+
         <div v-if="$slots.actions" class="flex flex-wrap gap-2">
             <slot name="actions" />
         </div>

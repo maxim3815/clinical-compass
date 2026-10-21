@@ -1,0 +1,67 @@
+# Виды фактов о пациенте, которые вносит врач и проверяют правила. Загружаются вместе с правилами
+# командой `php artisan app:rules:import`, формат описан в README.
+#
+# Набор собран по противопоказаниям и разделам «с осторожностью» препаратов справочника [медик].
+# Новый вид факта добавляется записью в этом файле, без миграции. Правила ссылаются на вид по коду:
+# fact('gfr').
+#
+# value: boolean («да / нет»), number (число с единицей unit) или choice (вариант из options).
+# female_only: true — только у женщин; пока пол не указан, такие факты правила считают неизвестными.
+
+- code: pregnancy
+  name: Беременность
+  value: boolean
+  female_only: true
+
+- code: lactation
+  name: Грудное вскармливание
+  value: boolean
+  female_only: true
+
+- code: gfr
+  name: СКФ
+  value: number
+  unit: мл/мин/1,73 м²
+  min: 1
+  max: 200
+
+- code: hepatic_impairment
+  name: Печёночная недостаточность
+  value: choice
+  options:
+    - value: none
+      label: нет
+    - value: a
+      label: класс A по Чайлд-Пью
+    - value: b
+      label: класс B по Чайлд-Пью
+    - value: c
+      label: класс C по Чайлд-Пью
+
+- code: epilepsy
+  name: Эпилепсия или органическое поражение головного мозга
+  value: boolean
+
+- code: maoi
+  name: Ингибиторы МАО сейчас или в последние 14 дней
+  value: boolean
+
+- code: qt_prolongation
+  name: Удлинение интервала QT, врождённое или приобретённое
+  value: boolean
+
+- code: qt_risk_factors
+  name: Факторы риска удлинения QT (брадикардия, гипокалиемия, гипомагниемия, внезапная сердечная смерть в семье)
+  value: boolean
+
+- code: cardiovascular
+  name: Сердечно-сосудистые заболевания
+  value: boolean
+
+- code: diabetes_endocrine
+  name: Сахарный диабет или другие эндокринные заболевания
+  value: boolean
+
+- code: substance_dependence
+  name: Алкогольная или наркотическая зависимость
+  value: boolean

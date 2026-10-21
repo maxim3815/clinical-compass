@@ -23,8 +23,8 @@ declare module '@inertiajs/core' {
             sidebarOpen: boolean;
             // У пациента — непрочитанные сообщения, у врача — диалоги с ними.
             unreadMessages: number;
-            // У врача — пациенты с сигналом о приверженности и новыми пропусками, у пациента 0.
-            adherenceSignals: number;
+            // У врача — пациенты с новыми пропусками приёма или противопоказанием без решения, у пациента 0.
+            patientSignals: number;
             // Открытый ключ VAPID для подписки на пуши. У гостя null.
             vapidPublicKey: string | null;
             [key: string]: unknown;

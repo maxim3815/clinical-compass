@@ -6,6 +6,7 @@ import {
     MessagesSquare,
     Pill,
     Settings,
+    ShieldCheck,
     UserPlus,
     Users,
 } from '@lucide/vue';
@@ -30,6 +31,7 @@ import { index as conversations } from '@/routes/doctor/conversations';
 import { index as drugs } from '@/routes/doctor/drugs';
 import { index as invitations } from '@/routes/doctor/invitations';
 import { index as patients } from '@/routes/doctor/patients';
+import { index as rules } from '@/routes/doctor/rules';
 import { home as patientHome, medications } from '@/routes/patient';
 import { show as patientChat } from '@/routes/patient/chat';
 import { edit as editProfile } from '@/routes/profile';
@@ -51,11 +53,11 @@ useRealtime<{ count: number }>(
     (event) => router.replaceProp('unreadMessages', event.count),
 );
 
-// Счётчик сигналов о приверженности у врача обновляется так же.
+// Счётчик пациентов, которые требуют внимания врача, обновляется так же.
 useRealtime<{ count: number }>(
     `App.Models.User.${page.props.auth.user.id}`,
-    'adherence.changed',
-    (event) => router.replaceProp('adherenceSignals', event.count),
+    'patient-signals.changed',
+    (event) => router.replaceProp('patientSignals', event.count),
 );
 
 // Диалог с пациентом относится к «Сообщениям», а не к «Пациентам».
@@ -81,8 +83,8 @@ const mainNavItems = computed<NavItem[]>(() =>
                   // Карточка пациента тоже относится к разделу.
                   isActive:
                       isCurrentOrParentUrl(patients()) && !isDoctorChat.value,
-                  badge: page.props.adherenceSignals,
-                  badgeLabel: 'с новыми пропусками приёма',
+                  badge: page.props.patientSignals,
+                  badgeLabel: 'требуют внимания',
               },
               {
                   title: 'Сообщения',
@@ -102,6 +104,11 @@ const mainNavItems = computed<NavItem[]>(() =>
                   icon: Pill,
                   // Карточка препарата тоже относится к разделу.
                   isActive: isCurrentOrParentUrl(drugs()),
+              },
+              {
+                  title: 'Правила',
+                  href: rules(),
+                  icon: ShieldCheck,
               },
               settings,
           ]

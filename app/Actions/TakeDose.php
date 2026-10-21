@@ -4,7 +4,7 @@ namespace App\Actions;
 
 use App\Actions\Concerns\MarksDoses;
 use App\Enums\DoseEventStatus;
-use App\Events\AdherenceSignalsChanged;
+use App\Events\PatientSignalsChanged;
 use App\Exceptions\DoseNotMarkable;
 use App\Models\DoseEvent;
 use App\Models\User;
@@ -45,7 +45,7 @@ class TakeDose
                 'skip_comment' => null,
             ]);
 
-            AdherenceSignalsChanged::dispatchForDoctorOf($patient);
+            PatientSignalsChanged::dispatchForDoctorOf($patient);
         });
     }
 

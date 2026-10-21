@@ -20,6 +20,8 @@ type PatientRow = {
     age: number | null;
     started_at: string;
     adherence: Signal;
+    // Красные находки проверки безопасности без решения врача.
+    contraindications: number;
 };
 
 // По доле за 7 дней: сначала самые низкие или самые высокие. null — по ФИО.
@@ -75,10 +77,11 @@ function submit(): void {
     );
 }
 
-// Пациент отметил приём или scheduler отметил пропуск: доли и сигналы в строках меняются.
+// Пациент отметил приём или добавил препарат, scheduler отметил пропуск: доли, сигналы
+// и отметки о противопоказаниях в строках меняются.
 useRealtime(
     `App.Models.User.${page.props.auth.user.id}`,
-    'adherence.changed',
+    'patient-signals.changed',
     () => router.reload({ only: ['patients'] }),
 );
 </script>
@@ -196,10 +199,15 @@ useRealtime(
                             :key="patient.id"
                             class="border-t"
                             :class="{
-                                'bg-destructive/5': patient.adherence.raised,
+                                'bg-destructive/5':
+                                    patient.adherence.raised ||
+                                    patient.contraindications > 0,
                             }"
                             data-test="patient-row"
                             :data-signal="patient.adherence.raised || undefined"
+                            :data-contraindication="
+                                patient.contraindications > 0 || undefined
+                            "
                         >
                             <td class="px-3 py-2">
                                 <Link
@@ -210,7 +218,20 @@ useRealtime(
                                 </Link>
                             </td>
                             <td class="px-3 py-2">
-                                <AdherenceSignal :signal="patient.adherence" />
+                                <span
+                                    class="inline-flex flex-wrap items-center gap-1.5"
+                                >
+                                    <AdherenceSignal
+                                        :signal="patient.adherence"
+                                    />
+                                    <span
+                                        v-if="patient.contraindications > 0"
+                                        class="rounded-md bg-destructive/10 px-1.5 py-0.5 font-medium whitespace-nowrap text-destructive"
+                                        data-test="contraindication-mark"
+                                    >
+                                        Противопоказание без решения
+                                    </span>
+                                </span>
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap">
                                 {{

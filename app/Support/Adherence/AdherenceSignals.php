@@ -154,10 +154,21 @@ final class AdherenceSignals
     }
 
     /**
-     * Счётчик у пункта меню «Пациенты»: пациенты врача, у которых есть сигнал и непринятый приём
-     * появился после того, как врач последний раз открывал карточку.
+     * Сколько пациентов врача с сигналом и непринятым приёмом, который появился после того,
+     * как врач последний раз открывал карточку.
      */
     public static function count(User $doctor): int
+    {
+        return count(self::unseenPatientIds($doctor));
+    }
+
+    /**
+     * Пациенты врача, у которых есть сигнал и непринятый приём появился после того, как врач
+     * последний раз открывал карточку. Они входят в счётчик у пункта меню «Пациенты».
+     *
+     * @return list<int>
+     */
+    public static function unseenPatientIds(User $doctor): array
     {
         $candidates = CareRelationship::query()
             ->active()
@@ -170,9 +181,10 @@ final class AdherenceSignals
 
         $misses = self::consecutiveMisses($candidates->map(fn (CareRelationship $care): User => $care->patient));
 
-        return $candidates
+        return array_values($candidates
             ->filter(fn (CareRelationship $care): bool => (new AdherenceSignal($care->adherence_share, $misses[$care->patient_id] ?? 0))->isRaised())
-            ->count();
+            ->map(fn (CareRelationship $care): int => $care->patient_id)
+            ->all());
     }
 
     /**

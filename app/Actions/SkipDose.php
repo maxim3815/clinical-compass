@@ -5,7 +5,7 @@ namespace App\Actions;
 use App\Actions\Concerns\MarksDoses;
 use App\Enums\DoseEventStatus;
 use App\Enums\DoseSkipReason;
-use App\Events\AdherenceSignalsChanged;
+use App\Events\PatientSignalsChanged;
 use App\Exceptions\DoseNotMarkable;
 use App\Models\DoseEvent;
 use App\Models\User;
@@ -45,7 +45,7 @@ class SkipDose
                 'skip_comment' => $comment,
             ]);
 
-            AdherenceSignalsChanged::dispatchForDoctorOf($patient);
+            PatientSignalsChanged::dispatchForDoctorOf($patient);
         });
     }
 }

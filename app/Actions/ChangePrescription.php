@@ -8,10 +8,13 @@ use App\Enums\PrescriptionCloseReason;
 use App\Enums\PrescriptionSource;
 use App\Enums\PrescriptionStatus;
 use App\Exceptions\PrescriptionNotChangeable;
+use App\Models\AuditLog;
 use App\Models\Prescription;
 use App\Models\PrescriptionIntake;
 use App\Models\User;
 use App\Support\PrescriptionData;
+use App\Support\Safety\SafetyAcknowledgement;
+use App\Support\Safety\SafetyCheck;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
@@ -26,13 +29,17 @@ class ChangePrescription
 {
     use WritesPrescriptions;
 
-    public function __construct(private readonly SyncDoseEvents $syncDoseEvents) {}
+    public function __construct(
+        private readonly SyncDoseEvents $syncDoseEvents,
+        private readonly SafetyCheck $safetyCheck,
+        private readonly SyncSafetyFindings $syncSafetyFindings,
+    ) {}
 
     /**
      * @throws PrescriptionNotChangeable
      * @throws ValidationException
      */
-    public function handle(User $doctor, Prescription $prescription, PrescriptionData $data): PrescriptionChangeOutcome
+    public function handle(User $doctor, Prescription $prescription, PrescriptionData $data, ?SafetyAcknowledgement $acknowledgement = null): PrescriptionChangeOutcome
     {
         $this->ensureDoctor($doctor);
 
@@ -40,7 +47,7 @@ class ChangePrescription
             throw new InvalidArgumentException('Препарат и вид приёма в назначении не меняются: для них нужно новое назначение.');
         }
 
-        return DB::transaction(function () use ($doctor, $prescription, $data): PrescriptionChangeOutcome {
+        return DB::transaction(function () use ($doctor, $prescription, $data, $acknowledgement): PrescriptionChangeOutcome {
             $patient = $this->lockPatient($prescription->patient_id);
             $today = $patient->localToday();
             $current = $this->lockChangeable($prescription, $today);
@@ -49,20 +56,30 @@ class ChangePrescription
                 return PrescriptionChangeOutcome::Unchanged;
             }
 
-            if ($current->status($today) === PrescriptionStatus::Upcoming) {
-                $this->ensureNoOverlap($patient->id, $data, $data->startsOn, 'starts_on', $current->id);
+            $before = $current->auditSnapshot();
+            $upcoming = $current->status($today) === PrescriptionStatus::Upcoming;
+            $this->ensureNoOverlap($patient->id, $data, $upcoming ? $data->startsOn : $today, $upcoming ? 'starts_on' : 'ends_on', $current->id);
 
+            $report = $this->safetyCheck->forCandidate($patient, $data->strength->drug, $current);
+            $decision = ($acknowledgement ?? new SafetyAcknowledgement)->confirm($report, $doctor);
+
+            if ($upcoming) {
                 $current->update([
                     ...$this->versionAttributes($data),
                     'prescriber_id' => $doctor->id,
                 ]);
                 $this->syncIntakes($current, $data);
                 $this->syncDoseEvents->handle($patient);
+                $this->syncSafetyFindings->handle($patient, $decision?->forPrescription($current->id));
+
+                AuditLog::record($doctor, 'prescription.changed', $patient, $current, $before, [
+                    ...$current->auditSnapshot(),
+                    'safety' => $report->auditSnapshot(),
+                    'justification' => $decision?->text,
+                ]);
 
                 return PrescriptionChangeOutcome::Edited;
             }
-
-            $this->ensureNoOverlap($patient->id, $data, $today, 'ends_on', $current->id);
 
             $current->update([
                 'closed_at' => now(),
@@ -80,6 +97,13 @@ class ChangePrescription
             ]);
             $this->createIntakes($next, $data, $current);
             $this->syncDoseEvents->handle($patient);
+            $this->syncSafetyFindings->handle($patient, $decision?->forPrescription($next->id));
+
+            AuditLog::record($doctor, 'prescription.changed', $patient, $next, $before, [
+                ...$next->auditSnapshot(),
+                'safety' => $report->auditSnapshot(),
+                'justification' => $decision?->text,
+            ]);
 
             return PrescriptionChangeOutcome::NewVersion;
         });

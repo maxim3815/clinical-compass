@@ -14,3 +14,6 @@ Schedule::command('app:dose-events:sync')->hourly()->withoutOverlapping();
 Schedule::command('app:dose-events:mark-missed')->everyMinute();
 // Напоминания о приёме пушем. Сами пуши отправляет очередь.
 Schedule::command('app:dose-events:send-reminders')->everyMinute()->withoutOverlapping();
+// Находки проверки безопасности сразу пересчитывают сами действия. Раз в час — на случай, когда
+// назначение завершилось по дате или у пациента сменился возраст.
+Schedule::command('app:safety:sync')->hourly()->withoutOverlapping();

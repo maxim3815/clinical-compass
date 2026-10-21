@@ -12,7 +12,8 @@ class ImportDrugsCommand extends Command
      * @var string
      */
     protected $signature = 'app:drugs:import
-        {path? : Путь к файлу справочника. По умолчанию database/data/drugs.yaml}';
+        {path? : Путь к файлу справочника. По умолчанию database/data/drugs.yaml}
+        {--groups= : Путь к файлу групп препаратов. По умолчанию database/data/drug-groups.yaml}';
 
     /**
      * @var string
@@ -22,9 +23,13 @@ class ImportDrugsCommand extends Command
     public function handle(ImportDrugs $importDrugs): int
     {
         $path = $this->argument('path');
+        $groups = $this->option('groups');
 
         try {
-            $result = $importDrugs->handle(is_string($path) ? $path : base_path(ImportDrugs::DEFAULT_PATH));
+            $result = $importDrugs->handle(
+                is_string($path) ? $path : base_path(ImportDrugs::DEFAULT_PATH),
+                is_string($groups) ? $groups : base_path(ImportDrugs::DEFAULT_GROUPS_PATH),
+            );
         } catch (InvalidDrugCatalog $e) {
             $this->components->error('Справочник не загружен, в базе ничего не изменилось. Исправьте файл и запустите команду снова.');
             $this->components->bulletList($e->errors);
@@ -44,6 +49,10 @@ class ImportDrugsCommand extends Command
             if ($codes !== []) {
                 $this->components->twoColumnDetail($title, implode(', ', $codes));
             }
+        }
+
+        if ($result->groupsChanged) {
+            $this->components->twoColumnDetail('Группы препаратов', 'обновлены');
         }
 
         return self::SUCCESS;

@@ -4,6 +4,7 @@ namespace App\Actions;
 
 use App\Exceptions\InvalidDrugCatalog;
 use App\Models\Drug;
+use App\Models\DrugGroup;
 use App\Support\DrugImportResult;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -12,24 +13,30 @@ use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * Загрузка справочника препаратов из YAML-файла. Файл проверяется целиком до записи в БД,
- * поэтому при ошибке справочник остаётся прежним. Записи сопоставляются по коду, и повторная
- * загрузка того же файла ничего не меняет. Препараты и дозировки, которых в файле больше нет,
- * выключаются, а не удаляются: на них ссылаются назначения.
+ * Загрузка справочника препаратов из YAML-файла вместе с группами препаратов для правил
+ * взаимодействий. Файлы проверяются целиком до записи в БД, поэтому при ошибке справочник
+ * остаётся прежним. Записи сопоставляются по коду, и повторная загрузка тех же файлов ничего
+ * не меняет. Препараты и дозировки, которых в файле больше нет, выключаются, а не удаляются:
+ * на них ссылаются назначения. Группа, которой больше нет в файле, удаляется: на неё ссылаются
+ * только препараты и правила, а их файлы проверяются по списку групп.
  *
  * @phpstan-type StrengthData array{mg: int|float|string, divisible: bool}
  * @phpstan-type SourceData array{trade_name: string, document: string, registration_number: string, url: string, edition: string}
- * @phpstan-type DrugData array{code: string, name: string, inn: string, atc: string, dosage_form: string, strengths: list<StrengthData>, regimen: string, patient_instruction: string, missed_dose: string, window_hours: int|string|null, source: SourceData}
+ * @phpstan-type DrugData array{code: string, name: string, inn: string, atc: string, groups: list<string>, dosage_form: string, strengths: list<StrengthData>, regimen: string, patient_instruction: string, missed_dose: string, window_hours: int|string|null, source: SourceData}
+ * @phpstan-type GroupData array{code: string, name: string}
  */
 class ImportDrugs
 {
     public const string DEFAULT_PATH = 'database/data/drugs.yaml';
+
+    public const string DEFAULT_GROUPS_PATH = 'database/data/drug-groups.yaml';
 
     private const array FIELDS = [
         'code',
         'name',
         'inn',
         'atc',
+        'groups',
         'dosage_form',
         'strengths',
         'regimen',
@@ -46,11 +53,12 @@ class ImportDrugs
     /**
      * @throws InvalidDrugCatalog
      */
-    public function handle(string $path): DrugImportResult
+    public function handle(string $path, string $groupsPath): DrugImportResult
     {
-        $drugs = $this->validate($this->parse($path));
+        $groups = $this->validateGroups($this->parse($groupsPath));
+        $drugs = $this->validate($this->parse($path), array_column($groups, 'code'));
 
-        return DB::transaction(fn (): DrugImportResult => $this->sync($drugs));
+        return DB::transaction(fn (): DrugImportResult => $this->sync($drugs, $this->syncGroups($groups)));
     }
 
     private function parse(string $path): mixed
@@ -67,9 +75,54 @@ class ImportDrugs
     }
 
     /**
+     * @return list<GroupData>
+     */
+    private function validateGroups(mixed $data): array
+    {
+        if (! is_array($data) || ! array_is_list($data)) {
+            throw new InvalidDrugCatalog(['Файл групп должен содержать список групп.']);
+        }
+
+        $errors = [];
+        $codes = [];
+
+        foreach ($data as $index => $group) {
+            $label = is_array($group) && is_string($group['code'] ?? null) ? "Группа {$group['code']}" : 'Группа №'.($index + 1);
+            $validator = Validator::make(is_array($group) ? $group : [], [
+                'code' => ['required', 'string', 'max:64', 'regex:/^'.DrugGroup::CODE_PATTERN.'$/'],
+                'name' => ['required', 'string', 'max:255'],
+            ], [], ['code' => 'code', 'name' => 'name']);
+
+            foreach (self::extraKeys(is_array($group) ? $group : [], ['code', 'name'], '') as $field) {
+                $errors[] = "{$label}: неизвестное поле {$field}.";
+            }
+
+            foreach ($validator->errors()->all() as $message) {
+                $errors[] = "{$label}: {$message}";
+            }
+
+            if (is_array($group) && is_string($group['code'] ?? null)) {
+                if (in_array($group['code'], $codes, true)) {
+                    $errors[] = "{$label}: код повторяется.";
+                }
+
+                $codes[] = $group['code'];
+            }
+        }
+
+        if ($errors !== []) {
+            throw new InvalidDrugCatalog($errors);
+        }
+
+        /** @var list<GroupData> $data */
+        return $data;
+    }
+
+    /**
+     * @param  list<string>  $groups  коды групп из файла групп
      * @return list<DrugData>
      */
-    private function validate(mixed $data): array
+    private function validate(mixed $data, array $groups): array
     {
         if (! is_array($data) || ! array_is_list($data) || $data === []) {
             throw new InvalidDrugCatalog(['Файл должен содержать список препаратов.']);
@@ -96,6 +149,12 @@ class ImportDrugs
 
             foreach ($this->validationErrors($drug) as $message) {
                 $errors[] = "{$label}: {$message}";
+            }
+
+            foreach (is_array($drug['groups'] ?? null) ? $drug['groups'] : [] as $group) {
+                if (is_string($group) && ! in_array($group, $groups, true)) {
+                    $errors[] = "{$label}: группы {$group} нет в файле групп.";
+                }
             }
 
             if (is_string($code)) {
@@ -128,6 +187,9 @@ class ImportDrugs
             'name' => ['required', 'string', 'max:255'],
             'inn' => ['required', 'string', 'max:255'],
             'atc' => ['required', 'string', 'max:16'],
+            // Ключ обязателен, как window_hours: препарат без групп записывается явно, [].
+            'groups' => ['present', 'list'],
+            'groups.*' => ['string', 'distinct'],
             'dosage_form' => ['required', 'string', 'max:255'],
             'strengths' => ['required', 'list'],
             'strengths.*' => ['array'],
@@ -152,6 +214,7 @@ class ImportDrugs
 
         $validator = Validator::make($drug, $rules, [
             'window_hours.present' => 'Поле window_hours обязательно. Если окно в источнике не задано, укажите ~.',
+            'groups.present' => 'Поле groups обязательно. Если препарат не входит в группы, укажите [].',
         ], array_combine($fields, $fields));
 
         return array_values($validator->errors()->all());
@@ -199,7 +262,7 @@ class ImportDrugs
     /**
      * @param  list<DrugData>  $drugs
      */
-    private function sync(array $drugs): DrugImportResult
+    private function sync(array $drugs, bool $groupsChanged): DrugImportResult
     {
         $existing = Drug::query()->with('strengths')->get()->keyBy('code');
         $created = [];
@@ -213,6 +276,7 @@ class ImportDrugs
                 'name' => $data['name'],
                 'inn' => $data['inn'],
                 'atc' => $data['atc'],
+                'groups' => $data['groups'],
                 'dosage_form' => $data['dosage_form'],
                 'regimen' => $data['regimen'],
                 'patient_instruction' => $data['patient_instruction'],
@@ -247,7 +311,26 @@ class ImportDrugs
             }
         }
 
-        return new DrugImportResult(count($drugs), $created, $updated, $deactivated);
+        return new DrugImportResult(count($drugs), $created, $updated, $deactivated, $groupsChanged);
+    }
+
+    /**
+     * @param  list<GroupData>  $groups
+     * @return bool Изменилась ли хотя бы одна группа.
+     */
+    private function syncGroups(array $groups): bool
+    {
+        $codes = array_column($groups, 'code');
+        $changed = DrugGroup::query()->whereNotIn('code', $codes)->delete() > 0;
+
+        foreach ($groups as $data) {
+            $group = DrugGroup::query()->firstOrNew(['code' => $data['code']]);
+            $group->fill(['name' => $data['name']]);
+            $changed = $changed || $group->isDirty();
+            $group->save();
+        }
+
+        return $changed;
     }
 
     /**

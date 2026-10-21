@@ -4,7 +4,7 @@ namespace App\Console\Commands;
 
 use App\Enums\DoseEventStatus;
 use App\Enums\PrescriptionSource;
-use App\Events\AdherenceSignalsChanged;
+use App\Events\PatientSignalsChanged;
 use App\Models\CareRelationship;
 use App\Models\DoseEvent;
 use App\Models\User;
@@ -52,7 +52,7 @@ class MarkMissedDoseEventsCommand extends Command
             User::query()
                 ->whereIn('id', CareRelationship::query()->active()->whereIn('patient_id', $patientIds)->select('doctor_id'))
                 ->get()
-                ->each(fn (User $doctor) => AdherenceSignalsChanged::dispatch($doctor));
+                ->each(fn (User $doctor) => PatientSignalsChanged::dispatch($doctor));
         }
 
         $this->notifyPatients($missed->pluck('id')->all(), $now);

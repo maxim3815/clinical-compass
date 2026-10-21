@@ -32,9 +32,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $source_url
  * @property string $source_edition
  * @property bool $is_active
+ * @property list<string> $groups
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  * @property-read Collection<int, DrugStrength> $strengths
+ * @property-read Collection<int, SafetyRule> $safetyRules
  */
 #[Fillable([
     'code',
@@ -52,6 +54,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'source_url',
     'source_edition',
     'is_active',
+    'groups',
 ])]
 class Drug extends Model
 {
@@ -74,6 +77,16 @@ class Drug extends Model
     }
 
     /**
+     * Правила проверки назначения, в том числе выключенные.
+     *
+     * @return HasMany<SafetyRule, $this>
+     */
+    public function safetyRules(): HasMany
+    {
+        return $this->hasMany(SafetyRule::class);
+    }
+
+    /**
      * @param  Builder<self>  $query
      */
     #[Scope]
@@ -92,6 +105,7 @@ class Drug extends Model
         return [
             'window_hours' => 'integer',
             'is_active' => 'boolean',
+            'groups' => 'array',
         ];
     }
 }

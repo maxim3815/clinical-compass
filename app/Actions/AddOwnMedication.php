@@ -4,6 +4,7 @@ namespace App\Actions;
 
 use App\Actions\Concerns\WritesOwnMedications;
 use App\Enums\PrescriptionSource;
+use App\Models\AuditLog;
 use App\Models\Prescription;
 use App\Models\User;
 use App\Support\OwnMedicationData;
@@ -18,7 +19,10 @@ class AddOwnMedication
 {
     use WritesOwnMedications;
 
-    public function __construct(private readonly SyncDoseEvents $syncDoseEvents) {}
+    public function __construct(
+        private readonly SyncDoseEvents $syncDoseEvents,
+        private readonly SyncSafetyFindings $syncSafetyFindings,
+    ) {}
 
     /**
      * @throws ValidationException
@@ -39,6 +43,10 @@ class AddOwnMedication
 
             $this->createIntakes($prescription, $data);
             $this->syncDoseEvents->handle($patient);
+            // Сочетание с назначениями врача видит только врач: находка появляется у него.
+            $this->syncSafetyFindings->handle($patient);
+
+            AuditLog::record($patient, 'own_medication.added', $patient, $prescription, null, $prescription->auditSnapshot());
 
             return $prescription;
         });

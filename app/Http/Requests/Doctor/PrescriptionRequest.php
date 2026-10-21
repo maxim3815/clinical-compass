@@ -9,6 +9,7 @@ use App\Models\DrugStrength;
 use App\Models\Prescription;
 use App\Models\User;
 use App\Support\PrescriptionData;
+use App\Support\Safety\SafetyAcknowledgement;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -79,6 +80,11 @@ class PrescriptionRequest extends FormRequest
                 ? ['exclude']
                 : ['required', 'date_format:Y-m-d', 'after_or_equal:'.$today],
             'ends_on' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:'.($this->hasStarted() ? $today : 'starts_on')],
+            // Проверка безопасности: какие красные находки врач видел в форме и его обоснование.
+            // Нужны ли они, решает повторная проверка при сохранении.
+            'safety_seen' => ['nullable', 'list', 'max:100'],
+            'safety_seen.*' => ['string', 'max:64'],
+            'justification' => ['nullable', 'string', 'max:'.SafetyAcknowledgement::MAX_JUSTIFICATION_LENGTH],
         ];
     }
 
@@ -114,6 +120,9 @@ class PrescriptionRequest extends FormRequest
                 ? 'Дата окончания не может быть раньше сегодняшнего дня.'
                 : 'Дата окончания не может быть раньше даты начала.',
             'ends_on' => 'Проверьте дату окончания.',
+            'safety_seen' => SafetyAcknowledgement::STALE,
+            'safety_seen.*' => SafetyAcknowledgement::STALE,
+            'justification' => 'Обоснование — не больше '.SafetyAcknowledgement::MAX_JUSTIFICATION_LENGTH.' символов.',
         ];
     }
 
@@ -152,6 +161,16 @@ class PrescriptionRequest extends FormRequest
             startsOn: $startsOn === null && $prescription !== null ? $prescription->starts_on : CarbonImmutable::parse((string) $startsOn),
             endsOn: $endsOn === null ? null : CarbonImmutable::parse($endsOn),
         );
+    }
+
+    public function toAcknowledgement(): SafetyAcknowledgement
+    {
+        /** @var list<string> $seen */
+        $seen = $this->validated('safety_seen') ?? [];
+        /** @var string|null $justification */
+        $justification = $this->validated('justification');
+
+        return new SafetyAcknowledgement($seen, $justification);
     }
 
     public function patient(): User

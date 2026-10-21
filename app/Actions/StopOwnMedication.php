@@ -5,6 +5,7 @@ namespace App\Actions;
 use App\Actions\Concerns\WritesOwnMedications;
 use App\Enums\PrescriptionCloseReason;
 use App\Exceptions\PrescriptionNotChangeable;
+use App\Models\AuditLog;
 use App\Models\Prescription;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -16,7 +17,10 @@ class StopOwnMedication
 {
     use WritesOwnMedications;
 
-    public function __construct(private readonly SyncDoseEvents $syncDoseEvents) {}
+    public function __construct(
+        private readonly SyncDoseEvents $syncDoseEvents,
+        private readonly SyncSafetyFindings $syncSafetyFindings,
+    ) {}
 
     /**
      * @throws PrescriptionNotChangeable
@@ -28,14 +32,20 @@ class StopOwnMedication
         DB::transaction(function () use ($patient, $prescription): void {
             $patient = $this->lockPatient($patient->id);
 
-            $this->lockChangeable($patient, $prescription, $patient->localToday())->update([
+            $current = $this->lockChangeable($patient, $prescription, $patient->localToday());
+            $before = $current->auditSnapshot();
+
+            $current->update([
                 'closed_at' => now(),
                 'closed_by_id' => $patient->id,
                 'close_reason' => PrescriptionCloseReason::Cancelled,
             ]);
 
-            // Будущие неотмеченные приёмы прекращённого препарата удаляются.
+            // Будущие неотмеченные приёмы прекращённого препарата удаляются, его находки закрываются.
             $this->syncDoseEvents->handle($patient);
+            $this->syncSafetyFindings->handle($patient);
+
+            AuditLog::record($patient, 'own_medication.stopped', $patient, $current, $before, $current->auditSnapshot());
         });
     }
 }

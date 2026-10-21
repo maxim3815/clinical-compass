@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm, useHttp } from '@inertiajs/vue3';
 import { Plus, Trash2 } from '@lucide/vue';
-import { computed, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { toast } from 'vue-sonner';
 import PrescriptionController from '@/actions/App/Http/Controllers/Doctor/PrescriptionController';
+import SafetyCheckController from '@/actions/App/Http/Controllers/Doctor/SafetyCheckController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import SafetyCheckPanel from '@/components/SafetyCheckPanel.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,7 +15,7 @@ import { NativeSelect } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
 import { formatMg, formatTablets } from '@/lib/dose';
 import { index, show } from '@/routes/doctor/patients';
-import type { SelectOption } from '@/types';
+import type { SafetyReport, SelectOption } from '@/types';
 
 type Strength = {
     id: number;
@@ -63,6 +66,9 @@ type Props = {
     };
     today: string;
     prescription: EditedPrescription | null;
+    // Проверка при изменении назначения. Новое назначение проверяется запросом при выборе препарата.
+    safety: SafetyReport | null;
+    justificationLimit: number;
 };
 
 const props = defineProps<Props>();
@@ -107,6 +113,8 @@ const form = useForm<{
     instruction: string;
     starts_on: string;
     ends_on: string;
+    justification: string;
+    safety_seen: string[];
 }>({
     drug_id: editing?.drug_id ?? null,
     drug_strength_id: editing?.drug_strength_id ?? null,
@@ -119,11 +127,73 @@ const form = useForm<{
     instruction: editing?.instruction ?? '',
     starts_on: editing?.starts_on ?? props.today,
     ends_on: editing?.ends_on ?? '',
+    justification: '',
+    safety_seen: [],
 });
 
 // Ошибки приёмов приходят с ключами вида «intakes.0.tablets».
 const errors = computed(
     () => form.errors as Record<string, string | undefined>,
+);
+
+// Проверка безопасности: при изменении приходит со страницей, для нового назначения её
+// запрашиваем при выборе препарата. Ответ на прежний выбор, пришедший позже, отбрасываем.
+const report = ref<SafetyReport | null>(props.safety);
+const check = useHttp<{ drug_id: number | null }, SafetyReport>({
+    drug_id: null,
+});
+let checkRequest = 0;
+
+async function runCheck(): Promise<void> {
+    const request = ++checkRequest;
+
+    if (form.drug_id === null) {
+        report.value = null;
+
+        return;
+    }
+
+    check.drug_id = form.drug_id;
+
+    try {
+        const result = await check.get(
+            SafetyCheckController.show.url(props.patient.id),
+        );
+
+        if (request === checkRequest) {
+            report.value = result;
+        }
+    } catch {
+        if (request === checkRequest) {
+            toast.error(
+                'Не удалось проверить безопасность назначения. Выберите препарат ещё раз.',
+            );
+        }
+    }
+}
+
+watch(
+    () => props.safety,
+    (value) => {
+        report.value = value;
+    },
+);
+
+// Красные находки без решения: их врач видел, и для них нужно обоснование.
+const contraindicationKeys = computed(() =>
+    [...(report.value?.findings ?? []), ...(report.value?.caused ?? [])]
+        .filter((item) => item.level === 'contraindicated' && !item.decided)
+        .map((item) => item.key),
+);
+
+// Сервер увидел красную находку, которой не было в блоке: проверяем заново.
+watch(
+    () => errors.value.safety,
+    (message) => {
+        if (message && editing === null) {
+            void runCheck();
+        }
+    },
 );
 
 const drug = computed(
@@ -146,6 +216,7 @@ watch(
         const previous = props.drugs.find((option) => option.id === previousId);
 
         form.clearErrors('drug_id');
+        void runCheck();
 
         form.drug_strength_id =
             next?.strengths.length === 1 ? next.strengths[0].id : null;
@@ -238,6 +309,8 @@ const endsOnMin = computed(() =>
 );
 
 function submit(): void {
+    form.safety_seen = contraindicationKeys.value;
+
     form.submit(
         editing === null
             ? PrescriptionController.store(props.patient.id)
@@ -296,6 +369,35 @@ function submit(): void {
                     По инструкции: {{ drug.regimen }}
                 </p>
                 <InputError :message="form.errors.drug_id" />
+            </div>
+
+            <SafetyCheckPanel
+                v-if="form.drug_id !== null"
+                :report="report"
+                :loading="check.processing"
+            />
+            <InputError :message="errors.safety" data-test="safety-error" />
+
+            <div
+                v-if="report?.requires_justification"
+                class="grid gap-2"
+                data-test="justification"
+            >
+                <Label for="justification"
+                    >Обоснование назначения вопреки предупреждению</Label
+                >
+                <Textarea
+                    id="justification"
+                    v-model="form.justification"
+                    name="justification"
+                    rows="3"
+                    :maxlength="justificationLimit"
+                />
+                <p class="text-sm text-muted-foreground">
+                    Обязательно при противопоказании. Сохранится в находке и в
+                    журнале аудита.
+                </p>
+                <InputError :message="form.errors.justification" />
             </div>
 
             <div v-if="drug" class="grid gap-2">
@@ -531,7 +633,7 @@ function submit(): void {
             <div class="flex flex-wrap gap-2">
                 <Button
                     type="submit"
-                    :disabled="form.processing"
+                    :disabled="form.processing || check.processing"
                     data-test="save-prescription"
                 >
                     {{ editing === null ? 'Назначить' : 'Сохранить изменения' }}
