@@ -24,7 +24,7 @@ test('doctor opens the drug catalog and the aviandr card', function () {
         ->assertNoJavaScriptErrors();
 });
 
-test('doctor on a phone sees all strengths without scrolling the table', function () {
+test('doctor on a phone sees all strengths without scrolling the page', function () {
     $this->artisan('app:drugs:import')->assertSuccessful();
     User::factory()->doctor()->create(['login' => 'doctor']);
 
@@ -38,7 +38,27 @@ test('doctor on a phone sees all strengths without scrolling the table', functio
         ->click('Препараты')
         ->assertPathIs('/doctor/drugs')
         ->assertSee('50 мг, 100 мг')
-        // Таблица прокручивается вбок внутри рамки, поэтому ширины страницы мало.
-        ->assertScript('[...document.querySelectorAll("table")].every((table) => table.parentElement.scrollWidth <= table.parentElement.clientWidth)')
+        ->assertScript(FITS_SCREEN)
         ->assertNoJavaScriptErrors();
+});
+
+test('doctor goes from the drug card to its rules and filters them by level', function () {
+    loadSafetyRules();
+    User::factory()->doctor()->create(['login' => 'doctor']);
+
+    $page = visit(route('login'))
+        ->fill('login', 'doctor')
+        ->fill('password', 'password')
+        ->press('Войти')
+        ->navigate(route('doctor.drugs.show', 'maritupirdine'))
+        ->click('Правила проверки')
+        ->assertPathIs('/doctor/rules')
+        ->assertSee('Действующих правил: 52.')
+        ->assertPresent('[data-test="rule"][data-level="caution"]')
+        ->click('input[name="level"][value="contraindicated"]')
+        ->assertMissing('[data-test="rule"][data-level="caution"]')
+        ->assertPresent('[data-test="rule"][data-level="contraindicated"]')
+        ->assertNoJavaScriptErrors();
+
+    expect($page->script('location.hash'))->toBe('#drug-maritupirdine');
 });

@@ -1,5 +1,7 @@
 <?php
 
+use App\Actions\SyncSafetyFindings;
+use App\Enums\Sex;
 use App\Events\MessageSent;
 use App\Events\MessagesRead;
 use App\Events\UnreadMessagesChanged;
@@ -98,4 +100,25 @@ test('menu counter shows dialogs with unread patient messages', function () {
     $this->actingAs($this->doctor)
         ->get(route('doctor.patients.index'))
         ->assertInertia(fn (Assert $page) => $page->where('unreadMessages', 2));
+});
+
+test('dialog shows the doctor who the patient is, what they take and what needs attention', function () {
+    loadSafetyRules();
+    $this->patient->patientProfile?->update(['sex' => Sex::Female, 'birth_date' => now()->subYears(35)->toDateString()]);
+    diagnose($this->patient, 'F41.1');
+    takes($this->patient, 'escitalopram', own: true);
+    takes($this->patient, 'hydroxyzine', own: true);
+    app(SyncSafetyFindings::class)->handle($this->patient);
+
+    $this->actingAs($this->doctor)
+        ->get(route('doctor.patients.chat.show', $this->patient))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('context.age', 35)
+            ->where('context.sex', 'female')
+            ->where('context.diagnosis', ['code' => 'F41.1', 'name' => 'Диагноз F41.1'])
+            ->has('context.prescriptions', 2)
+            ->where('context.prescriptions.0.drug.name', 'Гидроксизин')
+            ->where('context.adherence.raised', false)
+            ->where('context.contraindications', ['Гидроксизин', 'Эсциталопрам']),
+        );
 });

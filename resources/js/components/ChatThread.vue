@@ -244,7 +244,7 @@ async function scrollToBottom(): Promise<void> {
                 <p
                     v-if="i === 0 || messages[i - 1].date !== message.date"
                     class="my-1 self-center text-muted-foreground"
-                    :class="isPatient ? 'text-base' : 'text-xs'"
+                    :class="isPatient ? 'text-base' : 'text-sm'"
                 >
                     {{ message.date }}
                 </p>
@@ -270,7 +270,7 @@ async function scrollToBottom(): Promise<void> {
                     </p>
                     <p
                         class="text-muted-foreground"
-                        :class="isPatient ? 'text-base' : 'text-xs'"
+                        :class="isPatient ? 'text-base' : 'text-sm'"
                     >
                         {{ message.time }}
                         <template v-if="message.sender_id === me">
@@ -314,7 +314,7 @@ async function scrollToBottom(): Promise<void> {
             <p
                 v-if="tooLong"
                 class="text-destructive"
-                :class="isPatient ? 'text-base' : 'text-xs'"
+                :class="isPatient ? 'text-base' : 'text-sm'"
             >
                 {{ form.body.length }} из {{ MAX_LENGTH }} символов
             </p>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Check, Copy } from '@lucide/vue';
-import { ref, useId, watch } from 'vue';
+import { Check, Copy, Share2 } from '@lucide/vue';
+import { onMounted, ref, useId, watch } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -21,6 +21,21 @@ watch(
         selected.value = false;
     },
 );
+
+// На телефоне ссылку удобнее сразу отправить в мессенджер через системное меню «Поделиться».
+const canShare = ref(false);
+
+onMounted(() => {
+    canShare.value = typeof navigator.share === 'function';
+});
+
+async function shareLink(): Promise<void> {
+    try {
+        await navigator.share({ url: props.url });
+    } catch {
+        // Врач закрыл меню «Поделиться»: ссылка остаётся на экране.
+    }
+}
 
 async function copyLink(): Promise<void> {
     try {
@@ -45,7 +60,8 @@ async function copyLink(): Promise<void> {
         <p class="text-sm font-medium">
             <slot />
         </p>
-        <div class="flex gap-2">
+        <!-- На телефоне поле во всю ширину, кнопки под ним. -->
+        <div class="flex flex-col gap-2 sm:flex-row">
             <Input
                 :id="inputId"
                 :model-value="url"
@@ -53,12 +69,32 @@ async function copyLink(): Promise<void> {
                 :aria-label="label"
                 @focus="($event.target as HTMLInputElement).select()"
             />
-            <Button type="button" variant="outline" @click="copyLink">
-                <Check v-if="copied" class="size-4" />
-                <Copy v-else class="size-4" />
-                {{ copied ? 'Скопировано' : 'Скопировать' }}
-            </Button>
+            <div class="flex gap-2">
+                <Button
+                    v-if="canShare"
+                    type="button"
+                    class="flex-1 sm:flex-none"
+                    @click="shareLink"
+                >
+                    <Share2 class="size-4" />
+                    Отправить
+                </Button>
+                <Button
+                    type="button"
+                    variant="outline"
+                    class="flex-1 sm:flex-none"
+                    @click="copyLink"
+                >
+                    <Check v-if="copied" class="size-4" />
+                    <Copy v-else class="size-4" />
+                    {{ copied ? 'Скопировано' : 'Скопировать' }}
+                </Button>
+            </div>
         </div>
+        <!-- Итог копирования озвучивается: кнопка меняет только подпись. -->
+        <p class="sr-only" aria-live="polite">
+            {{ copied ? 'Ссылка скопирована' : '' }}
+        </p>
         <p v-if="selected" class="text-sm text-muted-foreground">
             Ссылка выделена, скопируйте её вручную (Ctrl+C или ⌘C).
         </p>

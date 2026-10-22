@@ -44,6 +44,8 @@ test('patient and doctor exchange messages without reloading the page', function
         ->assertSeeIn('[data-test="nav-badge"]', '1')
         ->click('Иванов Пётр Алексеевич')
         ->assertPathIs("/doctor/patients/{$patient->id}/chat")
+        // Рядом с перепиской — что пациент принимает, чтобы отвечать без карточки.
+        ->assertSeeIn('[data-test="chat-patient-context"]', 'Назначений нет.')
         ->assertMissing('[data-test="nav-badge"]')
         ->fill('body', 'Добрый день! Во сколько вы принимаете препарат?')
         ->press('Отправить');

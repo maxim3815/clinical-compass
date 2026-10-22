@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
-import { ExternalLink } from '@lucide/vue';
+import { Link } from '@inertiajs/vue3';
+import { ExternalLink, ShieldCheck } from '@lucide/vue';
 import { computed } from 'vue';
-import Heading from '@/components/Heading.vue';
+import { Button } from '@/components/ui/button';
 import { plural } from '@/lib/plural';
 import { index, show } from '@/routes/doctor/drugs';
+import { index as rules } from '@/routes/doctor/rules';
 
 type Drug = {
     code: string;
@@ -47,9 +49,6 @@ defineOptions({
 });
 
 const details = computed(() => [
-    { label: 'МНН', value: props.drug.inn },
-    { label: 'АТХ', value: props.drug.atc },
-    { label: 'Лекарственная форма', value: props.drug.dosage_form },
     {
         label: 'Дозировки',
         value:
@@ -82,39 +81,62 @@ const texts = computed(() => [
 <template>
     <Head :title="drug.name" />
 
-    <div class="flex max-w-3xl flex-col gap-8 p-4">
-        <Heading :title="drug.name" description="Карточка препарата" />
-
-        <p
-            v-if="!drug.is_active"
-            class="rounded-lg border border-dashed p-4 text-sm text-muted-foreground"
-            data-test="drug-inactive"
+    <div class="@container flex w-full max-w-4xl flex-col gap-6 p-4 md:p-6">
+        <header
+            class="flex flex-col gap-3 rounded-2xl border bg-card p-5 shadow-xs"
         >
-            Препарат убран из справочника: назначить его заново нельзя,
-            действующие назначения продолжают работать.
-        </p>
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="flex flex-col gap-1">
+                    <h1 class="text-2xl font-semibold tracking-tight">
+                        {{ drug.name }}
+                    </h1>
+                    <p class="text-muted-foreground">
+                        {{ drug.inn }} · АТХ {{ drug.atc }} ·
+                        {{ drug.dosage_form }}
+                    </p>
+                </div>
+                <Button variant="outline" size="sm" as-child>
+                    <Link :href="`${rules.url()}#drug-${drug.code}`">
+                        <ShieldCheck />
+                        Правила проверки
+                    </Link>
+                </Button>
+            </div>
 
-        <dl
-            class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-[max-content_1fr]"
-            data-test="drug-details"
-        >
-            <template v-for="item in details" :key="item.label">
-                <dt class="text-muted-foreground">{{ item.label }}</dt>
-                <dd class="-mt-2 font-medium sm:mt-0">{{ item.value }}</dd>
-            </template>
-        </dl>
+            <p
+                v-if="!drug.is_active"
+                class="rounded-lg border border-dashed p-3 text-sm text-muted-foreground"
+                data-test="drug-inactive"
+            >
+                Препарат убран из справочника: назначить его заново нельзя,
+                действующие назначения продолжают работать.
+            </p>
+
+            <dl
+                class="grid gap-x-6 gap-y-2 text-sm @xl:grid-cols-[max-content_1fr]"
+                data-test="drug-details"
+            >
+                <template v-for="item in details" :key="item.label">
+                    <dt class="text-muted-foreground">{{ item.label }}</dt>
+                    <dd class="-mt-1 font-medium @xl:mt-0">{{ item.value }}</dd>
+                </template>
+            </dl>
+        </header>
 
         <section
             v-for="item in texts"
             :key="item.title"
-            class="flex flex-col gap-2"
+            class="flex flex-col gap-2 rounded-xl border bg-card p-4 shadow-xs"
         >
-            <Heading variant="small" :title="item.title" />
+            <h2 class="font-semibold">{{ item.title }}</h2>
             <p class="text-sm">{{ item.text }}</p>
         </section>
 
-        <section class="flex flex-col gap-2" data-test="drug-source">
-            <Heading variant="small" title="Источник" />
+        <section
+            class="flex flex-col gap-2 rounded-xl border bg-card p-4 shadow-xs"
+            data-test="drug-source"
+        >
+            <h2 class="font-semibold">Источник</h2>
             <p class="text-sm">
                 {{ drug.source.document }}, препарат «{{
                     drug.source.trade_name
@@ -125,10 +147,11 @@ const texts = computed(() => [
                 :href="drug.source.url"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="inline-flex items-center gap-1 self-start text-sm underline underline-offset-4"
+                class="inline-flex items-center gap-1 self-start text-sm text-primary underline underline-offset-4 pointer-coarse:min-h-11"
             >
                 Открыть документ
                 <ExternalLink class="size-4" />
+                <span class="sr-only">(в новой вкладке)</span>
             </a>
         </section>
     </div>

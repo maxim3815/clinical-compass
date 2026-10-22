@@ -8,6 +8,10 @@ use App\Http\Controllers\Concerns\ServesChat;
 use App\Http\Controllers\Controller;
 use App\Models\CareRelationship;
 use App\Models\User;
+use App\Support\Adherence\AdherenceSignals;
+use App\Support\PrescriptionPresenter;
+use App\Support\Safety\ClinicalProfilePresenter;
+use App\Support\Safety\SafetySignals;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
@@ -39,6 +43,7 @@ class ChatController extends Controller
                 'id' => $careRelationship->id,
                 ...$this->messagesPage($careRelationship),
             ],
+            'context' => $this->context($patient),
         ]);
     }
 
@@ -55,6 +60,31 @@ class ChatController extends Controller
     public function read(Request $request, User $patient, MarkMessagesRead $markMessagesRead): HttpResponse
     {
         return $this->markRead($request, $this->careRelationship($request, $patient), $markMessagesRead);
+    }
+
+    /**
+     * Что врачу видно рядом с перепиской, чтобы отвечать, не открывая карточку: кто пациент,
+     * что принимает сейчас и что требует внимания.
+     *
+     * @return array<string, mixed>
+     */
+    private function context(User $patient): array
+    {
+        $today = $patient->localToday();
+        $profile = $patient->patientProfile;
+
+        return [
+            'age' => $profile?->age(),
+            'sex' => $profile?->sex?->value,
+            'diagnosis' => ClinicalProfilePresenter::mainDiagnoses([$patient->id])[$patient->id] ?? null,
+            'prescriptions' => PrescriptionPresenter::presentList(
+                $patient->prescriptions()->current($today)->with(['drug', 'strength', 'intakes'])->get(),
+                $today,
+            ),
+            'adherence' => AdherenceSignals::forPatient($patient)->toArray(),
+            // Препараты с красной находкой без решения.
+            'contraindications' => SafetySignals::awaitingDrugs([$patient->id])[$patient->id] ?? [],
+        ];
     }
 
     /**
