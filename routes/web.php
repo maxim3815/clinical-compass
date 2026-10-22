@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Doctor\AlertController;
+use App\Http\Controllers\Doctor\AppointmentInvitationController;
 use App\Http\Controllers\Doctor\ChatController;
 use App\Http\Controllers\Doctor\ClinicalProfileController;
 use App\Http\Controllers\Doctor\ConversationController;
@@ -15,6 +16,7 @@ use App\Http\Controllers\Doctor\SafetyFindingController;
 use App\Http\Controllers\Doctor\SafetyRuleController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InvitationRegistrationController;
+use App\Http\Controllers\JoinController;
 use App\Http\Controllers\PasswordResetByLinkController;
 use App\Http\Controllers\Patient\AsNeededDoseController;
 use App\Http\Controllers\Patient\AssessmentController;
@@ -39,6 +41,13 @@ Route::middleware('throttle:access-link')->group(function () {
 
     Route::get('password-reset/{token}', [PasswordResetByLinkController::class, 'show'])->name('password-reset.show');
     Route::post('password-reset/{token}', [PasswordResetByLinkController::class, 'store'])->name('password-reset.store');
+});
+
+// Адрес врача для подключения на приёме. Неверные PIN считает PinAttempts, общий лимит
+// не даёт перебирать коды врачей.
+Route::middleware('throttle:join')->group(function () {
+    Route::get('join/{joinCode}', [JoinController::class, 'show'])->where('joinCode', '[A-Za-z0-9]+')->name('join.show');
+    Route::post('join/{joinCode}', [JoinController::class, 'store'])->where('joinCode', '[A-Za-z0-9]+')->name('join.store');
 });
 
 // Кнопки «Принял» и «Через 15 минут» в напоминании. Service worker отправляет их без сессии
@@ -127,6 +136,11 @@ Route::middleware('auth')->group(function () {
 
         Route::get('invitations', [InvitationController::class, 'index'])->name('invitations.index');
         Route::post('invitations', [InvitationController::class, 'store'])->name('invitations.store');
+        Route::post('invitations/appointment', [AppointmentInvitationController::class, 'store'])->name('invitations.appointment.store');
+        Route::get('invitations/appointment/{invitation}', [AppointmentInvitationController::class, 'show'])
+            ->whereNumber('invitation')
+            ->name('invitations.appointment.show');
+        Route::get('invitations/card', [AppointmentInvitationController::class, 'card'])->name('invitations.card');
         Route::post('invitations/{invitation}/revoke', [InvitationController::class, 'revoke'])
             ->whereNumber('invitation')
             ->name('invitations.revoke');

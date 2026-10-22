@@ -24,12 +24,16 @@ class InvitationController extends Controller
         $invitations = AccessLink::query()
             ->where('doctor_id', $doctor->id)
             ->where('purpose', AccessLinkPurpose::Invitation)
+            // PIN на приёме, который ещё никто не ввёл, — не приглашение: ссылки у него нет.
+            ->withLink()
             ->with('patient:id,name')
             ->latest('id')
             ->get()
             ->map(fn (AccessLink $invitation) => [
                 'id' => $invitation->id,
                 'patient_name' => $invitation->patient->name ?? $invitation->patient_name,
+                // Пациент ввёл PIN на приёме и ещё заполняет форму: ФИО появится после регистрации.
+                'from_appointment' => $invitation->pin_entered_at !== null,
                 'created_at' => DisplayTime::format($invitation->created_at ?? now()),
                 'expires_at' => DisplayTime::format($invitation->expires_at),
                 'status' => $invitation->status()->value,

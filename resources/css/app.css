@@ -211,3 +211,33 @@
         cursor: pointer;
     }
 }
+
+/*
+ * Карточка для стола (doctor/JoinCard): на бумаге только она, без меню и шапки кабинета.
+ * :where() обнуляет вес правила, иначе оно перебило бы видимость самой карточки.
+ * Страница одна: карточка закреплена по центру листа, остальное по высоте не выходит за лист.
+ */
+@media print {
+    :where(body:has(.print-sheet)) {
+        height: 100vh;
+        overflow: hidden;
+    }
+    :where(body:has(.print-sheet)) * {
+        visibility: hidden;
+    }
+    .print-sheet,
+    .print-sheet * {
+        visibility: visible;
+    }
+    .print-sheet {
+        position: fixed;
+        top: 0;
+        right: 0;
+        left: 0;
+        margin: 0 auto;
+        box-shadow: none;
+        /* Без этого браузер не печатает фоны, и белый знак на зелёной плашке пропадает. */
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+}

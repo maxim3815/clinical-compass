@@ -44,6 +44,11 @@ class DemoSeeder extends Seeder
      */
     public const string INVITATION_TOKEN = 'demo-invite-patient-registration-link-01';
 
+    /**
+     * Постоянный адрес `doctor` для подключения на приёме: /join/smirnova.
+     */
+    public const string JOIN_CODE = 'smirnova';
+
     public function run(CreateDoctor $createDoctor, DemoHistory $history): void
     {
         // Справочники и правила загружаются теми же командами, что и вне локального окружения.
@@ -57,6 +62,9 @@ class DemoSeeder extends Seeder
             'doctor' => $this->doctor($createDoctor, 'doctor', 'Смирнова Анна Сергеевна'),
             'doctor2' => $this->doctor($createDoctor, 'doctor2', 'Волков Дмитрий Андреевич'),
         ];
+
+        // Карточку с QR для показа печатают заранее, поэтому адрес не меняется от сброса к сбросу.
+        $doctors['doctor']->doctorProfile?->update(['join_code' => self::JOIN_CODE]);
 
         $this->quietly(function () use ($doctors, $history): void {
             foreach (DemoPatients::all() as $plan) {

@@ -37,6 +37,10 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('access-link', fn (Request $request) => Limit::perMinute(10)->by($request->ip()));
 
+        // Страница ввода PIN: каждая ошибка — запрос и возврат на страницу, поэтому лимит выше,
+        // чем у ссылок. Сами ошибки PIN считает App\Support\PinAttempts.
+        RateLimiter::for('join', fn (Request $request) => Limit::perMinute(30)->by($request->ip()));
+
         // Отправка сообщений в чат. Ответ JSON: форма показывает текст под полем.
         RateLimiter::for('chat', fn (Request $request) => Limit::perMinute(30)
             ->by('chat:'.$request->user()?->id)

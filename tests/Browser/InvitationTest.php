@@ -13,7 +13,7 @@ test('doctor invites a patient who registers by the link and sees the cabinet', 
         ->click('Приглашения')
         ->assertPathIs('/doctor/invitations')
         ->fill('patient_name', 'Новиков Артём Сергеевич')
-        ->press('Пригласить пациента')
+        ->press('Пригласить по ссылке')
         ->assertSee('Отправьте ссылку пациенту')
         ->assertNoJavaScriptErrors();
 

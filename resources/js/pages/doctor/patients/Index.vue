@@ -12,6 +12,7 @@ import {
 } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import AdherenceSignal from '@/components/AdherenceSignal.vue';
+import AppointmentInvitation from '@/components/AppointmentInvitation.vue';
 import AttentionQueue from '@/components/AttentionQueue.vue';
 import ListPagination from '@/components/ListPagination.vue';
 import PushBanner from '@/components/PushBanner.vue';
@@ -24,7 +25,12 @@ import { formatAge, plural } from '@/lib/plural';
 import { index as invitations } from '@/routes/doctor/invitations';
 import { index, show } from '@/routes/doctor/patients';
 import { show as chat } from '@/routes/doctor/patients/chat';
-import type { AttentionPatient, Paginated, PatientRow } from '@/types';
+import type {
+    AttentionPatient,
+    InvitationChanged,
+    Paginated,
+    PatientRow,
+} from '@/types';
 
 // По доле за 7 дней: сначала самые низкие или самые высокие. null — по ФИО.
 type Sort = 'adherence' | '-adherence' | null;
@@ -111,6 +117,14 @@ useRealtime(channel, 'alerts.changed', () =>
 useRealtime(channel, 'unread.changed', () =>
     router.reload({ only: ['patients', 'attention'] }),
 );
+
+// Пациент зарегистрировался по приглашению: он появляется в списке, даже если окно
+// «Пригласить на приёме» уже закрыто.
+useRealtime<InvitationChanged>(channel, 'invitation.changed', (event) => {
+    if (event.stage === 'registered') {
+        router.reload({ only: ['patients', 'attention'] });
+    }
+});
 </script>
 
 <template>
@@ -119,35 +133,35 @@ useRealtime(channel, 'unread.changed', () =>
     <div class="@container flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">
         <header class="flex flex-wrap items-center justify-between gap-3">
             <h1 class="text-2xl font-semibold tracking-tight">Пациенты</h1>
-            <Button
-                v-if="patients.total > 0 || search"
-                variant="outline"
-                as-child
-            >
-                <Link :href="invitations()">
-                    <UserPlus />
-                    Пригласить пациента
-                </Link>
-            </Button>
+            <!-- Одно окно приглашения на всю страницу: при первой регистрации пустое состояние
+                 пропадает, а окно с «зарегистрирован» остаётся открытым. -->
+            <div class="flex flex-wrap gap-2">
+                <AppointmentInvitation
+                    :variant="
+                        patients.total === 0 && !search ? 'default' : 'outline'
+                    "
+                />
+                <Button variant="outline" as-child>
+                    <Link :href="invitations()">
+                        <UserPlus />
+                        Пригласить по ссылке
+                    </Link>
+                </Button>
+            </div>
         </header>
 
         <PushBanner />
 
         <div
             v-if="patients.total === 0 && !search"
-            class="flex flex-col items-start gap-4 rounded-xl border border-dashed bg-card p-6"
+            class="rounded-xl border border-dashed bg-card p-6"
             data-test="patients-empty"
         >
             <p class="text-muted-foreground">
-                Пациентов пока нет. Пригласите пациента: он зарегистрируется по
-                ссылке и появится в этом списке.
+                Пациентов пока нет. Пригласите пациента кнопками выше: он
+                зарегистрируется по коду на приёме или по ссылке и появится в
+                этом списке.
             </p>
-            <Button as-child>
-                <Link :href="invitations()">
-                    <UserPlus />
-                    Пригласить пациента
-                </Link>
-            </Button>
         </div>
 
         <template v-else>

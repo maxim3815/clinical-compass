@@ -20,11 +20,13 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { doctorLine } from '@/lib/doctor';
+import type { InvitingDoctor } from '@/types';
 
 type Props = {
     token: string;
     patientName: string | null;
-    doctor: { name: string; specialty: string | null };
+    doctor: InvitingDoctor;
 };
 
 const props = defineProps<Props>();
@@ -39,18 +41,10 @@ function agree(): void {
 }
 
 defineOptions({
-    layout: (props: Props) => {
-        // Специальность внутри фразы — со строчной: «Смирнова Анна Сергеевна, психиатр».
-        const specialty = props.doctor.specialty
-            ? props.doctor.specialty.charAt(0).toLocaleLowerCase('ru') +
-              props.doctor.specialty.slice(1)
-            : null;
-
-        return {
-            title: 'Регистрация пациента',
-            description: `Вас приглашает врач: ${[props.doctor.name, specialty].filter(Boolean).join(', ')}. Заполните форму, чтобы создать учётную запись.`,
-        };
-    },
+    layout: (props: Props) => ({
+        title: 'Регистрация пациента',
+        description: `Вас приглашает врач: ${doctorLine(props.doctor)}. Заполните форму, чтобы создать учётную запись.`,
+    }),
 });
 </script>
 

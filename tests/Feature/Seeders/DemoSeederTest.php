@@ -187,6 +187,11 @@ test('demo seeder builds the planned doctors, patients and courses and can be ru
             ->component('invitation/Register')
             ->where('patientName', 'Новиков Артём Сергеевич'),
         );
+
+    // Адрес doctor для подключения на приёме постоянный: карточку с QR печатают заранее.
+    $this->get(route('join.show', DemoSeeder::JOIN_CODE))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('doctor.name', 'Смирнова Анна Сергеевна'));
 });
 
 test('only the planned patients have an adherence signal and the counters are the same at any time of day', function (string $time) {

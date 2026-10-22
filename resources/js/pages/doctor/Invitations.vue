@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { Form, Head, router, usePage } from '@inertiajs/vue3';
-import { UserPlus } from '@lucide/vue';
+import { Form, Head, Link, router, usePage } from '@inertiajs/vue3';
+import { Printer, UserPlus } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import InvitationController from '@/actions/App/Http/Controllers/Doctor/InvitationController';
+import AppointmentInvitation from '@/components/AppointmentInvitation.vue';
 import InputError from '@/components/InputError.vue';
 import OneTimeLink from '@/components/OneTimeLink.vue';
 import { Badge } from '@/components/ui/badge';
@@ -20,11 +21,14 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
-import { index } from '@/routes/doctor/invitations';
+import { useRealtime } from '@/composables/useRealtime';
+import { card, index } from '@/routes/doctor/invitations';
 
 type Invitation = {
     id: number;
     patient_name: string | null;
+    // Пациент ввёл PIN на приёме и ещё заполняет форму.
+    from_appointment: boolean;
     created_at: string;
     expires_at: string;
     status: 'active' | 'used' | 'expired' | 'revoked';
@@ -49,6 +53,13 @@ defineOptions({
 
 const page = usePage();
 const invitationUrl = computed(() => page.flash.invitationUrl);
+
+// Пациент ввёл код на приёме или зарегистрировался: приглашение появилось или сменило статус.
+useRealtime(
+    `App.Models.User.${page.props.auth.user.id}`,
+    'invitation.changed',
+    () => router.reload({ only: ['invitations'] }),
+);
 
 // Приглашение, которое врач собрался отозвать; пока null, окно закрыто.
 const revoking = ref<Invitation | null>(null);
@@ -82,17 +93,45 @@ function statusVariant(status: Invitation['status']): BadgeVariants['variant'] {
         <header class="flex flex-col gap-1">
             <h1 class="text-2xl font-semibold tracking-tight">Приглашения</h1>
             <p class="text-muted-foreground">
-                Пациент регистрируется по ссылке и сразу попадает в список ваших
-                пациентов.
+                Пациент регистрируется по коду на приёме или по ссылке и сразу
+                попадает в список ваших пациентов.
             </p>
         </header>
+
+        <section
+            class="flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-xs"
+            aria-labelledby="appointment-invitation-title"
+        >
+            <div class="flex flex-col gap-1">
+                <h2
+                    id="appointment-invitation-title"
+                    class="text-lg font-semibold"
+                >
+                    На приёме
+                </h2>
+                <p class="text-sm text-muted-foreground">
+                    Пациент наводит камеру телефона на QR-код и вводит 4 цифры,
+                    которые вы назовёте. Код действует 15 минут и срабатывает
+                    один раз.
+                </p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <AppointmentInvitation variant="default" />
+                <Button variant="outline" as-child>
+                    <Link :href="card()">
+                        <Printer />
+                        Карточка для стола
+                    </Link>
+                </Button>
+            </div>
+        </section>
 
         <section
             class="flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-xs"
             aria-labelledby="new-invitation-title"
         >
             <h2 id="new-invitation-title" class="text-lg font-semibold">
-                Новое приглашение
+                По ссылке
             </h2>
             <Form
                 v-bind="InvitationController.store.form()"
@@ -123,7 +162,7 @@ function statusVariant(status: Invitation['status']): BadgeVariants['variant'] {
                 >
                     <Spinner v-if="processing" />
                     <UserPlus v-else />
-                    Пригласить пациента
+                    Пригласить по ссылке
                 </Button>
             </Form>
             <p class="text-sm text-muted-foreground">
@@ -194,7 +233,12 @@ function statusVariant(status: Invitation['status']): BadgeVariants['variant'] {
                                 :id="`invitation-${invitation.id}-name`"
                                 class="px-4 py-3 font-medium @max-2xl:w-full @max-2xl:p-0"
                             >
-                                {{ invitation.patient_name ?? 'Без имени' }}
+                                {{
+                                    invitation.patient_name ??
+                                    (invitation.from_appointment
+                                        ? 'Пациент с приёма'
+                                        : 'Без имени')
+                                }}
                             </td>
                             <td
                                 class="px-4 py-3 whitespace-nowrap @max-2xl:p-0 @max-2xl:text-muted-foreground"

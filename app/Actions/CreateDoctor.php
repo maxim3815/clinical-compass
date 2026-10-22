@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Enums\UserRole;
+use App\Models\DoctorProfile;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
@@ -21,7 +22,10 @@ class CreateDoctor
                 'role' => UserRole::Doctor,
             ]);
 
-            $doctor->doctorProfile()->create(['specialty' => $specialty]);
+            $doctor->doctorProfile()->create([
+                'specialty' => $specialty,
+                'join_code' => DoctorProfile::newJoinCode(),
+            ]);
 
             return $doctor;
         });

@@ -17,6 +17,7 @@ void createInertiaApp({
             case name.startsWith('auth/'):
             case name.startsWith('access-link/'):
             case name.startsWith('invitation/'):
+            case name.startsWith('join/'):
             case name.startsWith('password-reset/'):
             case name === 'Consent':
                 return AuthLayout;

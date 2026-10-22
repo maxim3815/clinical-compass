@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Enums\AccessLinkPurpose;
+use App\Events\InvitationChanged;
 use App\Exceptions\AccessLinkUnavailable;
 use App\Models\AccessLink;
 use App\Models\User;
@@ -53,6 +54,8 @@ class RegisterInvitedPatient
                 'patient_id' => $patient->id,
                 'used_at' => now(),
             ]);
+
+            InvitationChanged::dispatch($invitation);
 
             return $patient;
         });

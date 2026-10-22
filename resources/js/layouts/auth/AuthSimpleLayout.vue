@@ -13,8 +13,9 @@ const name = usePage().props.name;
 </script>
 
 <template>
+    <!-- На телефоне форма прижата к верху: клавиатура снизу не закрывает поля и ошибки под ними. -->
     <div
-        class="flex min-h-svh flex-col items-center justify-center bg-background px-4 py-10 sm:px-6"
+        class="flex min-h-svh flex-col items-center justify-start bg-background px-4 pt-4 pb-10 sm:justify-center sm:px-6 sm:py-10"
     >
         <div class="flex w-full max-w-md flex-col gap-6">
             <Link

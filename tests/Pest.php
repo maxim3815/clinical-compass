@@ -556,3 +556,11 @@ function takes(User $patient, string $drug, bool $own = false): Prescription
         ? ownPrescription($patient, $catalog)
         : timedPrescription($patient, $catalog->strengths()->orderBy('mg')->firstOrFail(), attributes: ['prescriber_id' => clinician($patient)->id]);
 }
+
+/**
+ * PIN, который точно не совпадает с выданным: для проверок приглашения на приёме.
+ */
+function wrongPin(string $pin): string
+{
+    return $pin === '0000' ? '1111' : '0000';
+}

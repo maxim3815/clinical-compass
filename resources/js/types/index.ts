@@ -4,6 +4,7 @@ export * from './assessments';
 export * from './auth';
 export * from './chat';
 export * from './doses';
+export * from './invitations';
 export * from './navigation';
 export * from './patients';
 export * from './prescriptions';

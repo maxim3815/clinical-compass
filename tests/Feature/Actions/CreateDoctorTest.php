@@ -20,3 +20,12 @@ test('specialty is psychiatrist by default', function () {
 
     expect($doctor->doctorProfile?->specialty)->toBe('Психиатр');
 });
+
+test('doctor gets an own join code that is easy to dictate', function () {
+    $first = app(CreateDoctor::class)->handle('Смирнова Анна Сергеевна', 'doctor.one', 'secret-password');
+    $second = app(CreateDoctor::class)->handle('Волков Дмитрий Андреевич', 'doctor.two', 'secret-password');
+
+    expect($first->doctorProfile?->join_code)->toMatch('/^[abcdefghjkmnpqrstuvwxyz23456789]{6}$/')
+        ->and($second->doctorProfile?->join_code)->toMatch('/^[abcdefghjkmnpqrstuvwxyz23456789]{6}$/')
+        ->and($first->doctorProfile?->join_code)->not->toBe($second->doctorProfile?->join_code);
+});

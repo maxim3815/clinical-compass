@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Enums\UserRole;
 use App\Models\CareRelationship;
+use App\Models\DoctorProfile;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
@@ -44,6 +45,7 @@ class UserFactory extends Factory
             match ($user->role) {
                 UserRole::Doctor => $user->doctorProfile()->create([
                     'specialty' => 'Психиатр',
+                    'join_code' => DoctorProfile::newJoinCode(),
                 ]),
                 UserRole::Patient => $user->patientProfile()->create([
                     'birth_date' => fake()->dateTimeBetween('-70 years', '-18 years'),
