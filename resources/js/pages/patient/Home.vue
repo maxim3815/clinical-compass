@@ -18,6 +18,7 @@ import AsNeededCard from '@/components/AsNeededCard.vue';
 import DoseGroupCard from '@/components/DoseGroupCard.vue';
 import TimeSetupCard from '@/components/TimeSetupCard.vue';
 import DoseMarkDialog from '@/components/DoseMarkDialog.vue';
+import HelpCard from '@/components/HelpCard.vue';
 import InstallAppBanner from '@/components/InstallAppBanner.vue';
 import PushBanner from '@/components/PushBanner.vue';
 import QuestionnaireCard from '@/components/QuestionnaireCard.vue';
@@ -59,6 +60,8 @@ const props = defineProps<{
     skipReasons: SelectOption[];
     // Опросники по календарю; null — опросников нет или пациент не прикреплён к врачу.
     assessments: AssessmentStatus | null;
+    // Карточка с 112, пока врач не закрыл алерт по ответам.
+    help: boolean;
 }>();
 
 defineOptions({
@@ -174,7 +177,8 @@ function keepInView(card: Element, container: HTMLElement): () => void {
     <Head title="Сегодня" />
 
     <!--
-        Сверху вниз: итог дня, приёмы на сегодня, что нужно настроить, опросники, если пора их
+        Сверху вниз: итог дня, куда звонить, если тяжело (после ответов, на которые сработал
+        алерт), приёмы на сегодня, что нужно настроить, опросники, если пора их
         заполнить, вчерашние приёмы без отметки и «по необходимости». Баннеры напоминаний
         и установки идут после приёмов, чтобы не сдвигать их с первого экрана.
     -->
@@ -190,6 +194,8 @@ function keepInView(card: Element, container: HTMLElement): () => void {
             </div>
             <TodaySummary v-if="today.groups.length" :groups="today.groups" />
         </header>
+
+        <HelpCard v-if="help" compact />
 
         <template v-if="setupFirst">
             <TimeSetupCard

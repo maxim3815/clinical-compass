@@ -8,6 +8,7 @@ use App\Http\Requests\Patient\AssessmentRequest;
 use App\Models\Assessment;
 use App\Models\Scale;
 use App\Models\User;
+use App\Support\Alerts\AlertEngine;
 use App\Support\Assessments\PatientAssessments;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -76,8 +77,11 @@ class AssessmentController extends Controller
 
     /**
      * Экран после отправки. Ссылка ведёт на одно из отправленных вместе заполнений.
+     *
+     * Если ответы подпадают под правило алертинга, вместо «Ответы переданы» — экран помощи.
+     * Он зависит только от ответов и правил, а не от того, дошла ли до алерта очередь.
      */
-    public function sent(Request $request, Assessment $assessment): Response
+    public function sent(Request $request, Assessment $assessment, AlertEngine $alertEngine): Response
     {
         /** @var User $patient */
         $patient = $request->user();
@@ -85,10 +89,15 @@ class AssessmentController extends Controller
         abort_unless($assessment->patient_id === $patient->id, 404);
 
         $doctor = $patient->currentDoctor()->first();
+        $submission = Assessment::query()
+            ->where('patient_id', $patient->id)
+            ->where('submitted_at', $assessment->submitted_at->format('Y-m-d H:i:s.v'))
+            ->get();
 
         return Inertia::render('patient/QuestionnaireSent', [
             'doctor' => $doctor?->name,
             'submittedAt' => $assessment->submitted_at->setTimezone($patient->localTimezone())->isoFormat('D MMMM в HH:mm'),
+            'help' => $alertEngine->check($submission) !== [],
         ]);
     }
 }

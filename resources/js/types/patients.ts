@@ -1,4 +1,5 @@
 import type { AdherenceSignal } from './adherence';
+import type { AttentionAlert } from './alerts';
 import type { Prescription } from './prescriptions';
 
 /**
@@ -19,6 +20,8 @@ export type PatientRow = {
     diagnosis: MainDiagnosis | null;
     started_at: string;
     adherence: AdherenceSignal;
+    // Открытый алерт: врач ещё не закрыл его решением.
+    alert: boolean;
     // Красные находки проверки безопасности без решения врача.
     contraindications: number;
     unread: number;
@@ -32,6 +35,8 @@ export type AttentionPatient = {
     name: string;
     age: number | null;
     diagnosis: MainDiagnosis | null;
+    // Открытые алерты, сначала новые.
+    alerts: AttentionAlert[];
     // Препараты с красной находкой без решения.
     contraindications: string[];
     adherence: AdherenceSignal | null;

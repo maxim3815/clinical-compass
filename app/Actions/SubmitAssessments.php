@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Jobs\CheckAlertRules;
 use App\Models\Assessment;
 use App\Models\Scale;
 use App\Models\User;
@@ -13,6 +14,9 @@ use InvalidArgumentException;
 /**
  * Пациент отправляет ответы на все действующие опросники одним заходом. Каждый опросник —
  * запись с ответами на все вопросы, суммой и степенью; у отправленных вместе одно время отправки.
+ *
+ * В той же транзакции в очередь ставится проверка правил алертинга: очередь в PostgreSQL,
+ * поэтому ответы не теряются между записью и проверкой.
  */
 class SubmitAssessments
 {
@@ -60,6 +64,8 @@ class SubmitAssessments
 
                 $assessments->push($assessment->setRelation('scale', $scale));
             }
+
+            CheckAlertRules::dispatch($assessments);
 
             return $assessments;
         });

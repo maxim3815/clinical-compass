@@ -14,7 +14,7 @@ afterEach(fn () => $this->reverb->stop());
 
 /**
  * Сквозной сценарий этапа на чистой базе: путь нового пациента от приглашения через опросники
- * до сигнала у врача.
+ * и алерт по ответам до сигнала у врача.
  */
 test('a new patient goes from the invitation to an adherence signal at the doctor', function () {
     // Время приложения переводится только вперёд: срок cookie сессии считается по нему.
@@ -22,7 +22,7 @@ test('a new patient goes from the invitation to an adherence signal at the docto
     $this->travelTo($day->setTime(7, 0));
     Notification::fake();
     $this->artisan('app:drugs:import')->assertSuccessful();
-    loadScales();
+    loadAlertRules();
     User::factory()->doctor()->create(['login' => 'doctor', 'name' => 'Смирнова Анна Сергеевна']);
 
     // Врач приглашает пациента, пациент регистрируется по ссылке на телефоне.
@@ -60,20 +60,28 @@ test('a new patient goes from the invitation to an adherence signal at the docto
 
     $patientPage->press('Дальше')->assertSee('Настроение');
 
+    // На 9-й вопрос PHQ-9 — «в течение нескольких дней»: у пациента экран помощи, у врача алерт.
     foreach (range(0, 8) as $item) {
-        $patientPage->click("input[name=\"phq9-{$item}\"][value=\"".($item === 8 ? 0 : 1).'"]');
+        $patientPage->click("input[name=\"phq9-{$item}\"][value=\"1\"]");
     }
 
     $patientPage->press('Отправить врачу')
         ->assertSee('Ответы переданы врачу')
+        ->assertSeeIn('[data-test="help-card"]', 'Позвонить 112')
         ->click('[data-test="questionnaire-done"]')
         ->assertPathIs('/patient')
+        ->assertPresent('[data-test="help-card"]')
         ->assertMissing('[data-test="questionnaire-card"]')
         ->assertPresent('[data-test="wellbeing-link"]')
         ->assertNoJavaScriptErrors();
 
-    // Врач назначает «Авиандр» утром и вечером, пациент выбирает время приёма.
+    // Врач видит красную плашку, принимает алерт, назначает «Авиандр» утром и вечером,
+    // пациент выбирает время приёма.
     $doctorPage->navigate(route('doctor.patients.index'))
+        ->assertSeeIn('[data-test="urgent-alert"]', 'Срочно: Новиков Артём Сергеевич')
+        ->click('[data-test="urgent-alert-accept"]')
+        ->assertSee('Алерт принят.')
+        ->assertMissing('[data-test="alert-banner"]')
         ->click('Новиков Артём Сергеевич')
         ->click('[data-test="prescribe-button"]')
         ->click('[data-drug="maritupirdine"]')
@@ -114,12 +122,21 @@ test('a new patient goes from the invitation to an adherence signal at the docto
         ->assertSee('Принят в 8:00')
         ->assertNoJavaScriptErrors();
 
-    // Врач видит отметку и ответы на опросники в карточке и отвечает пациенту в чате.
+    // Врач видит отметку и ответы на опросники в карточке, закрывает алерт решением
+    // и отвечает пациенту в чате.
     $doctorPage->navigate(route('doctor.patients.show', $patient))
         ->assertSeeIn('[data-test="adherence-course"]', 'принято 1 из 1')
         ->assertSeeIn('[data-test="wellbeing-gad7"]', 'лёгкая тревога')
         ->assertSeeIn('[data-test="wellbeing-phq9"]', 'лёгкая депрессия')
+        ->click('[data-test="alert-close"]')
+        ->click('input[name="decision"][value="contacted"]')
+        ->click('[data-test="confirm-close-alert"]')
+        ->assertSee('Алерт закрыт: связался с пациентом.')
+        ->assertSeeIn('[data-test="closed-alerts"]', 'Связался с пациентом')
         ->assertNoJavaScriptErrors();
+
+    $patientPage->navigate(route('patient.home'))
+        ->assertMissing('[data-test="help-card"]');
 
     $patientPage->navigate(route('patient.chat.show'))
         ->fill('body', 'Утром принял, пока всё хорошо.')

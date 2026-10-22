@@ -198,6 +198,13 @@
     html:has([data-test='facts-save-bar']) {
         scroll-padding-bottom: 8rem;
     }
+    /*
+     * Красная плашка алертов закреплена под шапкой врача: раздел по ссылке и поле в фокусе
+     * не уходят под неё. Высоту плашки пишет AlertBanner, шапку учитывает scroll-mt-20 разделов.
+     */
+    html {
+        scroll-padding-top: var(--alert-banner-height, 0px);
+    }
     /* Tailwind 4 убрал указатель у кнопок, а для кликабельного он привычнее. */
     button:not(:disabled),
     [role='button']:not(:disabled) {

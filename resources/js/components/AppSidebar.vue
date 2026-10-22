@@ -56,7 +56,8 @@ const mainNavItems = computed<NavItem[]>(() => [
         isActive: isCurrentOrParentUrl(patients()) && !isDoctorChat.value,
         badge: page.props.patientSignals,
         badgeLabel: 'требуют внимания',
-        badgeTone: 'attention',
+        // Пока есть непринятый алерт, число красное, как плашка алерта.
+        badgeTone: page.props.urgentAlerts.length > 0 ? 'danger' : 'attention',
     },
     {
         title: 'Сообщения',

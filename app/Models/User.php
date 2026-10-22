@@ -151,6 +151,16 @@ class User extends Authenticatable
     }
 
     /**
+     * Алерты по ответам пациента.
+     *
+     * @return HasMany<Alert, $this>
+     */
+    public function alerts(): HasMany
+    {
+        return $this->hasMany(Alert::class, 'patient_id');
+    }
+
+    /**
      * Часовой пояс пациента, у врача — пояс интерфейса.
      */
     public function localTimezone(): string

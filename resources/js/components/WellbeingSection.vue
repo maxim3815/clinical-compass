@@ -5,7 +5,7 @@ import {
     CalendarClock,
     ExternalLink,
     Minus,
-    OctagonAlert,
+    Siren,
 } from '@lucide/vue';
 import { computed, nextTick, ref, useTemplateRef } from 'vue';
 import ScoreChart from '@/components/ScoreChart.vue';
@@ -254,7 +254,8 @@ function highlighted(filling: AssessmentFilling) {
                                 "
                                 data-test="wellbeing-highlight"
                             >
-                                <OctagonAlert
+                                <!-- Иконка алерта: такой ответ на 9-й вопрос PHQ-9 его и вызывает. -->
+                                <Siren
                                     v-if="answer.score > 0"
                                     :class="CHIP_ICON"
                                 />

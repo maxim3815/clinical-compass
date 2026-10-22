@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AlertBanner from '@/components/AlertBanner.vue';
 import AppContent from '@/components/AppContent.vue';
 import AppShell from '@/components/AppShell.vue';
 import AppSidebar from '@/components/AppSidebar.vue';
@@ -31,7 +32,11 @@ withDefaults(defineProps<Props>(), {
             class="min-w-0 overflow-x-clip outline-none"
             tabindex="-1"
         >
-            <AppSidebarHeader :breadcrumbs="breadcrumbs" />
+            <!-- Красная плашка алертов закреплена вместе с шапкой: новый алерт виден и внизу страницы. -->
+            <div class="sticky top-0 z-20">
+                <AppSidebarHeader :breadcrumbs="breadcrumbs" />
+                <AlertBanner />
+            </div>
             <slot />
         </AppContent>
         <Toaster container-aria-label="Уведомления" />

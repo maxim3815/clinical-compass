@@ -16,5 +16,5 @@ export type NavItem = {
     // Что считает число, для скринридера: «непрочитанных».
     badgeLabel?: string;
     // «attention» — число того, что ждёт решения врача, оно выделено сильнее.
-    badgeTone?: 'default' | 'attention';
+    badgeTone?: 'default' | 'attention' | 'danger';
 };

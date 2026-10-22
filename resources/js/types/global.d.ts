@@ -1,4 +1,5 @@
 import type { Directive } from 'vue';
+import type { UrgentAlert } from '@/types/alerts';
 import type { Auth } from '@/types/auth';
 import type { FlashToast } from '@/types/ui';
 
@@ -23,8 +24,10 @@ declare module '@inertiajs/core' {
             sidebarOpen: boolean;
             // У пациента — непрочитанные сообщения, у врача — диалоги с ними.
             unreadMessages: number;
-            // У врача — пациенты с новыми пропусками приёма или противопоказанием без решения, у пациента 0.
+            // У врача — пациенты с открытым алертом, новыми пропусками приёма или противопоказанием без решения, у пациента 0.
             patientSignals: number;
+            // У врача — непринятые алерты для красной плашки, у пациента пусто.
+            urgentAlerts: UrgentAlert[];
             // Открытый ключ VAPID для подписки на пуши. У гостя null.
             vapidPublicKey: string | null;
             // Пациентка: кнопки отметки приёма в женском роде.

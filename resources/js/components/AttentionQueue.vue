@@ -4,18 +4,28 @@ import {
     CircleCheck,
     MessageCircle,
     OctagonAlert,
+    Siren,
     TriangleAlert,
 } from '@lucide/vue';
 import AdherenceSignal from '@/components/AdherenceSignal.vue';
+import { alertTitle } from '@/lib/alerts';
 import { CHIP_ICON, DANGER_CHIP, MESSAGE_CHIP } from '@/lib/chips';
 import { formatAge, plural } from '@/lib/plural';
 import { show } from '@/routes/doctor/patients';
 import { show as chat } from '@/routes/doctor/patients/chat';
-import type { AttentionPatient } from '@/types';
+import type { AttentionAlert, AttentionPatient } from '@/types';
 
 defineProps<{
     patients: AttentionPatient[];
 }>();
+
+// Алертов у пациента обычно один: виден новый, остальные — числом.
+function alertLabel(alerts: AttentionAlert[]): string {
+    const [latest] = alerts;
+    const more = alerts.length > 1 ? ` · ещё ${alerts.length - 1}` : '';
+
+    return `${alertTitle(latest.rule, latest.trigger)} · ${latest.acknowledged ? 'ждёт решения' : 'не принят'}${more}`;
+}
 
 function messages(count: number): string {
     return `${count} ${plural(count, ['новое сообщение', 'новых сообщения', 'новых сообщений'])}`;
@@ -41,8 +51,8 @@ function messages(count: number): string {
             v-if="patients.length > 0"
             class="-mt-2 text-sm text-muted-foreground"
         >
-            Число у «Пациентов» в меню — противопоказания без решения и новые
-            пропуски.
+            Число у «Пациентов» в меню — алерты, противопоказания без решения и
+            новые пропуски.
         </p>
 
         <p
@@ -51,8 +61,8 @@ function messages(count: number): string {
             data-test="attention-empty"
         >
             <CircleCheck class="size-5 shrink-0 text-success" />
-            Сигналов о приёме, противопоказаний без решения и новых сообщений
-            нет.
+            Алертов, сигналов о приёме, противопоказаний без решения и новых
+            сообщений нет.
         </p>
 
         <ul v-else class="divide-y rounded-xl border bg-card shadow-xs">
@@ -86,6 +96,14 @@ function messages(count: number): string {
                     class="flex flex-wrap items-center gap-2 text-sm @2xl:max-w-[60%] @2xl:justify-end"
                     aria-label="Причины"
                 >
+                    <li
+                        v-if="patient.alerts.length > 0"
+                        :class="DANGER_CHIP"
+                        data-test="attention-alert"
+                    >
+                        <Siren :class="CHIP_ICON" />
+                        <span>{{ alertLabel(patient.alerts) }}</span>
+                    </li>
                     <li
                         v-if="patient.contraindications.length > 0"
                         :class="DANGER_CHIP"

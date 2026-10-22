@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Form, Head, Link, usePage } from '@inertiajs/vue3';
+import { Form, Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
     ArrowDown,
     KeyRound,
@@ -7,6 +7,7 @@ import {
     OctagonAlert,
     Pencil,
     Plus,
+    Siren,
     TriangleAlert,
 } from '@lucide/vue';
 import { computed, ref } from 'vue';
@@ -15,8 +16,10 @@ import PasswordResetLinkController from '@/actions/App/Http/Controllers/Doctor/P
 import PrescriptionController from '@/actions/App/Http/Controllers/Doctor/PrescriptionController';
 import AdherenceCourse from '@/components/AdherenceCourse.vue';
 import AdherenceSignal from '@/components/AdherenceSignal.vue';
+import AlertSection from '@/components/AlertSection.vue';
 import CancelPrescriptionDialog from '@/components/CancelPrescriptionDialog.vue';
 import ClinicalProfileSummary from '@/components/ClinicalProfileSummary.vue';
+import CloseAlertDialog from '@/components/CloseAlertDialog.vue';
 import ContinueFindingDialog from '@/components/ContinueFindingDialog.vue';
 import OneTimeLink from '@/components/OneTimeLink.vue';
 import PrescriptionDetails from '@/components/PrescriptionDetails.vue';
@@ -25,6 +28,8 @@ import PrescriptionSafety from '@/components/PrescriptionSafety.vue';
 import WellbeingSection from '@/components/WellbeingSection.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { useRealtime } from '@/composables/useRealtime';
+import { alertTitle } from '@/lib/alerts';
 import { CHIP_ICON, DANGER_CHIP } from '@/lib/chips';
 import { formatAge, plural } from '@/lib/plural';
 import { index, show } from '@/routes/doctor/patients';
@@ -32,7 +37,9 @@ import { show as chat } from '@/routes/doctor/patients/chat';
 import type {
     Adherence,
     AdherenceSignal as Signal,
+    AlertDecisionOption,
     ClinicalProfile,
+    PatientAlert,
     Prescription,
     SafetyCard,
     SafetyFinding,
@@ -59,6 +66,10 @@ const props = defineProps<{
     adherenceSignal: Signal;
     cancelReasons: SelectOption[];
     clinicalProfile: ClinicalProfile;
+    // Алерты по ответам пациента, сначала новые.
+    alerts: PatientAlert[];
+    alertDecisions: AlertDecisionOption[];
+    alertCommentLimit: number;
     // Опросники пациента: суммы, степени, изменение и ответы.
     wellbeing: Wellbeing;
     // Находки и «Не проверено» по id назначения.
@@ -85,6 +96,35 @@ defineOptions({
 
 const page = usePage();
 const cancelling = ref<Prescription | null>(null);
+const closingAlert = ref<PatientAlert | null>(null);
+
+// Новый, принятый или закрытый алерт — в том числе в другой вкладке: блок алертов обновляется.
+useRealtime(
+    `App.Models.User.${page.props.auth.user.id}`,
+    'alerts.changed',
+    () => router.reload({ only: ['alerts'] }),
+);
+
+const openAlerts = computed(() =>
+    props.alerts.filter((alert) => !alert.closed),
+);
+
+// Плашка в шапке — о новом открытом алерте, остальные числом.
+const alertChip = computed(() => {
+    const [latest] = openAlerts.value;
+
+    if (latest === undefined) {
+        return null;
+    }
+
+    const state = latest.acknowledged ? 'ждёт решения' : 'не принят';
+    const more =
+        openAlerts.value.length > 1
+            ? ` · ещё ${openAlerts.value.length - 1}`
+            : '';
+
+    return `${alertTitle(latest.rule, latest.trigger)} · ${state}${more}`;
+});
 const continuing = ref<{ finding: SafetyFinding; drug: string } | null>(null);
 
 function continueDespite(
@@ -299,6 +339,7 @@ const unreadLabel = computed(
             -->
             <ul
                 v-if="
+                    alertChip !== null ||
                     awaiting.length > 0 ||
                     adherenceSignal.raised ||
                     adherenceSignal.share !== null ||
@@ -307,6 +348,18 @@ const unreadLabel = computed(
                 class="flex flex-wrap gap-2 text-sm"
                 aria-label="Сводка"
             >
+                <li v-if="alertChip">
+                    <a
+                        href="#alerts"
+                        class="hover:underline pointer-coarse:min-h-11 pointer-coarse:items-center"
+                        :class="DANGER_CHIP"
+                        data-test="card-alert"
+                    >
+                        <Siren :class="CHIP_ICON" />
+                        {{ alertChip }}
+                        <ArrowDown class="mt-0.5 size-4 shrink-0" />
+                    </a>
+                </li>
                 <li v-if="awaiting.length > 0">
                     <a
                         :href="`#prescription-${awaiting[0].id}-title`"
@@ -383,6 +436,16 @@ const unreadLabel = computed(
             class="grid grid-cols-[minmax(0,1fr)] items-start gap-6 @4xl:grid-cols-[minmax(0,1fr)_20rem]"
         >
             <div class="flex flex-col gap-6 @max-4xl:contents">
+                <!-- Открытый алерт — первым, только закрытые — рядом с историей назначений. -->
+                <AlertSection
+                    v-if="alerts.length > 0"
+                    :patient-id="patient.id"
+                    :alerts="alerts"
+                    :chat-href="chat(patient.id)"
+                    :class="openAlerts.length > 0 ? 'order-0' : 'order-5'"
+                    @close="(alert) => (closingAlert = alert)"
+                />
+
                 <section
                     class="order-1 flex scroll-mt-20 flex-col gap-3"
                     aria-labelledby="prescriptions-title"
@@ -717,6 +780,13 @@ const unreadLabel = computed(
             v-model:prescription="cancelling"
             :patient-id="patient.id"
             :reasons="cancelReasons"
+        />
+
+        <CloseAlertDialog
+            v-model:alert="closingAlert"
+            :patient-id="patient.id"
+            :decisions="alertDecisions"
+            :max-length="alertCommentLimit"
         />
 
         <ContinueFindingDialog

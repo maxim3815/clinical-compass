@@ -36,7 +36,7 @@ const hasNews = computed(
 
 <template>
     <header
-        class="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4 md:px-6"
+        class="flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4 md:px-6"
     >
         <div class="relative -ml-2">
             <SidebarTrigger
@@ -47,7 +47,11 @@ const hasNews = computed(
                 v-if="hasNews"
                 class="pointer-events-none absolute top-2 right-2 size-2.5 rounded-full ring-2 ring-background"
                 :class="
-                    page.props.patientSignals > 0 ? 'bg-warning' : 'bg-primary'
+                    page.props.urgentAlerts.length > 0
+                        ? 'bg-danger'
+                        : page.props.patientSignals > 0
+                          ? 'bg-warning'
+                          : 'bg-primary'
                 "
                 aria-hidden="true"
                 data-test="menu-news"

@@ -5,10 +5,12 @@ namespace Database\Seeders;
 use App\Actions\CreateDoctor;
 use App\Actions\InvitePatient;
 use App\Enums\AccessLinkPurpose;
+use App\Events\AlertsChanged;
 use App\Events\MessageSent;
 use App\Events\MessagesRead;
 use App\Events\PatientSignalsChanged;
 use App\Events\UnreadMessagesChanged;
+use App\Jobs\CheckAlertRules;
 use App\Models\AccessLink;
 use App\Models\User;
 use Closure;
@@ -18,6 +20,7 @@ use DateInterval;
 use Illuminate\Console\Command;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use RuntimeException;
@@ -44,7 +47,7 @@ class DemoSeeder extends Seeder
     public function run(CreateDoctor $createDoctor, DemoHistory $history): void
     {
         // Справочники и правила загружаются теми же командами, что и вне локального окружения.
-        foreach (['app:drugs:import' => 'Справочник препаратов', 'app:icd10:import' => 'Справочник МКБ-10', 'app:rules:import' => 'Правила проверки', 'app:scales:import' => 'Опросники'] as $command => $title) {
+        foreach (['app:drugs:import' => 'Справочник препаратов', 'app:icd10:import' => 'Справочник МКБ-10', 'app:rules:import' => 'Правила проверки', 'app:scales:import' => 'Опросники', 'app:alerts:import' => 'Правила алертинга'] as $command => $title) {
             if ($this->command->call($command) !== Command::SUCCESS) {
                 throw new RuntimeException("Не загружено: {$title}, ошибки выше.");
             }
@@ -71,21 +74,27 @@ class DemoSeeder extends Seeder
 
     /**
      * История пишется задним числом: событиям для открытых страниц и пушам о ней взяться неоткуда.
+     * Правила алертинга по истории опросников не проверяются: демо-алертов нет, алерт появляется
+     * на показе, когда пациент отвечает сам.
      */
     private function quietly(Closure $callback): void
     {
         $notifications = Notification::getFacadeRoot();
+        $bus = Bus::getFacadeRoot();
         Notification::fake();
+        Bus::fake([CheckAlertRules::class]);
 
         try {
             Event::fakeFor($callback, [
                 PatientSignalsChanged::class,
+                AlertsChanged::class,
                 MessageSent::class,
                 MessagesRead::class,
                 UnreadMessagesChanged::class,
             ]);
         } finally {
             Notification::swap($notifications);
+            Bus::swap($bus);
         }
     }
 

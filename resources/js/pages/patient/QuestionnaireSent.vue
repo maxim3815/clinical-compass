@@ -2,6 +2,7 @@
 import { Head, Link } from '@inertiajs/vue3';
 import { CircleCheck } from '@lucide/vue';
 import { computed, onMounted, useTemplateRef } from 'vue';
+import HelpCard from '@/components/HelpCard.vue';
 import { Button } from '@/components/ui/button';
 import { home, wellbeing } from '@/routes/patient';
 
@@ -9,6 +10,8 @@ const props = defineProps<{
     // Лечащий врач, которому ушли ответы.
     doctor: string | null;
     submittedAt: string;
+    // Ответы подпадают под правило алертинга: экран помощи с 112 и чатом.
+    help: boolean;
 }>();
 
 defineOptions({
@@ -31,7 +34,8 @@ const heading = useTemplateRef<HTMLElement>('heading');
 
 onMounted(() => heading.value?.focus());
 
-// Одной строкой: текст и <template v-if> подряд на сервере сливаются в один узел.
+// Одной строкой: текст и <template v-if> подряд на сервере сливаются в один узел. Что врач может
+// ответить не сразу, на экране помощи говорит карточка с 112: звонка врача экран не обещает [медик].
 const details = computed(() =>
     props.doctor === null
         ? `Отправлено ${props.submittedAt}.`
@@ -57,13 +61,21 @@ const details = computed(() =>
             <p class="text-muted-foreground">{{ details }}</p>
         </section>
 
+        <!-- Экран помощи: главное действие — звонок 112, «Готово» уходит вниз. -->
+        <HelpCard v-if="help" />
+
         <div class="flex flex-col gap-3">
-            <Button size="xl" as-child>
+            <Button
+                :size="help ? 'lg' : 'xl'"
+                :variant="help ? 'outline' : 'default'"
+                as-child
+            >
                 <Link :href="home()" data-test="questionnaire-done"
                     >Готово</Link
                 >
             </Button>
-            <Button variant="outline" size="lg" as-child>
+            <!-- На экране помощи лишний выбор не нужен: только 112, чат и «Готово». -->
+            <Button v-if="!help" variant="outline" size="lg" as-child>
                 <Link :href="wellbeing()">Посмотреть самочувствие</Link>
             </Button>
         </div>

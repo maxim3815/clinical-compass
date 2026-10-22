@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Doctor;
 
+use App\Enums\AlertDecision;
 use App\Enums\PrescriptionCancelReason;
 use App\Enums\PrescriptionSource;
 use App\Events\PatientSignalsChanged;
@@ -12,6 +13,8 @@ use App\Models\User;
 use App\Support\Adherence\AdherenceSignal;
 use App\Support\Adherence\AdherenceSignals;
 use App\Support\Adherence\PatientAdherence;
+use App\Support\Alerts\AlertPresenter;
+use App\Support\Alerts\AlertSignals;
 use App\Support\Assessments\PatientAssessments;
 use App\Support\AttentionQueue;
 use App\Support\DisplayTime;
@@ -61,6 +64,7 @@ class PatientController extends Controller
         $ids = $patients->getCollection()->map(fn (CareRelationship $care): int => $care->patient_id);
         $misses = AdherenceSignals::consecutiveMisses($patients->getCollection()->map(fn (CareRelationship $care): User => $care->patient));
         $awaiting = SafetySignals::awaitingCounts($ids);
+        $alerting = array_flip(AlertSignals::patientIds($doctor));
         $unread = UnreadMessages::byPatient($doctor, $ids->all());
         $diagnoses = ClinicalProfilePresenter::mainDiagnoses($ids->all());
 
@@ -72,6 +76,8 @@ class PatientController extends Controller
                 'diagnosis' => $diagnoses[$care->patient_id] ?? null,
                 'started_at' => DisplayTime::formatDate($care->started_at),
                 'adherence' => (new AdherenceSignal($care->adherence_share, $misses[$care->patient_id] ?? 0))->toArray(),
+                // Открытый алерт: врач ещё не закрыл его решением.
+                'alert' => isset($alerting[$care->patient_id]),
                 // Красные находки проверки безопасности без решения врача.
                 'contraindications' => $awaiting[$care->patient_id] ?? 0,
                 'unread' => $unread[$care->patient_id] ?? 0,
@@ -142,6 +148,10 @@ class PatientController extends Controller
             'unread' => UnreadMessages::byPatient($doctor, [$patient->id])[$patient->id] ?? 0,
             'cancelReasons' => PrescriptionCancelReason::options(),
             'clinicalProfile' => ClinicalProfilePresenter::present($patient),
+            // Алерты по ответам пациента: открытые и история, решения врача для закрытия.
+            'alerts' => AlertPresenter::forPatient($patient),
+            'alertDecisions' => AlertDecision::options(),
+            'alertCommentLimit' => AlertController::MAX_COMMENT_LENGTH,
             // Опросники, которые заполняет пациент: суммы, степени, изменение и ответы.
             'wellbeing' => PatientAssessments::forDoctor($patient),
             // Находки и «Не проверено» по id назначения, у назначений врача и своих препаратов пациента.

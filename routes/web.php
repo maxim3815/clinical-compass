@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Doctor\AlertController;
 use App\Http\Controllers\Doctor\ChatController;
 use App\Http\Controllers\Doctor\ClinicalProfileController;
 use App\Http\Controllers\Doctor\ConversationController;
@@ -80,6 +81,16 @@ Route::middleware('auth')->group(function () {
         Route::scopeBindings()->whereNumber(['patient', 'safetyFinding'])->group(function () {
             Route::post('patients/{patient}/safety-findings/{safetyFinding}/continue', [SafetyFindingController::class, 'continue'])
                 ->name('patients.safety-findings.continue');
+        });
+
+        // Алерт: отметка «показан» из браузера (JSON), «Принял» и закрытие решением.
+        Route::scopeBindings()->whereNumber(['patient', 'alert'])->group(function () {
+            Route::post('patients/{patient}/alerts/{alert}/shown', [AlertController::class, 'shown'])
+                ->name('patients.alerts.shown');
+            Route::post('patients/{patient}/alerts/{alert}/acknowledge', [AlertController::class, 'acknowledge'])
+                ->name('patients.alerts.acknowledge');
+            Route::post('patients/{patient}/alerts/{alert}/close', [AlertController::class, 'close'])
+                ->name('patients.alerts.close');
         });
 
         // Клинический профиль: пол, диагнозы и факты. Диагноз ищется только среди диагнозов пациента.

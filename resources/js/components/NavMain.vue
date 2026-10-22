@@ -46,9 +46,11 @@ const tooltip = (item: NavItem): string =>
                             v-if="item.badge"
                             class="absolute top-1.5 right-1.5 hidden size-2.5 rounded-full ring-2 ring-sidebar group-data-[collapsible=icon]:block"
                             :class="
-                                item.badgeTone === 'attention'
-                                    ? 'bg-warning-subtle'
-                                    : 'bg-sidebar-primary'
+                                item.badgeTone === 'danger'
+                                    ? 'bg-danger'
+                                    : item.badgeTone === 'attention'
+                                      ? 'bg-warning-subtle'
+                                      : 'bg-sidebar-primary'
                             "
                             aria-hidden="true"
                             data-test="nav-dot"
@@ -64,9 +66,11 @@ const tooltip = (item: NavItem): string =>
                     v-if="item.badge"
                     class="right-2 h-5 min-w-5 rounded-full px-1.5 font-semibold peer-data-[size=default]/menu-button:top-2.5"
                     :class="
-                        item.badgeTone === 'attention'
-                            ? 'bg-warning-subtle text-warning peer-hover/menu-button:text-warning peer-data-[active=true]/menu-button:text-warning'
-                            : 'bg-sidebar-primary text-sidebar-primary-foreground peer-hover/menu-button:text-sidebar-primary-foreground peer-data-[active=true]/menu-button:text-sidebar-primary-foreground'
+                        item.badgeTone === 'danger'
+                            ? 'bg-danger-subtle text-danger peer-hover/menu-button:text-danger peer-data-[active=true]/menu-button:text-danger'
+                            : item.badgeTone === 'attention'
+                              ? 'bg-warning-subtle text-warning peer-hover/menu-button:text-warning peer-data-[active=true]/menu-button:text-warning'
+                              : 'bg-sidebar-primary text-sidebar-primary-foreground peer-hover/menu-button:text-sidebar-primary-foreground peer-data-[active=true]/menu-button:text-sidebar-primary-foreground'
                     "
                     aria-hidden="true"
                     data-test="nav-badge"

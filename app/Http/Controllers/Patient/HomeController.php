@@ -66,6 +66,8 @@ class HomeController extends Controller
             'skipReasons' => DoseSkipReason::options($female),
             // Опросники по календарю: карточка «Пора ответить», когда срок наступил.
             'assessments' => PatientAssessments::status($patient),
+            // Карточка с 112, пока врач не закрыл алерт по ответам. Сам алерт пациент не видит.
+            'help' => $patient->alerts()->open()->exists(),
         ]);
     }
 

@@ -1,22 +1,6 @@
 <?php
 
-use App\Models\Scale;
-use Symfony\Component\Yaml\Yaml;
-
-// Сумма и степени шкал из файлов приложения, без загрузки в БД.
-
-function scaleFromFile(string $code): Scale
-{
-    $data = Yaml::parseFile(__DIR__."/../../../database/data/scales/{$code}.yaml");
-
-    return new Scale([
-        'code' => $data['code'],
-        'name' => $data['name'],
-        'options' => $data['options'],
-        'items' => $data['items'],
-        'bands' => $data['bands'],
-    ]);
-}
+// Сумма и степени шкал из файлов приложения, без загрузки в БД (scaleFromFile — в tests/Pest.php).
 
 test('scale files give the largest sum of each questionnaire', function () {
     expect(scaleFromFile('gad7')->maxTotal())->toBe(21)

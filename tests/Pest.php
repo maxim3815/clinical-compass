@@ -13,6 +13,7 @@ use App\Models\Observation;
 use App\Models\ObservationType;
 use App\Models\Prescription;
 use App\Models\PrescriptionIntake;
+use App\Models\Scale;
 use App\Models\User;
 use App\Support\DisplayTime;
 use Carbon\CarbonImmutable;
@@ -26,6 +27,7 @@ use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use NotificationChannels\WebPush\PushSubscription;
 use Symfony\Component\Process\Process;
+use Symfony\Component\Yaml\Yaml;
 use Tests\TestCase;
 
 /*
@@ -437,6 +439,54 @@ function loadSafetyRules(): void
 function loadScales(): void
 {
     expect(Artisan::call('app:scales:import'))->toBe(0);
+}
+
+/**
+ * Правила алертинга из файлов приложения, как на стенде. Опросники загружаются раньше:
+ * условия ссылаются на них.
+ */
+function loadAlertRules(): void
+{
+    loadScales();
+    expect(Artisan::call('app:alerts:import'))->toBe(0);
+}
+
+/**
+ * Каталог правил алертинга во временной папке: копия файла приложения с правкой $change
+ * и дополнительные файлы $extra (имя файла => содержимое).
+ *
+ * @param  (Closure(array<string, mixed>): array<string, mixed>)|null  $change
+ * @param  array<string, array<string, mixed>>  $extra
+ */
+function alertRulesDirectory(?Closure $change = null, array $extra = []): string
+{
+    $directory = sys_get_temp_dir().'/alerts-'.uniqid();
+    mkdir($directory);
+
+    $rule = Yaml::parseFile(base_path('database/data/alerts/suicide_risk.yaml'));
+    file_put_contents("{$directory}/suicide_risk.yaml", Yaml::dump($change === null ? $rule : $change($rule), 4));
+
+    foreach ($extra as $name => $data) {
+        file_put_contents("{$directory}/{$name}", Yaml::dump($data, 4));
+    }
+
+    return $directory;
+}
+
+/**
+ * Шкала из файла приложения без загрузки в БД: для юнит-тестов сумм, степеней и условий правил.
+ */
+function scaleFromFile(string $code): Scale
+{
+    $data = Yaml::parseFile(__DIR__."/../database/data/scales/{$code}.yaml");
+
+    return new Scale([
+        'code' => $data['code'],
+        'name' => $data['name'],
+        'options' => $data['options'],
+        'items' => $data['items'],
+        'bands' => $data['bands'],
+    ]);
 }
 
 /**

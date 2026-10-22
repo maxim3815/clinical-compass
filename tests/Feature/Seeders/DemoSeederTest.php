@@ -5,6 +5,8 @@ use App\Enums\PrescriptionCancelReason;
 use App\Enums\PrescriptionSource;
 use App\Enums\UserRole;
 use App\Models\AccessLink;
+use App\Models\Alert;
+use App\Models\AlertRule;
 use App\Models\Assessment;
 use App\Models\DoseEvent;
 use App\Models\Drug;
@@ -174,7 +176,10 @@ test('demo seeder builds the planned doctors, patients and courses and can be ru
         ->and($status('patient')['due'] ?? null)->toBeFalse()
         ->and($last('patient_norm2', 'gad7'))->toBe(1)
         ->and($last('patient_2b', 'gad7'))->toBe(14)
-        ->and($status('patient4'))->toMatchArray(['due' => true, 'last' => null]);
+        ->and($status('patient4'))->toMatchArray(['due' => true, 'last' => null])
+        // Правило алертинга загружено, алерт появляется на показе, когда Морозова отвечает сама.
+        ->and(AlertRule::query()->active()->pluck('code')->all())->toBe(['suicide_risk'])
+        ->and(Alert::query()->count())->toBe(0);
 
     $this->get(route('invitation.show', DemoSeeder::INVITATION_TOKEN))
         ->assertOk()

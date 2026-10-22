@@ -23,7 +23,8 @@ return new class extends Migration
             $table->string('band');
             // Дата заполнения по часовому поясу пациента: по ней закрываются сроки календаря.
             $table->date('local_date');
-            $table->timestamp('submitted_at');
+            // С миллисекундами: от этого момента считается время доставки алерта врачу.
+            $table->timestamp('submitted_at', 3);
 
             $table->index(['patient_id', 'scale_id', 'submitted_at']);
         });

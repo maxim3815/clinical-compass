@@ -7,6 +7,7 @@ import {
     MessageCircle,
     OctagonAlert,
     Search,
+    Siren,
     UserPlus,
 } from '@lucide/vue';
 import { computed, ref } from 'vue';
@@ -98,6 +99,11 @@ const channel = `App.Models.User.${page.props.auth.user.id}`;
 // Пациент отметил приём или добавил препарат, scheduler отметил пропуск: доли, сигналы
 // и отметки о противопоказаниях в строках и в очереди меняются.
 useRealtime(channel, 'patient-signals.changed', () =>
+    router.reload({ only: ['patients', 'attention'] }),
+);
+
+// Алерт появился, принят или закрыт: пациент в очереди первым или ушёл из неё.
+useRealtime(channel, 'alerts.changed', () =>
     router.reload({ only: ['patients', 'attention'] }),
 );
 
@@ -333,11 +339,20 @@ useRealtime(channel, 'unread.changed', () =>
                                     >
                                         <span
                                             v-if="
+                                                patient.alert ||
                                                 patient.contraindications > 0 ||
                                                 patient.unread > 0
                                             "
                                             class="inline-flex flex-wrap items-center gap-1.5"
                                         >
+                                            <span
+                                                v-if="patient.alert"
+                                                :class="DANGER_CHIP"
+                                                data-test="alert-mark"
+                                            >
+                                                <Siren :class="CHIP_ICON" />
+                                                Алерт
+                                            </span>
                                             <span
                                                 v-if="
                                                     patient.contraindications >

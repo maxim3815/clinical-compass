@@ -130,7 +130,8 @@ services:
     <<: *app
     init: true
     # Через очередь уходят события чата: пустую очередь проверяем раз в секунду, а не раз в три.
-    command: ["php", "artisan", "queue:work", "--tries=1", "--sleep=1"]
+    # Очередь alerts (проверка правил алертинга) воркер берёт раньше остальных.
+    command: ["php", "artisan", "queue:work", "--queue=alerts,default", "--tries=1", "--sleep=1"]
     depends_on:
       postgres:
         condition: service_healthy

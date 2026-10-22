@@ -33,6 +33,11 @@ class Assessment extends Model
     public const ?string UPDATED_AT = null;
 
     /**
+     * Время отправки хранится с миллисекундами: от него считается время доставки алерта.
+     */
+    protected $dateFormat = 'Y-m-d H:i:s.v';
+
+    /**
      * @return BelongsTo<Scale, $this>
      */
     public function scale(): BelongsTo

@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Enums\UserRole;
+use App\Support\Alerts\AlertPresenter;
 use App\Support\PatientSignals;
 use App\Support\UnreadMessages;
 use Illuminate\Http\Request;
@@ -50,6 +51,8 @@ class HandleInertiaRequests extends Middleware
             'unreadMessages' => fn (): int => $request->user() === null ? 0 : UnreadMessages::count($request->user()),
             // Счётчик у пункта меню «Пациенты» есть только у врача: пропуски приёма и противопоказания без решения.
             'patientSignals' => fn (): int => $request->user()?->role === UserRole::Doctor ? PatientSignals::count($request->user()) : 0,
+            // Непринятые алерты врача: красная плашка на всех страницах кабинета. Дальше — событиями.
+            'urgentAlerts' => fn (): array => $request->user()?->role === UserRole::Doctor ? AlertPresenter::banner($request->user()) : [],
             // Открытый ключ VAPID: с ним браузер подписывается на пуши (страница «Уведомления»).
             'vapidPublicKey' => fn (): ?string => $request->user() === null ? null : config('webpush.vapid.public_key'),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
