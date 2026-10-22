@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Check, Copy, Share2 } from '@lucide/vue';
-import { onMounted, ref, useId, watch } from 'vue';
+import { Check, CircleCheck, Copy, Share2 } from '@lucide/vue';
+import { nextTick, onMounted, ref, useId, useTemplateRef, watch } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -25,8 +25,14 @@ watch(
 // На телефоне ссылку удобнее сразу отправить в мессенджер через системное меню «Поделиться».
 const canShare = ref(false);
 
-onMounted(() => {
+const shareButton = useTemplateRef<{ $el: HTMLElement }>('shareButton');
+const copyButton = useTemplateRef<{ $el: HTMLElement }>('copyButton');
+
+// Ссылка появилась: фокус на действие с ней, чтобы с клавиатуры и скринридером не искать её.
+onMounted(async () => {
     canShare.value = typeof navigator.share === 'function';
+    await nextTick();
+    (shareButton.value ?? copyButton.value)?.$el.focus();
 });
 
 async function shareLink(): Promise<void> {
@@ -54,11 +60,13 @@ async function copyLink(): Promise<void> {
 </script>
 
 <template>
+    <!-- Белая подложка: рамки поля и кнопки на ней не бледнее 3:1. -->
     <div
-        class="flex flex-col gap-3 rounded-xl border border-success-border bg-success-subtle p-4"
+        class="flex flex-col gap-3 rounded-xl border border-success-border bg-card p-4 shadow-xs"
     >
-        <p class="text-sm font-medium">
-            <slot />
+        <p class="flex gap-2 text-sm font-medium" role="status">
+            <CircleCheck class="mt-0.5 size-4 shrink-0 text-success" />
+            <span><slot /></span>
         </p>
         <!-- На телефоне поле во всю ширину, кнопки под ним. -->
         <div class="flex flex-col gap-2 sm:flex-row">
@@ -72,6 +80,7 @@ async function copyLink(): Promise<void> {
             <div class="flex gap-2">
                 <Button
                     v-if="canShare"
+                    ref="shareButton"
                     type="button"
                     class="flex-1 sm:flex-none"
                     @click="shareLink"
@@ -80,6 +89,7 @@ async function copyLink(): Promise<void> {
                     Отправить
                 </Button>
                 <Button
+                    ref="copyButton"
                     type="button"
                     variant="outline"
                     class="flex-1 sm:flex-none"

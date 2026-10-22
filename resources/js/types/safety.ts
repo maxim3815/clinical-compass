@@ -57,6 +57,7 @@ export type SafetyFinding = SafetyRuleView & {
     awaits_decision: boolean;
     // С какими препаратами сочетание: решение относится и к ним.
     related: string[];
+    related_ids: number[];
     opened_at: string;
     decision: {
         kind_label: string;

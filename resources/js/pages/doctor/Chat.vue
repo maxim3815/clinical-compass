@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
-import { OctagonAlert, TriangleAlert } from '@lucide/vue';
+import { OctagonAlert, TriangleAlert, UserRound } from '@lucide/vue';
 import AdherenceSignal from '@/components/AdherenceSignal.vue';
 import ChatPatientContext from '@/components/ChatPatientContext.vue';
 import ChatThread from '@/components/ChatThread.vue';
 import { Button } from '@/components/ui/button';
+import { CHIP_ICON, DANGER_CHIP } from '@/lib/chips';
 import { index } from '@/routes/doctor/conversations';
 import { show as card } from '@/routes/doctor/patients';
 import { messages, read, show, store } from '@/routes/doctor/patients/chat';
@@ -46,7 +47,7 @@ defineOptions({
     >
         <div class="flex min-w-0 flex-1 flex-col gap-3">
             <div class="flex flex-wrap items-center justify-between gap-2">
-                <h1 class="text-xl font-semibold tracking-tight">
+                <h1 class="text-2xl font-semibold tracking-tight">
                     {{ patient.name }}
                 </h1>
                 <Button
@@ -55,7 +56,10 @@ defineOptions({
                     class="@4xl:hidden"
                     as-child
                 >
-                    <Link :href="card(patient.id)">Карточка пациента</Link>
+                    <Link :href="card(patient.id)">
+                        <UserRound />
+                        Карточка пациента
+                    </Link>
                 </Button>
             </div>
 
@@ -75,9 +79,9 @@ defineOptions({
                 >
                 <span
                     v-if="context.contraindications.length > 0"
-                    class="inline-flex items-center gap-1 rounded-md border border-danger-border bg-danger-subtle px-1.5 py-0.5 font-medium text-danger"
+                    :class="DANGER_CHIP"
                 >
-                    <OctagonAlert class="size-3.5 shrink-0" />
+                    <OctagonAlert :class="CHIP_ICON" />
                     Противопоказание без решения
                 </span>
                 <span

@@ -39,8 +39,11 @@ class ConversationController extends Controller
             ->whereHas('messages')
             ->withExists(['messages as has_unread' => $unread])
             ->withCount(['messages as unread_count' => $unread])
+            ->withMax('messages', 'created_at')
             ->withMax('messages', 'id')
             ->orderByDesc('has_unread')
+            // По времени последнего сообщения: id идут в порядке записи, а не переписки.
+            ->orderByDesc('messages_max_created_at')
             ->orderByDesc('messages_max_id')
             ->with(['patient', 'latestMessage'])
             ->paginate(self::PER_PAGE)

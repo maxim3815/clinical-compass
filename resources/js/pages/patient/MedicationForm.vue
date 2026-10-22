@@ -4,11 +4,13 @@ import { ChevronDown, Info, Plus, Trash2 } from '@lucide/vue';
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue';
 import OwnMedicationController from '@/actions/App/Http/Controllers/Patient/OwnMedicationController';
 import InputError from '@/components/InputError.vue';
+import LeaveConfirmDialog from '@/components/LeaveConfirmDialog.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Spinner } from '@/components/ui/spinner';
+import { useLeaveGuard } from '@/composables/useLeaveGuard';
 import { medications } from '@/routes/patient';
 
 type Kind = 'regular' | 'as_needed';
@@ -224,6 +226,9 @@ function submit(): void {
         },
     );
 }
+
+// Уход с заполненной формы переспрашивает: панели вкладок здесь нет, но ссылка назад в шапке есть.
+const leaveGuard = useLeaveGuard(() => form.isDirty && !form.processing);
 </script>
 
 <template>
@@ -585,5 +590,11 @@ function submit(): void {
                 </Button>
             </div>
         </form>
+
+        <LeaveConfirmDialog
+            :pending="leaveGuard.pending.value"
+            @leave="leaveGuard.leave"
+            @stay="leaveGuard.stay"
+        />
     </div>
 </template>

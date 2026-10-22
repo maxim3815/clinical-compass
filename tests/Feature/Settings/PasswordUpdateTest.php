@@ -51,7 +51,7 @@ test('new password must be at least 8 characters', function () {
             'password' => 'short',
             'password_confirmation' => 'short',
         ])
-        ->assertSessionHasErrors(['password' => 'Количество символов в поле пароль должно быть не меньше 8.']);
+        ->assertSessionHasErrors(['password' => 'Пароль — не короче 8 символов.']);
 
     expect(Hash::check('password', $user->refresh()->password))->toBeTrue();
 });

@@ -2,7 +2,6 @@
 import { Link, usePage } from '@inertiajs/vue3';
 import { Bell, KeyRound, LogOut, Smartphone, UserRound } from '@lucide/vue';
 import { computed, ref } from 'vue';
-import Heading from '@/components/Heading.vue';
 import SignOutDialog from '@/components/SignOutDialog.vue';
 import { Button } from '@/components/ui/button';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
@@ -52,9 +51,9 @@ const signOutOpen = ref(false);
 </script>
 
 <template>
-    <div class="@container px-4 py-6">
+    <div class="@container p-4 md:p-6">
         <!-- Разделы перечислены плитками ниже, подпись под заголовком их бы только повторила. -->
-        <Heading title="Настройки" />
+        <h1 class="mb-6 text-2xl font-semibold tracking-tight">Настройки</h1>
 
         <div class="flex flex-col gap-6 @3xl:flex-row @3xl:gap-10">
             <nav

@@ -225,7 +225,7 @@ function cancel(): void {
                         size="lg"
                         @click="open = false"
                     >
-                        Оставить
+                        Не удалять
                     </Button>
                     <Button
                         type="button"

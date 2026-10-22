@@ -1,19 +1,12 @@
 <script setup lang="ts">
-import { Head, Link, router, useForm, useHttp } from '@inertiajs/vue3';
+import { Head, Link, useForm, useHttp } from '@inertiajs/vue3';
 import { ArrowLeft, Search } from '@lucide/vue';
-import {
-    computed,
-    nextTick,
-    onBeforeUnmount,
-    onMounted,
-    reactive,
-    ref,
-    watch,
-} from 'vue';
+import { computed, nextTick, reactive, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import ClinicalProfileController from '@/actions/App/Http/Controllers/Doctor/ClinicalProfileController';
 import Icd10Controller from '@/actions/App/Http/Controllers/Doctor/Icd10Controller';
 import InputError from '@/components/InputError.vue';
+import LeaveConfirmDialog from '@/components/LeaveConfirmDialog.vue';
 import ObservationForm from '@/components/ObservationForm.vue';
 import type {
     ObservationDraft,
@@ -24,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { useLeaveGuard } from '@/composables/useLeaveGuard';
 import { index, show } from '@/routes/doctor/patients';
 import type { ClinicalDiagnosis, ClinicalProfile, SelectOption } from '@/types';
 
@@ -169,13 +163,17 @@ function focusFact(type: ObservationTypeOption): void {
         ?.focus();
 }
 
+// Сбросить два значения и больше — переспросить: одним нажатием пропадает много отмеченного.
+const confirmingReset = ref(false);
+
 function resetFacts(): void {
-    if (
-        changed.value.length > 1 &&
-        !window.confirm('Сбросить все отмеченные значения?')
-    ) {
+    if (changed.value.length > 1 && !confirmingReset.value) {
+        confirmingReset.value = true;
+
         return;
     }
+
+    confirmingReset.value = false;
 
     for (const type of props.profile.types) {
         drafts[type.id] = emptyDraft();
@@ -185,31 +183,7 @@ function resetFacts(): void {
 }
 
 // Уход со страницы с несохранёнными значениями переспрашивает: иначе они пропадут молча.
-const removeLeaveGuard = router.on('before', (event) => {
-    if (
-        changed.value.length > 0 &&
-        event.detail.visit.method === 'get' &&
-        !window.confirm(
-            'Новые значения фактов не сохранены. Уйти со страницы без сохранения?',
-        )
-    ) {
-        event.preventDefault();
-    }
-});
-
-// Закрытие вкладки и перезагрузка тоже переспрашивают.
-function warnBeforeUnload(event: BeforeUnloadEvent): void {
-    if (changed.value.length > 0) {
-        event.preventDefault();
-    }
-}
-
-onMounted(() => window.addEventListener('beforeunload', warnBeforeUnload));
-
-onBeforeUnmount(() => {
-    removeLeaveGuard();
-    window.removeEventListener('beforeunload', warnBeforeUnload);
-});
+const leaveGuard = useLeaveGuard(() => changed.value.length > 0);
 
 // Диагноз выбирается из справочника МКБ-10: поиск по коду или названию.
 const diagnosisForm = useForm<{
@@ -790,7 +764,17 @@ function resolve(diagnosis: ClinicalDiagnosis): void {
                     class="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t bg-background/95 px-4 py-3 backdrop-blur-sm md:-mx-6 md:px-6"
                     data-test="facts-save-bar"
                 >
-                    <p class="min-w-0 flex-1 text-sm">
+                    <p
+                        v-if="confirmingReset"
+                        class="min-w-0 flex-1 text-sm font-medium max-sm:basis-full"
+                        role="status"
+                    >
+                        Сбросить все отмеченные значения?
+                    </p>
+                    <p
+                        v-else
+                        class="min-w-0 flex-1 text-sm max-sm:line-clamp-2 max-sm:basis-full"
+                    >
                         <span class="font-medium">Не сохранено: </span>
                         <template
                             v-for="(type, position) in changed"
@@ -806,28 +790,56 @@ function resolve(diagnosis: ClinicalDiagnosis): void {
                             </button>
                         </template>
                     </p>
-                    <div class="ml-auto flex gap-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            @click="resetFacts"
-                        >
-                            Сбросить
-                        </Button>
-                        <Button
-                            type="button"
-                            :disabled="factsForm.processing"
-                            :aria-busy="factsForm.processing"
-                            data-test="save-observations"
-                            @click="saveFacts"
-                        >
-                            <Spinner v-if="factsForm.processing" />
-                            Сохранить факты
-                        </Button>
+                    <div class="flex gap-2 max-sm:w-full sm:ml-auto">
+                        <template v-if="confirmingReset">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                class="max-sm:flex-1"
+                                @click="resetFacts"
+                            >
+                                Сбросить
+                            </Button>
+                            <Button
+                                type="button"
+                                class="max-sm:flex-1"
+                                @click="confirmingReset = false"
+                            >
+                                Не сбрасывать
+                            </Button>
+                        </template>
+                        <template v-else>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                class="max-sm:flex-1"
+                                @click="resetFacts"
+                            >
+                                Сбросить
+                            </Button>
+                            <Button
+                                type="button"
+                                class="max-sm:flex-1"
+                                :disabled="factsForm.processing"
+                                :aria-busy="factsForm.processing"
+                                data-test="save-observations"
+                                @click="saveFacts"
+                            >
+                                <Spinner v-if="factsForm.processing" />
+                                Сохранить факты
+                            </Button>
+                        </template>
                     </div>
                 </div>
                 <InputError :message="factsForm.errors.observations" />
             </section>
         </div>
+
+        <LeaveConfirmDialog
+            :pending="leaveGuard.pending.value"
+            what="Отмеченные значения фактов"
+            @leave="leaveGuard.leave"
+            @stay="leaveGuard.stay"
+        />
     </div>
 </template>

@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { MessageCircle, ShieldCheck } from '@lucide/vue';
+import {
+    ArrowUp,
+    MessageCircle,
+    OctagonAlert,
+    Pencil,
+    ShieldCheck,
+} from '@lucide/vue';
 import { computed } from 'vue';
 import SafetyCautionGroup from '@/components/SafetyCautionGroup.vue';
 import SafetyFindingCard from '@/components/SafetyFindingCard.vue';
@@ -17,6 +23,8 @@ const props = defineProps<{
     chatHref: InertiaLinkProps['href'];
     // Изменить назначение врача: решение по находке прямо из плашки.
     editHref?: InertiaLinkProps['href'];
+    // Вторые находки пары препаратов: решение одно, оно в плашке у первого препарата.
+    pairedIds?: number[];
 }>();
 
 const emit = defineEmits<{
@@ -27,7 +35,16 @@ const emit = defineEmits<{
 
 // Сначала то, что ждёт решения врача, затем решённое и «с осторожностью» одной плашкой.
 const awaiting = computed(() =>
-    props.card.findings.filter((finding) => finding.awaits_decision),
+    props.card.findings.filter(
+        (finding) =>
+            finding.awaits_decision && !props.pairedIds?.includes(finding.id),
+    ),
+);
+const paired = computed(() =>
+    props.card.findings.filter(
+        (finding) =>
+            finding.awaits_decision && props.pairedIds?.includes(finding.id),
+    ),
 );
 const decided = computed(() =>
     props.card.findings.filter(
@@ -65,28 +82,20 @@ const cautions = computed(() =>
                             v-if="editHref"
                             variant="ghost"
                             size="sm"
-                            class="text-primary"
                             as-child
                         >
-                            <Link :href="editHref">Изменить назначение</Link>
+                            <Link :href="editHref"><Pencil />Изменить</Link>
                         </Button>
                         <Button
                             type="button"
                             variant="ghost"
                             size="sm"
-                            class="text-primary"
                             @click="emit('cancel')"
                         >
                             Отменить назначение
                         </Button>
                     </template>
-                    <Button
-                        v-else
-                        variant="ghost"
-                        size="sm"
-                        class="text-primary"
-                        as-child
-                    >
+                    <Button v-else variant="ghost" size="sm" as-child>
                         <Link :href="chatHref">
                             <MessageCircle />
                             Написать пациенту
@@ -109,6 +118,24 @@ const cautions = computed(() =>
                 </p>
             </div>
         </SafetyFindingCard>
+
+        <!-- Та же пара препаратов: полная плашка и решение — у первого из них. -->
+        <a
+            v-for="finding in paired"
+            :key="finding.id"
+            :href="`#prescription-${finding.related_ids[0]}-title`"
+            class="flex items-start gap-2 rounded-lg border border-danger-border bg-danger-subtle p-3 text-sm font-medium text-danger hover:underline"
+            :data-level="finding.level"
+            data-test="safety-finding-paired"
+        >
+            <OctagonAlert class="mt-0.5 size-4 shrink-0" />
+            <span
+                >{{
+                    `Противопоказано вместе с препаратом ${finding.related.join(', ')}: решение одно, в плашке выше`
+                }}
+                <ArrowUp class="inline size-4 align-text-bottom"
+            /></span>
+        </a>
 
         <SafetyFindingCard
             v-for="finding in decided"

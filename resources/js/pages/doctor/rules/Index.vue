@@ -63,20 +63,8 @@ defineOptions({
         <div
             class="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-xs"
         >
-            <nav aria-label="Препараты" class="flex flex-wrap gap-2 text-sm">
-                <a
-                    v-for="item in drugs"
-                    :key="item.code"
-                    :href="`#drug-${item.code}`"
-                    class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-medium hover:bg-accent pointer-coarse:min-h-11"
-                    >{{ item.name }}
-                    <span class="text-muted-foreground">{{
-                        item.rules.length
-                    }}</span></a
-                >
-            </nav>
             <fieldset class="flex flex-wrap items-center gap-2 text-sm">
-                <legend class="sr-only">Уровень</legend>
+                <legend class="mb-2 font-medium">Уровень</legend>
                 <label
                     v-for="option in levels"
                     :key="option.value"
@@ -92,6 +80,26 @@ defineOptions({
                     {{ option.label }}
                 </label>
             </fieldset>
+            <nav
+                aria-labelledby="rules-drugs-title"
+                class="flex flex-col gap-2 text-sm"
+            >
+                <p id="rules-drugs-title" class="font-medium">
+                    Перейти к препарату
+                </p>
+                <div class="flex flex-wrap gap-x-4 gap-y-1">
+                    <a
+                        v-for="item in shown"
+                        :key="item.code"
+                        :href="`#drug-${item.code}`"
+                        class="inline-flex items-center gap-1 text-primary underline underline-offset-4 pointer-coarse:min-h-11"
+                        >{{ item.name }}
+                        <span class="text-muted-foreground no-underline"
+                            >({{ item.rules.length }})</span
+                        ></a
+                    >
+                </div>
+            </nav>
         </div>
 
         <section

@@ -40,8 +40,6 @@ const timezone = ref(props.patientProfile?.timezone ?? '');
 <template>
     <Head title="Профиль" />
 
-    <h1 class="sr-only">Профиль</h1>
-
     <div class="flex flex-col space-y-6">
         <Heading
             variant="small"

@@ -27,6 +27,18 @@ class InvitationRegistrationRequest extends AccessLinkRequest
         ];
     }
 
+    /**
+     * Первый экран пациента: ошибки человеческими словами, а не «Поле … обязательно».
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'name.required' => 'Напишите ФИО.',
+        ];
+    }
+
     protected function purpose(): AccessLinkPurpose
     {
         return AccessLinkPurpose::Invitation;

@@ -65,9 +65,9 @@ function submit(): void {
                         Не прекращать
                     </Button>
                 </DialogClose>
+                <!-- Опасности здесь нет: красный у пациента — только для опасного. -->
                 <Button
                     type="button"
-                    variant="destructive"
                     size="lg"
                     :disabled="form.processing"
                     data-test="confirm-stop-medication"

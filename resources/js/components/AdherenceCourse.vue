@@ -7,9 +7,14 @@ import { Button } from '@/components/ui/button';
 import { plural } from '@/lib/plural';
 import type { AdherenceCourse, RegularPeriod } from '@/types';
 
-const props = defineProps<{
-    course: AdherenceCourse;
-}>();
+const props = withDefaults(
+    defineProps<{
+        course: AdherenceCourse;
+        // Показать легенду цветов дней: одна на раздел.
+        legend?: boolean;
+    }>(),
+    { legend: true },
+);
 
 // Завершённый курс свёрнут, пока врач его не откроет.
 const open = ref(!props.course.finished);
@@ -254,7 +259,7 @@ function counts(period: RegularPeriod): string[] {
                 />
             </Button>
 
-            <AdherenceDays :course="course" />
+            <AdherenceDays :course="course" :legend="legend" />
         </template>
     </article>
 </template>

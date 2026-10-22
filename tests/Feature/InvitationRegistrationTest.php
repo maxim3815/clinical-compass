@@ -29,7 +29,9 @@ test('valid invitation shows the registration form with the name from the doctor
         ->assertInertia(fn (Assert $page) => $page
             ->component('invitation/Register')
             ->where('token', INVITATION_TOKEN)
-            ->where('patientName', 'Новиков Артём Сергеевич'),
+            ->where('patientName', 'Новиков Артём Сергеевич')
+            // Кто пригласил: имя врача видно на странице регистрации.
+            ->has('doctor.name'),
         );
 });
 

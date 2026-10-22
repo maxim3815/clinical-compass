@@ -50,7 +50,7 @@ defineOptions({
             <li
                 v-for="drug in drugs"
                 :key="drug.code"
-                class="relative flex flex-col gap-1 rounded-xl border bg-card p-4 text-sm shadow-xs transition-colors hover:border-primary/60"
+                class="relative flex flex-col gap-1 rounded-xl border bg-card p-4 text-sm shadow-xs transition-colors hover:border-primary/60 has-[a:focus-visible]:border-primary"
                 data-test="drug-row"
             >
                 <!-- Ссылка растянута на всю карточку. -->

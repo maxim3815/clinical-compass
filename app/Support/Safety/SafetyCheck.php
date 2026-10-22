@@ -19,7 +19,7 @@ final readonly class SafetyCheck
      */
     public function forCandidate(User $patient, Drug $drug, ?Prescription $replacing = null): SafetyReport
     {
-        return $this->check(PatientSafetyData::load($patient, $replacing?->id), $drug, $this->decided($patient, $replacing));
+        return $this->check(PatientSafetyData::load($patient, $replacing?->id), $drug, $this->decided($patient, $replacing), $replacing !== null);
     }
 
     /**
@@ -45,9 +45,9 @@ final readonly class SafetyCheck
     /**
      * @param  array<string, true>  $decided
      */
-    private function check(PatientSafetyData $data, Drug $drug, array $decided): SafetyReport
+    private function check(PatientSafetyData $data, Drug $drug, array $decided, bool $changing = false): SafetyReport
     {
-        $candidate = Medication::candidate($drug);
+        $candidate = Medication::candidate($drug, $changing);
         $own = $this->engine->check($data, $candidate, $data->othersThan($candidate));
 
         // У других препаратов — только то, что появится из-за нового назначения.

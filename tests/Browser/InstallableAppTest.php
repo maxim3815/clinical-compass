@@ -60,12 +60,14 @@ test('not now hides the install banner on this phone for a week', function () {
     offerInstall($page)
         ->click('[data-test="install-dismiss"]')
         ->assertMissing('[data-test="install-banner"]')
-        ->refresh();
+        ->refresh()
+        // Событие шлём после загрузки приложения: раньше его некому было бы поймать.
+        ->assertPresent('[data-test="tab-bar"]');
 
     offerInstall($page)->assertMissing('[data-test="install-banner"]');
 
     $page->script('() => localStorage.setItem("install-banner-dismissed-at", String(Date.now() - 8 * 24 * 60 * 60 * 1000))');
-    $page->refresh();
+    $page->refresh()->assertPresent('[data-test="tab-bar"]');
 
     offerInstall($page)
         ->assertVisible('[data-test="install-banner"]')

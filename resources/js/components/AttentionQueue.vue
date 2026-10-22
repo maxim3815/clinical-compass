@@ -7,6 +7,7 @@ import {
     TriangleAlert,
 } from '@lucide/vue';
 import AdherenceSignal from '@/components/AdherenceSignal.vue';
+import { CHIP_ICON, DANGER_CHIP, MESSAGE_CHIP } from '@/lib/chips';
 import { formatAge, plural } from '@/lib/plural';
 import { show } from '@/routes/doctor/patients';
 import { show as chat } from '@/routes/doctor/patients/chat';
@@ -40,8 +41,8 @@ function messages(count: number): string {
             v-if="patients.length > 0"
             class="-mt-2 text-sm text-muted-foreground"
         >
-            Противопоказания без решения и новые пропуски входят в число у
-            пункта меню «Пациенты».
+            Число у «Пациентов» в меню — противопоказания без решения и новые
+            пропуски.
         </p>
 
         <p
@@ -58,7 +59,7 @@ function messages(count: number): string {
             <li
                 v-for="patient in patients"
                 :key="patient.id"
-                class="relative flex flex-col gap-2 p-4 transition-colors hover:bg-accent/50 @2xl:flex-row @2xl:items-start @2xl:justify-between @2xl:gap-6"
+                class="relative flex flex-col gap-2 p-4 transition-colors hover:bg-accent/50 has-[a:focus-visible]:bg-accent/50 @2xl:flex-row @2xl:items-start @2xl:justify-between @2xl:gap-6"
                 data-test="attention-row"
             >
                 <div class="flex min-w-0 flex-col gap-0.5">
@@ -87,10 +88,10 @@ function messages(count: number): string {
                 >
                     <li
                         v-if="patient.contraindications.length > 0"
-                        class="flex items-start gap-1.5 rounded-md border border-danger-border bg-danger-subtle px-2 py-1 font-medium text-danger"
+                        :class="DANGER_CHIP"
                         data-test="attention-contraindication"
                     >
-                        <OctagonAlert class="mt-0.5 size-4 shrink-0" />
+                        <OctagonAlert :class="CHIP_ICON" />
                         <span
                             >Противопоказание без решения:
                             {{ patient.contraindications.join(', ') }}</span
@@ -117,7 +118,9 @@ function messages(count: number): string {
                     <li v-if="patient.unread > 0">
                         <Link
                             :href="chat(patient.id)"
-                            class="relative z-10 inline-flex items-center gap-1.5 rounded-md bg-secondary px-2 py-1 font-medium text-secondary-foreground hover:bg-secondary-hover"
+                            class="relative z-10 pointer-coarse:min-h-11 pointer-coarse:px-3"
+                            :class="MESSAGE_CHIP"
+                            :aria-label="`Сообщения: ${messages(patient.unread)}, ${patient.name}`"
                             data-test="attention-unread"
                         >
                             <MessageCircle class="size-4 shrink-0" />

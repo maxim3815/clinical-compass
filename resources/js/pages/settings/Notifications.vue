@@ -63,8 +63,6 @@ function reload(): void {
 <template>
     <Head title="Уведомления" />
 
-    <h1 class="sr-only">Уведомления</h1>
-
     <div class="space-y-6">
         <Heading
             variant="small"
@@ -153,7 +151,7 @@ function reload(): void {
                     <summary
                         class="flex min-h-11 cursor-pointer items-center rounded-lg font-medium text-primary outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring focus-visible:outline-solid"
                     >
-                        Другое устройство
+                        Инструкции для других устройств
                     </summary>
                     <ul class="flex flex-col gap-2 pt-1">
                         <li v-for="other in otherDevices" :key="other">

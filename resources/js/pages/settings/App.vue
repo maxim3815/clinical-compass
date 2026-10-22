@@ -24,8 +24,6 @@ const { ready, installed, method, install } = useInstallApp();
 <template>
     <Head title="Приложение" />
 
-    <h1 class="sr-only">Приложение</h1>
-
     <div class="space-y-6">
         <Heading
             variant="small"

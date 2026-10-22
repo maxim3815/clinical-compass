@@ -150,6 +150,8 @@ final readonly class SafetyPresenter
             'awaits_decision' => $finding->awaitsDecision(),
             // С чем сочетание: решение «Продолжить» относится и к находке у второго препарата.
             'related' => array_values(array_filter(array_map(fn (int $id): ?string => $names[$id] ?? null, $finding->related_prescription_ids))),
+            // Те же назначения по id: в карточке пара находок показывается одним решением.
+            'related_ids' => array_values(array_filter($finding->related_prescription_ids, fn (int $id): bool => isset($names[$id]))),
             'opened_at' => DisplayTime::format($finding->opened_at),
             'decision' => $finding->decided_at === null ? null : [
                 'kind_label' => $finding->decision_kind?->label(),

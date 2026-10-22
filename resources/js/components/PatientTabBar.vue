@@ -78,7 +78,7 @@ const tabs = computed<(NavItem & { name: string })[]>(() => [
                         <component :is="tab.icon" class="size-6" />
                         <span
                             v-if="tab.badge"
-                            class="absolute -top-1.5 right-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-primary px-1.5 text-sm leading-none font-semibold text-primary-foreground tabular-nums ring-2 ring-card"
+                            class="absolute -top-1.5 right-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-primary px-1.5 text-base leading-none font-semibold text-primary-foreground tabular-nums ring-2 ring-card"
                             aria-hidden="true"
                             data-test="nav-badge"
                         >

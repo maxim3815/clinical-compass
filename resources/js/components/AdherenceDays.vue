@@ -9,9 +9,14 @@ import type {
     RegularDay,
 } from '@/types';
 
-const props = defineProps<{
-    course: AdherenceCourse;
-}>();
+const props = withDefaults(
+    defineProps<{
+        course: AdherenceCourse;
+        // Легенда цветов одна на раздел: у первого регулярного курса.
+        legend?: boolean;
+    }>(),
+    { legend: true },
+);
 
 // Цвет клетки регулярного курса по итогу дня и подписи для легенды. Непринятое отмечено
 // ещё и знаком: точка — часть не принята, черта — ни один. Различие видно и без цвета.
@@ -171,7 +176,7 @@ function asNeededClass(day: AsNeededDay): string {
         </div>
 
         <ul
-            v-if="course.kind === 'regular'"
+            v-if="course.kind === 'regular' && legend"
             class="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground"
         >
             <li
@@ -195,7 +200,10 @@ function asNeededClass(day: AsNeededDay): string {
                 {{ item.label }}
             </li>
         </ul>
-        <p v-else class="text-sm text-muted-foreground">
+        <p
+            v-else-if="course.kind === 'as_needed'"
+            class="text-sm text-muted-foreground"
+        >
             В клетке — сколько раз принят препарат за день, красным — больше,
             чем разрешено в сутки.
         </p>

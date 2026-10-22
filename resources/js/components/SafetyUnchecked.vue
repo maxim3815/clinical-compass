@@ -11,6 +11,8 @@ const props = defineProps<{
     open?: boolean;
     // Куда внести недостающие данные.
     profileHref?: InertiaLinkProps['href'];
+    // Открыть профиль в новой вкладке: из формы назначения, чтобы не потерять введённое.
+    newTab?: boolean;
 }>();
 
 // Два названия и меньше видны строкой сразу. Длинный список в карточке свёрнут: в строке
@@ -34,8 +36,18 @@ const preview = computed(() =>
             <span
                 ><span class="font-medium text-foreground">Не проверено</span>,
                 нет данных: {{ unchecked.join(', ') }}.
+                <a
+                    v-if="profileHref && newTab"
+                    :href="String(profileHref)"
+                    target="_blank"
+                    rel="noopener"
+                    class="text-primary underline underline-offset-4"
+                    >Внести в клинический профиль<span class="sr-only">
+                        (в новой вкладке)</span
+                    ></a
+                >
                 <Link
-                    v-if="profileHref"
+                    v-else-if="profileHref"
                     :href="profileHref"
                     class="text-primary underline underline-offset-4"
                     >Внести в клинический профиль</Link
@@ -58,8 +70,18 @@ const preview = computed(() =>
             </summary>
             <p class="mt-1 pl-5.5">
                 {{ unchecked.join(', ') }}.
+                <a
+                    v-if="profileHref && newTab"
+                    :href="String(profileHref)"
+                    target="_blank"
+                    rel="noopener"
+                    class="text-primary underline underline-offset-4"
+                    >Внести в клинический профиль<span class="sr-only">
+                        (в новой вкладке)</span
+                    ></a
+                >
                 <Link
-                    v-if="profileHref"
+                    v-else-if="profileHref"
                     :href="profileHref"
                     class="text-primary underline underline-offset-4"
                     >Внести в клинический профиль</Link

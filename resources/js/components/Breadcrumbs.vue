@@ -33,9 +33,11 @@ defineProps<Props>();
                     </template>
                     <template v-else>
                         <BreadcrumbLink as-child>
-                            <Link :href="item.href" class="truncate">{{
-                                item.title
-                            }}</Link>
+                            <Link
+                                :href="item.href"
+                                class="truncate pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center"
+                                >{{ item.title }}</Link
+                            >
                         </BreadcrumbLink>
                     </template>
                 </BreadcrumbItem>

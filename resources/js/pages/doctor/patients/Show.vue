@@ -24,6 +24,7 @@ import PrescriptionHistory from '@/components/PrescriptionHistory.vue';
 import PrescriptionSafety from '@/components/PrescriptionSafety.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { CHIP_ICON, DANGER_CHIP } from '@/lib/chips';
 import { formatAge, plural } from '@/lib/plural';
 import { index, show } from '@/routes/doctor/patients';
 import { show as chat } from '@/routes/doctor/patients/chat';
@@ -90,6 +91,16 @@ function continueDespite(
 }
 const passwordResetUrl = computed(() => page.flash.passwordResetUrl);
 
+// Легенда цветов дней — у первого регулярного курса раздела.
+const legendCourseId = computed(
+    () =>
+        [
+            ...props.adherence.courses,
+            ...props.adherence.own,
+            ...props.adherence.finished,
+        ].find((course) => course.kind === 'regular')?.id,
+);
+
 const hasCourses = computed(
     () =>
         props.adherence.courses.length > 0 ||
@@ -131,6 +142,36 @@ const awaiting = computed(() =>
         ),
     ),
 );
+
+// Сочетание двух препаратов даёт находку у обоих, а решение одно: полная плашка — у первого
+// по порядку в карточке, у второго — ссылка на неё.
+const pairedFindingIds = computed(() => {
+    const seen = new Set<string>();
+    const paired: number[] = [];
+
+    for (const prescription of [
+        ...props.prescriptions,
+        ...props.ownMedications,
+    ]) {
+        for (const finding of props.safety[prescription.id]?.findings ?? []) {
+            if (!finding.awaits_decision || finding.related_ids.length === 0) {
+                continue;
+            }
+
+            const pair = [prescription.id, ...finding.related_ids]
+                .sort((a, b) => a - b)
+                .join('-');
+
+            if (seen.has(pair)) {
+                paired.push(finding.id);
+            } else {
+                seen.add(pair);
+            }
+        }
+    }
+
+    return paired;
+});
 
 function awaitsDecision(prescription: Prescription): boolean {
     return awaiting.value.includes(prescription);
@@ -193,7 +234,7 @@ const unreadLabel = computed(
                         Написать
                         <span
                             v-if="unread > 0"
-                            class="rounded-full bg-secondary px-2 text-sm font-semibold text-secondary-foreground"
+                            class="rounded-md bg-secondary px-1.5 text-sm font-semibold text-secondary-foreground"
                             >{{ unreadLabel }}</span
                         >
                     </Link>
@@ -220,19 +261,27 @@ const unreadLabel = computed(
                 >
             </p>
 
-            <!-- Что требует внимания: ссылки ведут к назначению и к приёму в этой карточке. -->
+            <!--
+                Что требует внимания и как пациент принимает: ссылки ведут к назначению и к приёму
+                в этой карточке. Доля за 7 дней видна всегда, предупреждающим цветом — при сигнале.
+            -->
             <ul
-                v-if="awaiting.length > 0 || adherenceSignal.raised"
+                v-if="
+                    awaiting.length > 0 ||
+                    adherenceSignal.raised ||
+                    adherenceSignal.share !== null
+                "
                 class="flex flex-wrap gap-2 text-sm"
-                aria-label="Требует внимания"
+                aria-label="Сводка"
             >
                 <li v-if="awaiting.length > 0">
                     <a
                         :href="`#prescription-${awaiting[0].id}-title`"
-                        class="inline-flex items-start gap-1.5 rounded-md border border-danger-border bg-danger-subtle px-2 py-1 font-medium text-danger hover:underline pointer-coarse:min-h-11 pointer-coarse:items-center"
+                        class="hover:underline pointer-coarse:min-h-11 pointer-coarse:items-center"
+                        :class="DANGER_CHIP"
                         data-test="card-contraindication"
                     >
-                        <OctagonAlert class="mt-0.5 size-4 shrink-0" />
+                        <OctagonAlert :class="CHIP_ICON" />
                         Противопоказание без решения:
                         {{
                             awaiting
@@ -250,6 +299,19 @@ const unreadLabel = computed(
                         <TriangleAlert class="size-4 shrink-0 text-warning" />
                         <AdherenceSignal :signal="adherenceSignal" card />
                         <ArrowDown class="size-4 shrink-0 text-warning" />
+                    </a>
+                </li>
+                <li v-else-if="adherenceSignal.share !== null">
+                    <a
+                        href="#adherence"
+                        class="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 hover:underline pointer-coarse:min-h-11"
+                        data-test="card-adherence"
+                    >
+                        Приём за 7 дней:
+                        <span class="font-semibold tabular-nums"
+                            >{{ adherenceSignal.share }}%</span
+                        >
+                        <ArrowDown class="size-4 shrink-0" />
                     </a>
                 </li>
             </ul>
@@ -310,6 +372,7 @@ const unreadLabel = computed(
                                 :changeable="prescription.can_change"
                                 :profile-href="factsHref"
                                 :chat-href="chat(patient.id)"
+                                :paired-ids="pairedFindingIds"
                                 :edit-href="
                                     PrescriptionController.edit({
                                         patient: patient.id,
@@ -404,6 +467,7 @@ const unreadLabel = computed(
                                 :changeable="false"
                                 :profile-href="factsHref"
                                 :chat-href="chat(patient.id)"
+                                :paired-ids="pairedFindingIds"
                                 @continue="
                                     (finding) =>
                                         continueDespite(prescription, finding)
@@ -457,12 +521,14 @@ const unreadLabel = computed(
                         v-for="course in adherence.courses"
                         :key="course.id"
                         :course="course"
+                        :legend="course.id === legendCourseId"
                     />
 
                     <AdherenceCourse
                         v-for="course in adherence.own"
                         :key="course.id"
                         :course="course"
+                        :legend="course.id === legendCourseId"
                     />
 
                     <template v-if="adherence.finished.length > 0">
@@ -473,6 +539,7 @@ const unreadLabel = computed(
                             v-for="course in adherence.finished"
                             :key="course.id"
                             :course="course"
+                            :legend="course.id === legendCourseId"
                         />
                     </template>
                 </section>

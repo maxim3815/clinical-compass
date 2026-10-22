@@ -100,3 +100,18 @@ test('doctor sees only dialogs of current own patients', function () {
             ->where('conversations.data.0.patient_id', $own->id),
         );
 });
+
+test('read dialogs are ordered by the time of the last message, not by the order of records', function () {
+    $later = User::factory()->patientOf($this->doctor)->create(['name' => 'Попова Екатерина Александровна']);
+    $earlier = User::factory()->patientOf($this->doctor)->create(['name' => 'Соколов Михаил Игоревич']);
+    // Запись Поповой создана раньше, но её последнее сообщение позже.
+    Message::factory()->for(careBetween($this->doctor, $later))->fromDoctor()->create(['created_at' => CarbonImmutable::parse('2026-10-20 10:00')]);
+    Message::factory()->for(careBetween($this->doctor, $earlier))->fromDoctor()->create(['created_at' => CarbonImmutable::parse('2026-10-09 10:00')]);
+
+    $this->actingAs($this->doctor)
+        ->get(route('doctor.conversations.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('conversations.data.0.name', 'Попова Екатерина Александровна')
+            ->where('conversations.data.1.name', 'Соколов Михаил Игоревич'),
+        );
+});

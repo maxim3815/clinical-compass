@@ -79,7 +79,9 @@ test('doctor continues an ongoing combination with a justification and the mark 
         ->click($this->patient->name)
         ->assertSeeIn('[data-test="card-contraindication"]', 'Гидроксизин, Эсциталопрам')
         ->assertSee('Противопоказан вместе с препаратами, удлиняющими интервал QT')
-        ->click('[data-test="own-medications"] [data-test="prescription"]:last-of-type [data-test="continue-finding-button"]')
+        // Пара находок — одно решение: у второго препарата ссылка на плашку первого.
+        ->assertPresent('[data-test="safety-finding-paired"]')
+        ->click('[data-test="own-medications"] [data-test="continue-finding-button"]')
         ->assertSee('Решение относится и к находке у препарата')
         ->fill('justification', 'Написал пациентке прекратить гидроксизин')
         ->click('[data-test="confirm-continue"]')
@@ -145,7 +147,7 @@ test('safety check fits a phone screen', function () {
 
     waitForText($page, 'Назначение вне зарегистрированных показаний');
 
-    $page->assertSee('Обоснование назначения вопреки предупреждению')
+    $page->assertSee('Обоснование (обязательно)')
         ->assertScript('document.documentElement.scrollWidth <= window.innerWidth')
         ->navigate(route('doctor.rules.index'))
         ->assertSee('Действующих правил: 52.')

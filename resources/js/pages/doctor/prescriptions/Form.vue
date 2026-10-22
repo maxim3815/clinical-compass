@@ -1,10 +1,18 @@
 <script setup lang="ts">
 import { Head, Link, useForm, useHttp } from '@inertiajs/vue3';
-import { OctagonAlert, TriangleAlert } from '@lucide/vue';
-import { computed, nextTick, ref, watch } from 'vue';
+import { Info, OctagonAlert, TriangleAlert } from '@lucide/vue';
+import {
+    computed,
+    nextTick,
+    onBeforeUnmount,
+    onMounted,
+    ref,
+    watch,
+} from 'vue';
 import PrescriptionController from '@/actions/App/Http/Controllers/Doctor/PrescriptionController';
 import SafetyCheckController from '@/actions/App/Http/Controllers/Doctor/SafetyCheckController';
 import InputError from '@/components/InputError.vue';
+import LeaveConfirmDialog from '@/components/LeaveConfirmDialog.vue';
 import SafetyCheckPanel from '@/components/SafetyCheckPanel.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +20,9 @@ import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
+import { useLeaveGuard } from '@/composables/useLeaveGuard';
 import { formatMg, formatTablets } from '@/lib/dose';
+import ClinicalProfileController from '@/actions/App/Http/Controllers/Doctor/ClinicalProfileController';
 import { index, show } from '@/routes/doctor/patients';
 import type { SafetyReport, SelectOption } from '@/types';
 
@@ -141,6 +151,9 @@ const form = useForm<{
     safety_seen: [],
 });
 
+// Уход с заполненной формы переспрашивает: выбор препарата, приёмы и обоснование пропали бы молча.
+const leaveGuard = useLeaveGuard(() => form.isDirty && !form.processing);
+
 // Ошибки приёмов приходят с ключами вида «intakes.0.tablets».
 const errors = computed(
     () => form.errors as Record<string, string | undefined>,
@@ -182,6 +195,18 @@ async function runCheck(): Promise<void> {
         }
     }
 }
+
+// Врач вносил недостающие данные в профиль в другой вкладке: проверка пересчитывается.
+function recheckOnReturn(): void {
+    if (document.visibilityState === 'visible' && form.drug_id !== null) {
+        void runCheck();
+    }
+}
+
+onMounted(() => document.addEventListener('visibilitychange', recheckOnReturn));
+onBeforeUnmount(() =>
+    document.removeEventListener('visibilitychange', recheckOnReturn),
+);
 
 // Назначить можно, только когда проверка выбранного препарата на экране.
 const checkPending = computed(
@@ -446,9 +471,11 @@ const summary = computed(() => {
             <div class="flex flex-col gap-6 @max-4xl:contents">
                 <p
                     v-if="editing"
-                    class="order-1 rounded-xl border border-dashed bg-card p-4 text-sm text-muted-foreground"
+                    class="order-1 flex gap-2 rounded-xl border border-primary/30 bg-secondary p-4 text-sm text-secondary-foreground"
+                    role="note"
                     data-test="change-notice"
                 >
+                    <Info class="mt-0.5 size-4 shrink-0" />
                     <template v-if="editing.has_started">
                         Назначение действует с {{ editing.starts_on_label }}.
                         Изменения вступят в силу сразу, прежний вариант
@@ -914,6 +941,7 @@ const summary = computed(() => {
                     :loading="check.processing"
                     :failed="checkFailed"
                     :drug="drug?.name ?? null"
+                    :profile-url="`${ClinicalProfileController.edit.url(patient.id)}#facts`"
                     @retry="runCheck"
                 >
                     <p
@@ -930,9 +958,8 @@ const summary = computed(() => {
                         class="grid gap-2 border-t pt-3"
                         data-test="justification"
                     >
-                        <Label for="justification" class="leading-snug"
-                            >Обоснование назначения вопреки
-                            предупреждению</Label
+                        <Label for="justification"
+                            >Обоснование (обязательно)</Label
                         >
                         <Textarea
                             id="justification"
@@ -950,8 +977,8 @@ const summary = computed(() => {
                             id="justification-hint"
                             class="text-sm text-muted-foreground"
                         >
-                            Обязательно при противопоказании. Сохранится в
-                            находке и в журнале аудита.
+                            Почему назначаете вопреки противопоказанию.
+                            Сохранится в находке и в журнале аудита.
                         </p>
                         <InputError
                             id="justification-error"
@@ -965,20 +992,22 @@ const summary = computed(() => {
                 class="sticky bottom-0 z-10 order-5 -mx-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t bg-background/95 px-4 py-3 backdrop-blur-sm md:-mx-6 md:px-6 @4xl:col-span-2"
                 data-test="prescription-summary"
             >
-                <p
-                    v-if="summary"
-                    class="min-w-0 flex-1 text-sm font-medium max-sm:line-clamp-2"
-                >
-                    {{ summary }}
-                    <span
+                <div v-if="summary" class="flex min-w-0 flex-1 flex-col">
+                    <!-- Предупреждение отдельной строкой: на телефоне сводка обрезается, а оно — нет. -->
+                    <p
                         v-if="
                             report?.requires_justification &&
                             form.justification.trim() === ''
                         "
-                        class="text-danger"
-                        >· нужно обоснование</span
+                        class="text-sm font-semibold text-danger"
+                        data-test="summary-needs-justification"
                     >
-                </p>
+                        Нужно обоснование
+                    </p>
+                    <p class="text-sm font-medium max-sm:line-clamp-2">
+                        {{ summary }}
+                    </p>
+                </div>
                 <div class="ml-auto flex flex-wrap gap-2">
                     <Button variant="outline" as-child>
                         <Link :href="show(patient.id)">Отмена</Link>
@@ -999,5 +1028,11 @@ const summary = computed(() => {
                 </div>
             </div>
         </form>
+
+        <LeaveConfirmDialog
+            :pending="leaveGuard.pending.value"
+            @leave="leaveGuard.leave"
+            @stay="leaveGuard.stay"
+        />
     </div>
 </template>

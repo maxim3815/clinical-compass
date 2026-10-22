@@ -17,6 +17,8 @@ final readonly class Medication
         public ?Drug $drug,
         public string $name,
         public PrescriptionSource $source,
+        // Оформляемое назначение заменит действующее: врач его изменяет.
+        public bool $changing = false,
     ) {}
 
     public static function fromPrescription(Prescription $prescription): self
@@ -25,11 +27,11 @@ final readonly class Medication
     }
 
     /**
-     * Назначение врача, которое ещё не сохранено.
+     * Назначение врача, которое ещё не сохранено: новое или новая версия изменяемого.
      */
-    public static function candidate(Drug $drug): self
+    public static function candidate(Drug $drug, bool $changing = false): self
     {
-        return new self(null, $drug, $drug->name, PrescriptionSource::Doctor);
+        return new self(null, $drug, $drug->name, PrescriptionSource::Doctor, $changing);
     }
 
     public function isSameDrug(self $other): bool
@@ -38,11 +40,12 @@ final readonly class Medication
     }
 
     /**
-     * «Эсциталопрам (добавил пациент)», «Гидроксизин (новое назначение)».
+     * «Эсциталопрам (добавил пациент)», «Гидроксизин (новое назначение)», «Авиандр (изменение назначения)».
      */
     public function label(): string
     {
         return match (true) {
+            $this->prescriptionId === null && $this->changing => $this->name.' (изменение назначения)',
             $this->prescriptionId === null => $this->name.' (новое назначение)',
             $this->source === PrescriptionSource::Patient => $this->name.' (добавил пациент)',
             default => $this->name,

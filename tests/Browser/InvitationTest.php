@@ -25,6 +25,7 @@ test('doctor invites a patient who registers by the link and sees the cabinet', 
         ->assertPathIs('/login')
         ->navigate($link)
         ->assertSee('Регистрация пациента')
+        ->assertSee("Вас приглашает врач: {$doctor->name}, психиатр.")
         ->assertValue('name', 'Новиков Артём Сергеевич')
         ->fill('login', 'novikov')
         ->fill('password', 'secret-password')

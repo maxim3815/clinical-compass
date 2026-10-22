@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import PatientHeader from '@/components/PatientHeader.vue';
 import PatientTabBar from '@/components/PatientTabBar.vue';
 import { Toaster } from '@/components/ui/sonner';
@@ -26,6 +26,65 @@ const isForm = computed(() =>
     ['patient/MedicationForm', 'patient/IntakeTimes'].includes(page.component),
 );
 
+// Пока на телефоне открыта клавиатура, панель вкладок прячется: иначе Android поднимает её
+// над клавиатурой, и от переписки остаётся пара строк. Клавиатура открыта, когда фокус
+// в текстовом поле и видимая часть экрана заметно ниже обычной: «Назад» прячет клавиатуру,
+// не снимая фокус.
+const fieldFocused = ref(false);
+const keyboardOpen = ref(false);
+const typing = computed(() => fieldFocused.value && keyboardOpen.value);
+
+let fullHeight = 0;
+let lastWidth = 0;
+
+function isTextField(target: EventTarget | null): boolean {
+    return (
+        target instanceof HTMLTextAreaElement ||
+        (target instanceof HTMLInputElement &&
+            !['checkbox', 'radio', 'button', 'submit'].includes(target.type))
+    );
+}
+
+function onFocusIn(event: FocusEvent): void {
+    fieldFocused.value =
+        window.matchMedia('(pointer: coarse)').matches &&
+        isTextField(event.target);
+}
+
+function onFocusOut(): void {
+    fieldFocused.value = false;
+}
+
+function onViewportResize(): void {
+    const viewport = window.visualViewport;
+
+    if (viewport === null) {
+        return;
+    }
+
+    // После поворота экрана обычная высота другая.
+    if (viewport.width !== lastWidth) {
+        lastWidth = viewport.width;
+        fullHeight = viewport.height;
+    }
+
+    fullHeight = Math.max(fullHeight, viewport.height);
+    keyboardOpen.value = viewport.height < fullHeight * 0.8;
+}
+
+onMounted(() => {
+    document.addEventListener('focusin', onFocusIn);
+    document.addEventListener('focusout', onFocusOut);
+    window.visualViewport?.addEventListener('resize', onViewportResize);
+    onViewportResize();
+});
+
+onBeforeUnmount(() => {
+    document.removeEventListener('focusin', onFocusIn);
+    document.removeEventListener('focusout', onFocusOut);
+    window.visualViewport?.removeEventListener('resize', onViewportResize);
+});
+
 // Текст пациента не мельче 16 px, и в уведомлениях тоже.
 const toastOptions = {
     classes: { title: 'text-base leading-snug font-medium' },
@@ -39,7 +98,10 @@ const toastOptions = {
         страница чата берёт себе ровно остаток экрана.
     -->
     <div
-        class="flex min-h-svh flex-col [--patient-chrome:calc(3.5rem+1px+var(--tab-bar-height)+env(safe-area-inset-bottom)+1rem)] [--tab-bar-height:4.25rem]"
+        class="flex min-h-svh flex-col [--patient-chrome:calc(3.5rem+1px+var(--tab-bar-height)+env(safe-area-inset-bottom)+1rem)]"
+        :class="
+            typing ? '[--tab-bar-height:0px]' : '[--tab-bar-height:4.25rem]'
+        "
     >
         <PatientHeader :breadcrumbs="breadcrumbs" />
         <!--
@@ -56,7 +118,7 @@ const toastOptions = {
         >
             <slot />
         </main>
-        <PatientTabBar v-if="!isForm" />
+        <PatientTabBar v-if="!isForm" v-show="!typing" />
         <Toaster
             position="top-center"
             container-aria-label="Уведомления"

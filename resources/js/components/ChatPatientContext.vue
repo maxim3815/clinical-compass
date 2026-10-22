@@ -5,6 +5,7 @@ import { computed } from 'vue';
 import AdherenceSignal from '@/components/AdherenceSignal.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { CHIP_ICON, DANGER_CHIP } from '@/lib/chips';
 import { formatAge } from '@/lib/plural';
 import type { InertiaLinkProps } from '@inertiajs/vue3';
 import type { ChatPatientContext } from '@/types';
@@ -67,9 +68,9 @@ function regimen(prescription: ChatPatientContext['prescriptions'][number]) {
         >
             <li
                 v-if="context.contraindications.length > 0"
-                class="flex items-start gap-1.5 rounded-md border border-danger-border bg-danger-subtle px-2 py-1 font-medium text-danger"
+                :class="DANGER_CHIP"
             >
-                <OctagonAlert class="mt-0.5 size-4 shrink-0" />
+                <OctagonAlert :class="CHIP_ICON" />
                 <span
                     >Противопоказание без решения:
                     {{ context.contraindications.join(', ') }}</span
@@ -108,7 +109,7 @@ function regimen(prescription: ChatPatientContext['prescriptions'][number]) {
                         <Badge
                             v-if="prescription.source === 'patient'"
                             variant="outline"
-                            >добавил пациент</Badge
+                            >Добавил пациент</Badge
                         >
                     </p>
                     <p class="text-muted-foreground">

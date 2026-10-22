@@ -37,6 +37,11 @@ class InvitationRegistrationController extends Controller
         return Inertia::render('invitation/Register', [
             'token' => $token,
             'patientName' => $invitation->patient_name,
+            // Кто пригласил: пациенту так спокойнее доверять ссылке.
+            'doctor' => [
+                'name' => $invitation->doctor->name,
+                'specialty' => $invitation->doctor->doctorProfile?->specialty,
+            ],
         ])->toResponse($request);
     }
 

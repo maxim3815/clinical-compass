@@ -1,13 +1,22 @@
 <script setup lang="ts">
-import { Form, Head, Link, usePage } from '@inertiajs/vue3';
+import { Form, Head, router, usePage } from '@inertiajs/vue3';
 import { UserPlus } from '@lucide/vue';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import InvitationController from '@/actions/App/Http/Controllers/Doctor/InvitationController';
 import InputError from '@/components/InputError.vue';
 import OneTimeLink from '@/components/OneTimeLink.vue';
 import { Badge } from '@/components/ui/badge';
 import type { BadgeVariants } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
@@ -40,6 +49,25 @@ defineOptions({
 
 const page = usePage();
 const invitationUrl = computed(() => page.flash.invitationUrl);
+
+// Приглашение, которое врач собрался отозвать; пока null, окно закрыто.
+const revoking = ref<Invitation | null>(null);
+const revokingNow = ref(false);
+
+function revoke(): void {
+    if (revoking.value === null) {
+        return;
+    }
+
+    router.visit(InvitationController.revoke(revoking.value.id), {
+        preserveScroll: true,
+        onStart: () => (revokingNow.value = true),
+        onFinish: () => {
+            revokingNow.value = false;
+            revoking.value = null;
+        },
+    });
+}
 
 // Действующее приглашение выделено, остальные спокойные: ими уже ничего не сделать.
 function statusVariant(status: Invitation['status']): BadgeVariants['variant'] {
@@ -192,22 +220,14 @@ function statusVariant(status: Invitation['status']): BadgeVariants['variant'] {
                             >
                                 <Button
                                     v-if="invitation.can_revoke"
+                                    type="button"
                                     variant="ghost"
                                     size="sm"
-                                    as-child
+                                    :aria-describedby="`invitation-${invitation.id}-name`"
+                                    data-test="revoke-invitation"
+                                    @click="revoking = invitation"
                                 >
-                                    <Link
-                                        :href="
-                                            InvitationController.revoke(
-                                                invitation.id,
-                                            )
-                                        "
-                                        as="button"
-                                        preserve-scroll
-                                        :aria-describedby="`invitation-${invitation.id}-name`"
-                                    >
-                                        Отозвать
-                                    </Link>
+                                    Отозвать
                                 </Button>
                             </td>
                         </tr>
@@ -215,5 +235,43 @@ function statusVariant(status: Invitation['status']): BadgeVariants['variant'] {
                 </table>
             </div>
         </section>
+
+        <!-- Отзыв необратим: ссылка, которую врач уже отправил, перестанет работать. -->
+        <Dialog
+            :open="revoking !== null"
+            @update:open="(value: boolean) => !value && (revoking = null)"
+        >
+            <DialogContent data-test="revoke-invitation-dialog">
+                <DialogHeader>
+                    <DialogTitle>Отозвать приглашение?</DialogTitle>
+                    <DialogDescription>
+                        {{
+                            revoking?.patient_name
+                                ? `Ссылка для пациента ${revoking.patient_name} перестанет работать.`
+                                : 'Ссылка перестанет работать.'
+                        }}
+                        Чтобы пригласить пациента снова, создайте новое
+                        приглашение.
+                    </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                    <DialogClose as-child>
+                        <Button type="button" variant="outline">
+                            Не отзывать
+                        </Button>
+                    </DialogClose>
+                    <Button
+                        type="button"
+                        variant="destructive"
+                        :disabled="revokingNow"
+                        data-test="confirm-revoke-invitation"
+                        @click="revoke"
+                    >
+                        <Spinner v-if="revokingNow" />
+                        Отозвать
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </div>
 </template>

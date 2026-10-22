@@ -91,7 +91,7 @@ const box = computed(() => {
                 rel="noopener noreferrer"
                 class="mt-2 inline-flex items-center gap-1 underline underline-offset-4 hover:text-foreground"
             >
-                Открыть источник
+                Открыть документ
                 <ExternalLink class="size-3.5" />
                 <span class="sr-only">(в новой вкладке)</span>
             </a>

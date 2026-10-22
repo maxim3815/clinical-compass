@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useForm } from '@inertiajs/vue3';
-import { computed, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import DoseController from '@/actions/App/Http/Controllers/Patient/DoseController';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,10 @@ const form = useForm({
 
 const cancelForm = useForm({});
 
+// «Убрать отметку» переспрашивает: отметка и время приёма пропадут, а врач увидит приём без
+// отметки. Так же, как удаление записи «по необходимости».
+const confirmingUnmark = ref(false);
+
 // Новая отметка открывается сразу нужной формой. Выбор «Принял» или «Не принял» есть
 // только при правке: там же отметку можно отменить.
 const isMarked = computed(
@@ -70,6 +74,7 @@ let markedId: number | null = null;
 
 watch(dose, (value) => {
     form.clearErrors();
+    confirmingUnmark.value = false;
 
     if (value !== null) {
         markedId = value.id;
@@ -250,19 +255,55 @@ function focusDose(event: Event): void {
                     </div>
                 </template>
 
+                <div
+                    v-if="confirmingUnmark"
+                    class="flex flex-col gap-3 rounded-xl bg-muted p-4"
+                    role="alert"
+                    data-test="unmark-confirm"
+                >
+                    <p class="text-base font-medium">
+                        Убрать отметку о приёме? Врач увидит этот приём без
+                        отметки.
+                    </p>
+                    <div
+                        class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"
+                    >
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="lg"
+                            :disabled="cancelForm.processing"
+                            data-test="confirm-cancel-dose-mark"
+                            @click="unmark"
+                        >
+                            <Spinner
+                                v-if="cancelForm.processing"
+                                class="size-5"
+                            />
+                            Убрать отметку
+                        </Button>
+                        <Button
+                            type="button"
+                            size="lg"
+                            @click="confirmingUnmark = false"
+                        >
+                            Не убирать
+                        </Button>
+                    </div>
+                </div>
+
                 <!-- На телефоне кнопки идут столбцом снизу вверх: «Сохранить» оказывается сверху. -->
-                <DialogFooter>
+                <DialogFooter v-else>
                     <Button
                         v-if="isMarked"
                         type="button"
                         variant="ghost"
                         size="lg"
                         class="text-primary sm:mr-auto"
-                        :disabled="cancelForm.processing"
                         data-test="cancel-dose-mark"
-                        @click="unmark"
+                        @click="confirmingUnmark = true"
                     >
-                        Отменить отметку
+                        Убрать отметку
                     </Button>
                     <DialogClose as-child>
                         <Button type="button" variant="outline" size="lg">

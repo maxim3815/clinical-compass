@@ -2,7 +2,6 @@
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import {
     CalendarClock,
-    Clock,
     MessageCircle,
     Stethoscope,
     UserRoundX,
@@ -15,9 +14,9 @@ import {
     ref,
     useTemplateRef,
 } from 'vue';
-import IntakeTimeController from '@/actions/App/Http/Controllers/Patient/IntakeTimeController';
 import AsNeededCard from '@/components/AsNeededCard.vue';
 import DoseGroupCard from '@/components/DoseGroupCard.vue';
+import TimeSetupCard from '@/components/TimeSetupCard.vue';
 import DoseMarkDialog from '@/components/DoseMarkDialog.vue';
 import InstallAppBanner from '@/components/InstallAppBanner.vue';
 import PushBanner from '@/components/PushBanner.vue';
@@ -80,6 +79,15 @@ const yesterdayUnmarked = computed(() =>
             (dose) => dose.status === 'scheduled' || dose.status === 'missed',
         ),
     ),
+);
+
+// Пока ни один приём не пора принять, карточка «Настройте время приёма» стоит над расписанием:
+// иначе пациент может до неё не долистать, и препарат так и останется без напоминаний.
+const setupFirst = computed(
+    () =>
+        !props.today.groups.some((group) =>
+            group.doses.some((dose) => dose.due && dose.status === 'scheduled'),
+        ),
 );
 
 // Приём, который пациент отмечает в диалоге, и с какой отметки диалог открыт.
@@ -174,6 +182,14 @@ function keepInView(card: Element, container: HTMLElement): () => void {
             <TodaySummary v-if="today.groups.length" :groups="today.groups" />
         </header>
 
+        <template v-if="setupFirst">
+            <TimeSetupCard
+                v-for="prescription in timeSetup"
+                :key="prescription.id"
+                :prescription="prescription"
+            />
+        </template>
+
         <section class="flex flex-col gap-3" data-test="today">
             <h2 class="sr-only">Приёмы на сегодня</h2>
 
@@ -205,40 +221,14 @@ function keepInView(card: Element, container: HTMLElement): () => void {
             />
         </section>
 
-        <section
-            v-for="prescription in timeSetup"
-            :key="prescription.id"
-            class="flex items-start gap-4 rounded-2xl border border-primary/50 bg-card p-4 shadow-xs"
-            data-test="time-setup"
-        >
-            <div
-                class="flex size-11 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground"
-            >
-                <Clock class="size-6" />
-            </div>
-            <div class="flex min-w-0 flex-1 flex-col items-start gap-3">
-                <div class="flex flex-col gap-1">
-                    <h2 class="text-lg font-semibold">
-                        Настройте время приёма
-                    </h2>
-                    <p class="break-words">
-                        {{ prescription.title }}: выберите, во сколько вы будете
-                        принимать препарат.
-                    </p>
-                </div>
-                <Button size="lg" variant="secondary" as-child>
-                    <Link
-                        :href="
-                            IntakeTimeController.edit(prescription.id, {
-                                query: { from: 'today' },
-                            })
-                        "
-                    >
-                        Выбрать время
-                    </Link>
-                </Button>
-            </div>
-        </section>
+        <!-- Пока сейчас нечего принимать, настройка времени — над расписанием, иначе — после. -->
+        <template v-if="!setupFirst">
+            <TimeSetupCard
+                v-for="prescription in timeSetup"
+                :key="prescription.id"
+                :prescription="prescription"
+            />
+        </template>
 
         <section
             v-if="yesterday.groups.length"

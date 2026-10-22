@@ -129,6 +129,9 @@ test('patient takes doses at the same time at once and marks a missed dose with 
         ->click('[data-test="yesterday"] [data-test="edit-dose-mark"]')
         ->assertSee('Изменить отметку')
         ->click('[data-test="cancel-dose-mark"]')
+        // Переспрашивает, как удаление записи «по необходимости».
+        ->assertSee('Убрать отметку о приёме?')
+        ->click('[data-test="confirm-cancel-dose-mark"]')
         ->assertSee('Отметка отменена.')
         ->assertSeeIn('[data-test="yesterday"]', 'Нет отметки')
         ->assertScript(FITS_SCREEN)

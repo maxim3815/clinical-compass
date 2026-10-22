@@ -15,6 +15,8 @@ const props = defineProps<{
     failed?: boolean;
     // Какой препарат проверяется.
     drug: string | null;
+    // Профиль пациента: внести недостающие данные, не теряя форму (в новой вкладке).
+    profileUrl?: string;
 }>();
 
 const emit = defineEmits<{
@@ -156,6 +158,8 @@ const cautions = (items: SafetyResult[]) =>
             v-if="report"
             :unchecked="report.unchecked"
             :unknown-drugs="report.unknown_drugs"
+            :profile-href="profileUrl"
+            new-tab
             open
         />
     </section>

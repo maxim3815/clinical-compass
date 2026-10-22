@@ -27,8 +27,6 @@ defineOptions({
 <template>
     <Head title="Пароль" />
 
-    <h1 class="sr-only">Пароль</h1>
-
     <div class="space-y-6">
         <Heading
             variant="small"

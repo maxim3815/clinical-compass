@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { useRealtime } from '@/composables/useRealtime';
+import { CHIP_ICON, DANGER_CHIP, MESSAGE_CHIP } from '@/lib/chips';
 import { formatAge, plural } from '@/lib/plural';
 import { index as invitations } from '@/routes/doctor/invitations';
 import { index, show } from '@/routes/doctor/patients';
@@ -263,7 +264,7 @@ useRealtime(channel, 'unread.changed', () =>
                                         </Link>
                                     </th>
                                     <th class="px-4 py-3 font-medium">
-                                        Отметки
+                                        Внимание
                                     </th>
                                     <th class="w-[9%] px-4 py-3 font-medium">
                                         Возраст
@@ -277,7 +278,7 @@ useRealtime(channel, 'unread.changed', () =>
                                 <tr
                                     v-for="patient in patients.data"
                                     :key="patient.id"
-                                    class="relative border-t transition-colors first:border-t-0 hover:bg-accent/50 @max-2xl:flex @max-2xl:flex-wrap @max-2xl:items-center @max-2xl:gap-x-3 @max-2xl:gap-y-1 @max-2xl:p-4"
+                                    class="relative border-t transition-colors first:border-t-0 hover:bg-accent/50 has-[a:focus-visible]:bg-accent/50 @max-2xl:flex @max-2xl:flex-wrap @max-2xl:items-center @max-2xl:gap-x-3 @max-2xl:gap-y-1 @max-2xl:p-4"
                                     data-test="patient-row"
                                     :data-signal="
                                         patient.adherence.raised || undefined
@@ -342,23 +343,24 @@ useRealtime(channel, 'unread.changed', () =>
                                                     patient.contraindications >
                                                     0
                                                 "
-                                                class="inline-flex items-start gap-1 rounded-md border border-danger-border bg-danger-subtle px-1.5 py-0.5 font-medium text-danger"
+                                                :class="DANGER_CHIP"
                                                 data-test="contraindication-mark"
                                             >
                                                 <OctagonAlert
-                                                    class="mt-0.5 size-3.5 shrink-0"
+                                                    :class="CHIP_ICON"
                                                 />
                                                 Противопоказание без решения
                                             </span>
                                             <Link
                                                 v-if="patient.unread > 0"
                                                 :href="chat(patient.id)"
-                                                class="relative z-10 inline-flex items-center gap-1 rounded-md bg-secondary px-1.5 py-0.5 font-medium whitespace-nowrap text-secondary-foreground hover:bg-secondary-hover pointer-coarse:min-h-11 pointer-coarse:px-3"
+                                                class="relative z-10 whitespace-nowrap pointer-coarse:min-h-11 pointer-coarse:px-3"
+                                                :class="MESSAGE_CHIP"
                                                 :aria-label="`Сообщения: ${messages(patient.unread)}, ${patient.name}`"
                                                 data-test="unread-mark"
                                             >
                                                 <MessageCircle
-                                                    class="size-3.5 shrink-0"
+                                                    class="size-4 shrink-0"
                                                 />
                                                 {{ messages(patient.unread) }}
                                             </Link>
