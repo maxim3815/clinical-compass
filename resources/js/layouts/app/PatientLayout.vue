@@ -23,7 +23,11 @@ const page = usePage();
 // На формах панели вкладок нет: случайное касание вкладки не уносит введённое, а выйти
 // можно ссылкой назад в шапке или кнопкой «Отмена».
 const isForm = computed(() =>
-    ['patient/MedicationForm', 'patient/IntakeTimes'].includes(page.component),
+    [
+        'patient/MedicationForm',
+        'patient/IntakeTimes',
+        'patient/Questionnaire',
+    ].includes(page.component),
 );
 
 // Пока на телефоне открыта клавиатура, панель вкладок прячется: иначе Android поднимает её

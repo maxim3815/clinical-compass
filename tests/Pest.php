@@ -432,6 +432,28 @@ function loadSafetyRules(): void
 }
 
 /**
+ * Опросники GAD-7 и PHQ-9 из файлов приложения, как на стенде.
+ */
+function loadScales(): void
+{
+    expect(Artisan::call('app:scales:import'))->toBe(0);
+}
+
+/**
+ * Ответы на все опросники с заданными баллами: на каждый вопрос GAD-7 — $gad7, PHQ-9 — $phq9,
+ * на 9-й вопрос PHQ-9 — $phq9Item9.
+ *
+ * @return array<string, list<int>>
+ */
+function assessmentAnswers(int $gad7 = 1, int $phq9 = 1, ?int $phq9Item9 = null): array
+{
+    return [
+        'gad7' => array_fill(0, 7, $gad7),
+        'phq9' => [...array_fill(0, 8, $phq9), $phq9Item9 ?? $phq9],
+    ];
+}
+
+/**
  * Диагноз пациента по МКБ-10 сегодняшним числом, поставил его лечащий врач. Справочник МКБ-10
  * в тестах не загружается: код создаётся, если его нет. Находки не пересчитываются.
  */

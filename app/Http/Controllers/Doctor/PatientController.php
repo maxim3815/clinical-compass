@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Support\Adherence\AdherenceSignal;
 use App\Support\Adherence\AdherenceSignals;
 use App\Support\Adherence\PatientAdherence;
+use App\Support\Assessments\PatientAssessments;
 use App\Support\AttentionQueue;
 use App\Support\DisplayTime;
 use App\Support\PrescriptionPresenter;
@@ -141,6 +142,8 @@ class PatientController extends Controller
             'unread' => UnreadMessages::byPatient($doctor, [$patient->id])[$patient->id] ?? 0,
             'cancelReasons' => PrescriptionCancelReason::options(),
             'clinicalProfile' => ClinicalProfilePresenter::present($patient),
+            // Опросники, которые заполняет пациент: суммы, степени, изменение и ответы.
+            'wellbeing' => PatientAssessments::forDoctor($patient),
             // Находки и «Не проверено» по id назначения, у назначений врача и своих препаратов пациента.
             'safety' => (object) $safetyPresenter->card($patient),
             'justificationLimit' => SafetyAcknowledgement::MAX_JUSTIFICATION_LENGTH,

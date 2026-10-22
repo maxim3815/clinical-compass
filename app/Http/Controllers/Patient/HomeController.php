@@ -10,6 +10,7 @@ use App\Models\AsNeededDose;
 use App\Models\DoseEvent;
 use App\Models\Prescription;
 use App\Models\User;
+use App\Support\Assessments\PatientAssessments;
 use App\Support\DoseEventPresenter;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -63,6 +64,8 @@ class HomeController extends Controller
             ],
             'asNeeded' => $this->asNeeded($patient, $today, $timezone),
             'skipReasons' => DoseSkipReason::options($female),
+            // Опросники по календарю: карточка «Пора ответить», когда срок наступил.
+            'assessments' => PatientAssessments::status($patient),
         ]);
     }
 

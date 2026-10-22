@@ -5,6 +5,7 @@ use App\Enums\PrescriptionCancelReason;
 use App\Enums\PrescriptionSource;
 use App\Enums\UserRole;
 use App\Models\AccessLink;
+use App\Models\Assessment;
 use App\Models\DoseEvent;
 use App\Models\Drug;
 use App\Models\Message;
@@ -14,6 +15,7 @@ use App\Models\User;
 use App\Notifications\DoseReminder;
 use App\Support\Adherence\AdherenceSignals;
 use App\Support\Adherence\PatientAdherence;
+use App\Support\Assessments\PatientAssessments;
 use App\Support\DisplayTime;
 use App\Support\PatientSignals;
 use App\Support\Safety\SafetyPresenter;
@@ -38,8 +40,8 @@ test('demo seeder builds the planned doctors, patients and courses and can be ru
 
     expect($doctor->role)->toBe(UserRole::Doctor)
         ->and($doctor->doctorProfile?->specialty)->toBe('Психиатр')
-        ->and($doctor->patients()->count())->toBe(13)
-        ->and($doctor2->patients()->pluck('login')->sort()->values()->all())->toBe(['patient4', 'patient_4b'])
+        ->and($doctor->patients()->count())->toBe(14)
+        ->and($doctor2->patients()->pluck('login')->all())->toBe(['patient_4b'])
         ->and(User::query()->count())->toBe(17)
         ->and(User::query()->where('role', UserRole::Patient)->whereDoesntHave('patientProfile')->exists())->toBeFalse()
         ->and(User::query()->get()->every(fn (User $user) => Hash::check('password', $user->password)))->toBeTrue()
@@ -151,6 +153,28 @@ test('demo seeder builds the planned doctors, patients and courses and can be ru
         ->all();
 
     expect($unread)->toBe(['patient3' => 1, 'patient_4b' => 2]);
+
+    // Опросники по профилям у всех, у кого в профиле есть баллы. Морозова ещё не заполняла:
+    // оба опросника ждут её на «Сегодня». Ответ на 9-й вопрос PHQ-9 везде 0: демо-алертов нет.
+    $filled = Assessment::query()->with('patient')->get()->groupBy(fn (Assessment $assessment): string => $assessment->patient->login);
+    $status = fn (string $login): ?array => PatientAssessments::status($patient($login));
+    $last = fn (string $login, string $scale): ?int => Assessment::query()
+        ->where('patient_id', $patient($login)->id)
+        ->whereRelation('scale', 'code', $scale)
+        ->orderByDesc('submitted_at')
+        ->value('total');
+
+    expect($filled->keys()->sort()->values()->all())->toBe([
+        'patient', 'patient2', 'patient3', 'patient_1b', 'patient_1c', 'patient_1d', 'patient_2b', 'patient_2c', 'patient_4c', 'patient_norm1', 'patient_norm2',
+    ])
+        ->and(Assessment::query()->whereRelation('scale', 'code', 'phq9')->whereHas('answers', fn ($query) => $query->where('item', 9)->where('score', '>', 0))->exists())->toBeFalse()
+        ->and($filled['patient']->count())->toBe(14)
+        ->and($last('patient', 'gad7'))->toBe(4)
+        ->and($last('patient', 'phq9'))->toBe(2)
+        ->and($status('patient')['due'] ?? null)->toBeFalse()
+        ->and($last('patient_norm2', 'gad7'))->toBe(1)
+        ->and($last('patient_2b', 'gad7'))->toBe(14)
+        ->and($status('patient4'))->toMatchArray(['due' => true, 'last' => null]);
 
     $this->get(route('invitation.show', DemoSeeder::INVITATION_TOKEN))
         ->assertOk()

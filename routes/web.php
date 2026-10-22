@@ -16,6 +16,7 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InvitationRegistrationController;
 use App\Http\Controllers\PasswordResetByLinkController;
 use App\Http\Controllers\Patient\AsNeededDoseController;
+use App\Http\Controllers\Patient\AssessmentController;
 use App\Http\Controllers\Patient\ChatController as PatientChatController;
 use App\Http\Controllers\Patient\DoseController;
 use App\Http\Controllers\Patient\HomeController as PatientHomeController;
@@ -139,6 +140,14 @@ Route::middleware('auth')->group(function () {
         Route::put('medications/{prescription}/times', [IntakeTimeController::class, 'update'])
             ->whereNumber('prescription')
             ->name('intake-times.update');
+
+        // Опросники: раздел «Самочувствие», заполнение и экран после отправки.
+        Route::get('wellbeing', [AssessmentController::class, 'index'])->name('wellbeing');
+        Route::get('questionnaires', [AssessmentController::class, 'create'])->name('questionnaires.create');
+        Route::post('questionnaires', [AssessmentController::class, 'store'])->name('questionnaires.store');
+        Route::get('questionnaires/{assessment}/sent', [AssessmentController::class, 'sent'])
+            ->whereNumber('assessment')
+            ->name('questionnaires.sent');
 
         Route::get('chat', [PatientChatController::class, 'show'])->name('chat.show');
         Route::get('chat/messages', [PatientChatController::class, 'messages'])->name('chat.messages');

@@ -22,6 +22,7 @@ import OneTimeLink from '@/components/OneTimeLink.vue';
 import PrescriptionDetails from '@/components/PrescriptionDetails.vue';
 import PrescriptionHistory from '@/components/PrescriptionHistory.vue';
 import PrescriptionSafety from '@/components/PrescriptionSafety.vue';
+import WellbeingSection from '@/components/WellbeingSection.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CHIP_ICON, DANGER_CHIP } from '@/lib/chips';
@@ -36,6 +37,7 @@ import type {
     SafetyCard,
     SafetyFinding,
     SelectOption,
+    Wellbeing,
 } from '@/types';
 
 type Patient = {
@@ -57,6 +59,8 @@ const props = defineProps<{
     adherenceSignal: Signal;
     cancelReasons: SelectOption[];
     clinicalProfile: ClinicalProfile;
+    // Опросники пациента: суммы, степени, изменение и ответы.
+    wellbeing: Wellbeing;
     // Находки и «Не проверено» по id назначения.
     safety: Record<number, SafetyCard>;
     justificationLimit: number;
@@ -208,6 +212,34 @@ function closing(prescription: Prescription): string {
         : `отменено ${prescription.closed_at?.split(' ')[0]}: ${prescription.cancel_reason.toLowerCase()}`;
 }
 
+// Опросники в шапке: дата и суммы со степенью последнего заполнения и незаполненный срок.
+const questionnaires = computed(() => {
+    const filled = props.wellbeing.scales.filter(
+        (scale) => scale.latest !== null,
+    );
+    const status = props.wellbeing.status;
+    const due = status?.due
+        ? `срок ${status.due_since?.slice(0, 5)} не заполнен`
+        : null;
+
+    if (filled.length === 0 && due === null) {
+        return null;
+    }
+
+    return {
+        title:
+            filled.length === 0
+                ? 'Опросники:'
+                : `Опросники ${filled[0].latest!.date.slice(0, 5)}:`,
+        scores: filled.map((scale, index) => ({
+            name: scale.name,
+            total: `${scale.name} ${scale.latest!.total}`,
+            band: `, ${scale.latest!.band}${index < filled.length - 1 ? ' · ' : ''}`,
+        })),
+        due: due === null ? null : filled.length === 0 ? due : ` · ${due}`,
+    };
+});
+
 const unreadLabel = computed(
     () =>
         `${props.unread} ${plural(props.unread, ['новое', 'новых', 'новых'])}`,
@@ -269,7 +301,8 @@ const unreadLabel = computed(
                 v-if="
                     awaiting.length > 0 ||
                     adherenceSignal.raised ||
-                    adherenceSignal.share !== null
+                    adherenceSignal.share !== null ||
+                    questionnaires !== null
                 "
                 class="flex flex-wrap gap-2 text-sm"
                 aria-label="Сводка"
@@ -311,6 +344,31 @@ const unreadLabel = computed(
                         <span class="font-semibold tabular-nums"
                             >{{ adherenceSignal.share }}%</span
                         >
+                        <ArrowDown class="size-4 shrink-0" />
+                    </a>
+                </li>
+                <li v-if="questionnaires">
+                    <a
+                        href="#wellbeing"
+                        class="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 hover:underline pointer-coarse:min-h-11"
+                        data-test="card-wellbeing"
+                    >
+                        <!-- Суммы полужирные: высокая сумма видна сразу. -->
+                        <span>
+                            {{ `${questionnaires.title} ` }}
+                            <template
+                                v-for="score in questionnaires.scores"
+                                :key="score.name"
+                            >
+                                <span class="font-semibold tabular-nums">{{
+                                    score.total
+                                }}</span
+                                ><span>{{ score.band }}</span>
+                            </template>
+                            <span v-if="questionnaires.due">{{
+                                questionnaires.due
+                            }}</span>
+                        </span>
                         <ArrowDown class="size-4 shrink-0" />
                     </a>
                 </li>
@@ -543,6 +601,8 @@ const unreadLabel = computed(
                         />
                     </template>
                 </section>
+
+                <WellbeingSection :wellbeing="wellbeing" class="order-3" />
 
                 <section
                     v-if="prescriptionHistory.length > 0"

@@ -20,11 +20,18 @@ import TimeSetupCard from '@/components/TimeSetupCard.vue';
 import DoseMarkDialog from '@/components/DoseMarkDialog.vue';
 import InstallAppBanner from '@/components/InstallAppBanner.vue';
 import PushBanner from '@/components/PushBanner.vue';
+import QuestionnaireCard from '@/components/QuestionnaireCard.vue';
 import TodaySummary from '@/components/TodaySummary.vue';
 import { Button } from '@/components/ui/button';
 import { home } from '@/routes/patient';
 import { show as chat } from '@/routes/patient/chat';
-import type { AsNeeded, Dose, DoseGroup, SelectOption } from '@/types';
+import type {
+    AsNeeded,
+    AssessmentStatus,
+    Dose,
+    DoseGroup,
+    SelectOption,
+} from '@/types';
 
 type Doctor = {
     name: string;
@@ -50,6 +57,8 @@ const props = defineProps<{
     };
     asNeeded: AsNeeded[];
     skipReasons: SelectOption[];
+    // Опросники по календарю; null — опросников нет или пациент не прикреплён к врачу.
+    assessments: AssessmentStatus | null;
 }>();
 
 defineOptions({
@@ -165,9 +174,9 @@ function keepInView(card: Element, container: HTMLElement): () => void {
     <Head title="Сегодня" />
 
     <!--
-        Сверху вниз: итог дня, приёмы на сегодня, что нужно настроить, вчерашние приёмы без
-        отметки и «по необходимости». Баннеры напоминаний и установки идут после приёмов,
-        чтобы не сдвигать их с первого экрана.
+        Сверху вниз: итог дня, приёмы на сегодня, что нужно настроить, опросники, если пора их
+        заполнить, вчерашние приёмы без отметки и «по необходимости». Баннеры напоминаний
+        и установки идут после приёмов, чтобы не сдвигать их с первого экрана.
     -->
     <div ref="content" class="flex flex-col gap-6 p-4">
         <header class="flex flex-col gap-3">
@@ -188,6 +197,7 @@ function keepInView(card: Element, container: HTMLElement): () => void {
                 :key="prescription.id"
                 :prescription="prescription"
             />
+            <QuestionnaireCard v-if="assessments?.due" :status="assessments" />
         </template>
 
         <section class="flex flex-col gap-3" data-test="today">
@@ -221,13 +231,17 @@ function keepInView(card: Element, container: HTMLElement): () => void {
             />
         </section>
 
-        <!-- Пока сейчас нечего принимать, настройка времени — над расписанием, иначе — после. -->
+        <!--
+            Пока сейчас нечего принимать, настройка времени и опросники — над расписанием,
+            иначе — после.
+        -->
         <template v-if="!setupFirst">
             <TimeSetupCard
                 v-for="prescription in timeSetup"
                 :key="prescription.id"
                 :prescription="prescription"
             />
+            <QuestionnaireCard v-if="assessments?.due" :status="assessments" />
         </template>
 
         <section
@@ -275,6 +289,12 @@ function keepInView(card: Element, container: HTMLElement): () => void {
         <InstallAppBanner />
 
         <PushBanner />
+
+        <!-- В дни без срока — ссылка в «Самочувствие». -->
+        <QuestionnaireCard
+            v-if="assessments && !assessments.due"
+            :status="assessments"
+        />
 
         <section
             v-if="doctor"

@@ -15,6 +15,7 @@ use App\Actions\SendMessage;
 use App\Actions\SetIntakeTimes;
 use App\Actions\SetPatientSex;
 use App\Actions\SkipDose;
+use App\Actions\SubmitAssessments;
 use App\Actions\SyncDoseEvents;
 use App\Actions\TakeDose;
 use App\Enums\ObservationValueType;
@@ -29,6 +30,7 @@ use App\Models\Icd10Code;
 use App\Models\Message;
 use App\Models\ObservationType;
 use App\Models\Prescription;
+use App\Models\Scale;
 use App\Models\User;
 use App\Support\DisplayTime;
 use App\Support\OwnMedicationData;
@@ -37,11 +39,12 @@ use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Closure;
 use Illuminate\Support\Carbon;
+use RuntimeException;
 
 /**
  * Проигрывает историю демо-пациента через действия приложения со сдвинутыми часами: врач
- * заполняет клинический профиль и назначает препарат, пациент выбирает время и отмечает приёмы,
- * они переписываются. Поэтому
+ * заполняет клинический профиль и назначает препарат, пациент выбирает время, отмечает приёмы
+ * и заполняет опросники по календарю, они переписываются. Поэтому
  * у истории те же поля и правила, что у настоящей. Чего к текущему моменту ещё не случилось,
  * то не происходит: такие приёмы ждут отметки. Пропуски потом отмечает mark-missed.
  */
@@ -91,6 +94,7 @@ final class DemoHistory
         private readonly AddDiagnosis $addDiagnosis,
         private readonly ResolveDiagnosis $resolveDiagnosis,
         private readonly RecordObservation $recordObservation,
+        private readonly SubmitAssessments $submitAssessments,
     ) {}
 
     public function play(DemoPatient $plan, User $doctor, string $password): User
@@ -106,9 +110,15 @@ final class DemoHistory
         $today = DisplayTime::today();
 
         try {
-            // Пациент появляется накануне первого курса: в этот вечер врач назначает препарат.
+            // Пациент появляется накануне первого курса: в этот вечер врач назначает препарат. Без
+            // курсов — сейчас, а если у него есть опросники — вчера вечером: первый опросник
+            // заполнен при регистрации.
             $starts = array_map(fn (DemoCourse $course): CarbonImmutable => $today->subDays($course->today - 1), $plan->courses);
-            $createdAt = $starts === [] ? $now : $this->moment(min($starts)->subDay(), '18:00');
+            $createdAt = match (true) {
+                $starts !== [] => $this->moment(min($starts)->subDay(), '18:00'),
+                $plan->scales !== [] => $this->moment($today->subDay(), '18:00'),
+                default => $now,
+            };
             $this->travelTo($createdAt);
             $patient = $this->createPatient->handle(
                 doctor: $doctor,
@@ -136,6 +146,8 @@ final class DemoHistory
             foreach ($plan->messages as $index => $message) {
                 $this->message($patient, $doctor, $index, $message, $today->subDays($message->daysAgo));
             }
+
+            $this->assessments($patient, $plan, $createdAt, $today);
 
             usort($this->steps, fn (array $a, array $b): int => [$a[0], $a[1]] <=> [$b[0], $b[1]]);
 
@@ -274,6 +286,40 @@ final class DemoHistory
             foreach ($course->asNeeded[$day] ?? [] as $time) {
                 $this->step($this->moment($date, $time), fn () => $this->recordAsNeededDose->handle($patient, $this->prescriptions[$index]));
             }
+        }
+    }
+
+    /**
+     * Опросники на каждом наступившем сроке календаря: на дне 0 — сразу после регистрации,
+     * на остальных — вечером в день срока. Срок, который наступил сегодня, закрыт заполнением
+     * накануне: так картина не зависит от времени запуска сидера.
+     */
+    private function assessments(User $patient, DemoPatient $plan, CarbonImmutable $createdAt, CarbonImmutable $today): void
+    {
+        if ($plan->scales === []) {
+            return;
+        }
+
+        $scales = Scale::query()->active()->orderBy('position')->get();
+        $start = CarbonImmutable::parse($createdAt->setTimezone(DisplayTime::TIMEZONE)->toDateString(), 'UTC');
+
+        // У опросников один календарь: они заполняются вместе.
+        foreach ($scales->firstOrFail()->calendar()->dueDates($start, $today) as $due) {
+            $day = (int) $start->diffInDays($due);
+            $answers = [];
+
+            foreach ($scales as $scale) {
+                $anchors = $plan->scales[$scale->code] ?? throw new RuntimeException("{$plan->login}: нет сумм опросника {$scale->code}.");
+                $answers[$scale->code] = DemoAnswers::split($scale, DemoAnswers::total($anchors, $day));
+            }
+
+            $moment = match (true) {
+                $day === 0 => $createdAt->addMinutes(20),
+                $due->eq($today) => $this->moment($today->subDay(), '19:30'),
+                default => $this->moment($due, '19:00'),
+            };
+
+            $this->step($moment, fn () => $this->submitAssessments->handle($patient, $answers));
         }
     }
 
