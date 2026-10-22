@@ -37,6 +37,9 @@ test('doctor gives a pin at the appointment, the patient enters it on the phone 
         ->assertSee('Подключение к врачу')
         ->assertSee('Врач: Смирнова Анна Сергеевна, психиатр.')
         ->assertAttribute('[aria-label="Цифра 1 из 4"]', 'inputmode', 'numeric')
+        // Нажатие на клетку правее пустой ведёт в первую пустую: цифры идут по порядку.
+        ->click('[aria-label="Цифра 3 из 4"]')
+        ->assertScript('document.activeElement?.getAttribute("aria-label")', 'Цифра 1 из 4')
         // Подсказки кодов из SMS над клавиатурой не нужны: это не код из сообщения.
         ->assertAttribute('[aria-label="Цифра 1 из 4"]', 'autocomplete', 'off')
         // Неверный код: ошибка, ячейки пустые, фокус в первой — можно набирать снова.

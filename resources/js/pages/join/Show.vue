@@ -39,6 +39,21 @@ watch(digits, (value) => {
     }
 });
 
+// Цифры набираются по порядку: фокус в клетке правее пустой переходит в первую пустую.
+// Клавиатура при этом не закрывается: её уже открыло нажатие на клетку.
+function focusFirstEmpty(event: FocusEvent): void {
+    const cells = [
+        ...(root.value?.querySelectorAll<HTMLInputElement>('[data-pin-cell]') ??
+            []),
+    ];
+    const empty = cells.findIndex((cell) => cell.value === '');
+    const current = cells.indexOf(event.target as HTMLInputElement);
+
+    if (empty !== -1 && current > empty) {
+        cells[empty].focus();
+    }
+}
+
 // Четвёртая цифра — сразу проверка, без кнопки. Верный PIN ведёт в форму регистрации.
 // Ячейки на время проверки не отключаются: иначе на телефоне закрывается клавиатура.
 function submit(value: (number | undefined)[]): void {
@@ -69,7 +84,13 @@ function submit(value: (number | undefined)[]): void {
         <p id="pin-label" class="text-base font-medium">
             Нажмите на клетку и наберите 4 цифры, которые назвал врач
         </p>
-        <div ref="root">
+        <!--
+            reka-ui в режиме otp отменяет нажатие на клетку правее первой пустой и ставит фокус
+            скриптом, а на Android клавиатура от такого фокуса не открывается. Поэтому нажатие
+            до клеток не доходит: клетка получает фокус сама и клавиатура открывается, а уже
+            потом фокус переходит в первую пустую клетку (focusFirstEmpty).
+        -->
+        <div ref="root" @mousedown.capture.stop @focusin="focusFirstEmpty">
             <!--
                 otp — клетки заполняются по порядку: нажатие на любую ведёт в первую пустую.
                 autocomplete="off" на клетках перекрывает one-time-code из otp, иначе телефон
@@ -92,6 +113,7 @@ function submit(value: (number | undefined)[]): void {
                     v-focus="index === 1"
                     :index="index - 1"
                     :aria-label="`Цифра ${index} из ${PIN_LENGTH}`"
+                    data-pin-cell
                     autocomplete="off"
                     :aria-invalid="error ? true : undefined"
                     aria-describedby="pin-error"
