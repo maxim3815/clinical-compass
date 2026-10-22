@@ -105,7 +105,7 @@ class DoseController extends Controller
             return $this->rejected($e);
         }
 
-        Inertia::flash('toast', ['type' => 'success', 'message' => 'Отметка отменена.']);
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Отметка убрана.']);
 
         return to_route('patient.home');
     }

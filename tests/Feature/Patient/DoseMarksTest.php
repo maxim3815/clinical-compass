@@ -299,7 +299,7 @@ test('cancelling a mark returns the dose to scheduled or missed', function () {
     foreach ([$today, $yesterday] as $dose) {
         $this->delete(route('patient.doses.cancel', $dose))
             ->assertRedirect(route('patient.home'))
-            ->assertInertiaFlash('toast', ['type' => 'success', 'message' => 'Отметка отменена.']);
+            ->assertInertiaFlash('toast', ['type' => 'success', 'message' => 'Отметка убрана.']);
     }
 
     // Окно утреннего приёма открыто до 14:00, вчерашнего вечернего закрылось ночью.
