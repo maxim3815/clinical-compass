@@ -327,8 +327,11 @@ useRealtime<InvitationChanged>(
                                 <CircleCheck
                                     class="mt-0.5 size-4 shrink-0 text-success"
                                 />
+                                <!-- Без рода: пол пациента при регистрации ещё неизвестен. -->
                                 {{
-                                    `${patient?.name ?? 'Пациент'} зарегистрирован.`
+                                    patient
+                                        ? `Регистрация завершена: ${patient.name}.`
+                                        : 'Регистрация завершена.'
                                 }}
                             </p>
                             <Button v-if="patient" as-child class="self-start">

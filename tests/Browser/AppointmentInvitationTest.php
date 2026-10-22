@@ -66,7 +66,7 @@ test('doctor gives a pin at the appointment, the patient enters it on the phone 
         ->assertPathIs('/patient')
         ->assertNoJavaScriptErrors();
 
-    waitForText($doctorPage, 'Кузьмин Олег Викторович зарегистрирован.')
+    waitForText($doctorPage, 'Регистрация завершена: Кузьмин Олег Викторович.')
         // Приглашение появилось в списке под окном без перезагрузки.
         ->assertSeeIn('[data-test="invitation-row"]', 'Кузьмин Олег Викторович')
         ->click('[data-test="appointment-open-patient"]')

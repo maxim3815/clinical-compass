@@ -100,6 +100,7 @@ function submit(value: (number | undefined)[]): void {
                 v-model="digits"
                 type="number"
                 otp
+                name="pin"
                 :disabled="locked !== null"
                 role="group"
                 class="flex justify-center gap-2 min-[400px]:gap-3"
@@ -111,6 +112,7 @@ function submit(value: (number | undefined)[]): void {
                     v-for="index in PIN_LENGTH"
                     :key="index"
                     v-focus="index === 1"
+                    :id="`pin-${index}`"
                     :index="index - 1"
                     :aria-label="`Цифра ${index} из ${PIN_LENGTH}`"
                     data-pin-cell
