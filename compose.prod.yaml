@@ -111,8 +111,29 @@ services:
       POSTGRES_DB: ${DB_DATABASE:?DB_DATABASE is not set}
       POSTGRES_USER: ${DB_USERNAME:?DB_USERNAME is not set}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is not set}
+    # Архив WAL для восстановления на любую минуту: закрытый сегмент сжимается в backups/wal
+    # рядом с этим файлом, оттуда его забирает выгрузка вне сервера. Сегмент закрывается не реже
+    # раза в минуту, даже если записей мало: столько данных теряется, если пропадёт сервер
+    # целиком, плюс задержка выгрузки. Каталог архива отдаём postgres перед запуском сервера.
+    entrypoint:
+      ["sh", "-c", 'install -d -o postgres -g postgres -m 0700 /wal-archive && exec docker-entrypoint.sh "$$@"', "sh"]
+    command:
+      [
+        "postgres",
+        "-c",
+        "archive_mode=on",
+        "-c",
+        "archive_command=/usr/local/bin/archive-wal %p %f",
+        "-c",
+        "archive_timeout=60",
+      ]
+    configs:
+      - source: archive-wal
+        target: /usr/local/bin/archive-wal
+        mode: 0555
     volumes:
       - ./data/postgres:/var/lib/postgresql
+      - ./backups/wal:/wal-archive
     healthcheck:
       # По TCP, а не через сокет: во время init-скриптов временный сервер слушает только сокет.
       test: ["CMD-SHELL", 'pg_isready -h 127.0.0.1 -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
@@ -181,3 +202,24 @@ services:
       resources:
         limits:
           memory: 128m
+
+configs:
+  # archive_command: сжатый сегмент WAL (или .history, .backup) в архив. Повтор после сбоя:
+  # такой же файл уже в архиве — успех; другой с тем же именем — ошибка, архив не перезаписываем.
+  # Восстановление читает архив командой restore_command = 'gzip -dc /wal-archive/%f.gz > %p'.
+  archive-wal:
+    content: |
+      #!/bin/sh
+      set -eu
+      src="$$1"
+      dst="/wal-archive/$$2.gz"
+      if [ -f "$$dst" ]; then
+          if gzip -dc "$$dst" | cmp -s - "$$src"; then
+              exit 0
+          fi
+          echo "archive-wal: $$dst already exists with different content" >&2
+          exit 1
+      fi
+      gzip -c "$$src" > "$$dst.tmp"
+      sync "$$dst.tmp"
+      mv "$$dst.tmp" "$$dst"

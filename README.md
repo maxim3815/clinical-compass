@@ -414,7 +414,7 @@ make npm c="run build"
 | `php`                          | `clinical-compass/php`   | php-fpm с `php.ini-production` и opcache, процессы запускаются по запросу (не больше 5)                                                   |
 | `queue`, `scheduler`, `reverb` | `clinical-compass/php`   | Очередь (`queue:work`), планировщик и Reverb                                                                                              |
 | `ssr`                          | `clinical-compass/ssr`   | Серверная отрисовка страниц на Node. Если сервис недоступен, страницы рисуются в браузере                                                 |
-| `postgres`                     | `postgres:18.6-trixie`   | Данные в `./data/postgres` рядом с `compose.prod.yaml`                                                                                    |
+| `postgres`                     | `postgres:18.6-trixie`   | Данные в `./data/postgres` рядом с `compose.prod.yaml`, архив WAL в `./backups/wal` (раздел «Резервные копии и восстановление»)           |
 
 Образы собираются из stages `prod`, `prod-nginx` и `prod-ssr` файла `docker/php/Dockerfile`: Composer ставит пакеты без dev-зависимостей, фронтенд и серверная сборка собираются внутри Docker. Контейнеры на образе `php` при запуске выполняют `php artisan optimize`, поэтому кэш конфигурации всегда собран из их переменных окружения. Лимиты памяти в `compose.prod.yaml` рассчитаны на сервер с 2 ГБ памяти.
 
@@ -486,4 +486,51 @@ docker compose -f compose.prod.yaml exec php php artisan app:doctor:create
 
 ```sh
 docker compose -f compose.prod.yaml exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > backup.dump
+```
+
+### Резервные копии и восстановление
+
+Что защищает данные:
+
+- **Подтверждённые записи не теряются при падении базы или контейнера.** PostgreSQL записывает транзакцию в журнал (WAL) до ответа приложению и после перезапуска дочитывает его сам. Отметка приёма, сообщение и ответы опросника сохраняются целиком или не сохраняются вовсе. Задача проверки алерта ставится в очередь в той же транзакции, что и ответы: очередь лежит в той же базе.
+- **Архив WAL.** `compose.prod.yaml` включает `archive_mode`: каждый закрытый сегмент журнала сжимается в `./backups/wal` рядом с `compose.prod.yaml`. Сегмент закрывается не реже раза в минуту (`archive_timeout`), даже если записей мало. Вместе с базовой копией архив позволяет восстановить базу на любую минуту.
+- **Ночная копия.** Дамп `pg_dump -Fc` и базовая копия `pg_basebackup` со своим WAL в отдельном каталоге с `SHA256SUMS`:
+
+    ```sh
+    mkdir -m 700 copy
+    docker compose -f compose.prod.yaml exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > copy/compas.dump
+    docker compose -f compose.prod.yaml exec -T postgres sh -c 'pg_basebackup -U "$POSTGRES_USER" -D - -Ft -X fetch -c fast' | gzip > copy/base.tar.gz
+    (cd copy && sha256sum compas.dump base.tar.gz > SHA256SUMS)
+    ```
+
+- **Копия вне сервера.** Ночные копии и архив WAL нужно увозить с сервера: копия на том же диске не спасёт, если сервер пропадёт. На демо-стенде ночная копия делается в 01:15 UTC и в 02:00 уходит в объектное хранилище в РФ. Там хранятся 30 ежедневных и 12 ежемесячных копий. Архив WAL выгружается туда же раз в минуту и хранится 8 дней. Если пропадёт сервер, теряется только то, что записано после последней выгрузки WAL.
+
+В копиях нет секретов из `.env`. Без того же `APP_KEY` не прочитать зашифрованные поля, например текст сообщений чата. Храните `.env` отдельно от копий.
+
+**Восстановление на любую минуту или после потери сервера.** Нужны ночная копия, снятая раньше нужного момента, и архив WAL после неё:
+
+1. Остановите сервисы: `docker compose -f compose.prod.yaml down`. Прежний каталог `./data/postgres` переименуйте, не удаляйте.
+2. Подготовьте каталог данных. Время не указывайте, если нужно восстановить всё до последнего сегмента архива:
+
+    ```sh
+    sudo docker/postgres/restore.sh <каталог копии> data/postgres/18/docker "2026-10-23 10:15:00+03"
+    ```
+
+3. Положите архив WAL в `./backups/wal`.
+4. Запустите базу: `docker compose -f compose.prod.yaml up -d --wait postgres`. Сервер дочитает архив до нужного момента, откроет базу на новой ветке журнала и продолжит архивировать её.
+5. Запустите остальные сервисы: `docker compose -f compose.prod.yaml up -d --wait`.
+
+Проверить копию, не трогая рабочую базу, можно в одноразовом контейнере:
+
+```sh
+docker/postgres/restore.sh <каталог копии> /tmp/restore-check
+docker run -d --rm --name restore-check -e POSTGRES_PASSWORD=check \
+  -v /tmp/restore-check:/var/lib/postgresql/18/docker -v "$PWD/backups/wal:/wal-archive:ro" \
+  postgres:18.6-trixie -c archive_mode=off
+```
+
+Восстановление из дампа стирает текущие данные базы:
+
+```sh
+docker compose -f compose.prod.yaml exec -T postgres sh -c 'pg_restore --clean --if-exists -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < copy/compas.dump
 ```
