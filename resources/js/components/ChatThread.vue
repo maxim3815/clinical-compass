@@ -68,6 +68,20 @@ watch(
     },
 );
 
+// На маленьком экране страница чата прокручивается, и ошибка под полем оказывается
+// за нижней панелью: показываем её.
+watch(
+    () => form.errors.body,
+    async (error) => {
+        if (error) {
+            await nextTick();
+            document
+                .getElementById('chat-body-error')
+                ?.scrollIntoView({ block: 'nearest' });
+        }
+    },
+);
+
 onMounted(() => scrollToBottom());
 
 useRealtime<ChatMessage>(`chat.${props.chat.id}`, 'message.sent', (message) => {
