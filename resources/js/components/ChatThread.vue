@@ -46,7 +46,12 @@ const messages = ref<ChatMessage[]>([...props.chat.messages]);
 const hasEarlier = ref(props.chat.has_earlier);
 const list = useTemplateRef<HTMLElement>('list');
 
-const form = useHttp<{ body: string }, ChatMessage>({ body: '' });
+// Ключ отправки: повтор после потерянного ответа не создаёт второе сообщение. Новый текст —
+// новый ключ.
+const form = useHttp<{ body: string; key: string }, ChatMessage>({
+    body: '',
+    key: '',
+});
 const earlier = useHttp<
     { before: number },
     { messages: ChatMessage[]; has_earlier: boolean }
@@ -57,7 +62,10 @@ const tooLong = computed(() => form.body.length > MAX_LENGTH);
 
 watch(
     () => form.body,
-    () => form.clearErrors('body'),
+    () => {
+        form.clearErrors('body');
+        form.key = '';
+    },
 );
 
 onMounted(() => scrollToBottom());
@@ -109,6 +117,10 @@ function add(message: ChatMessage): void {
 async function send(): Promise<void> {
     if (form.processing) {
         return;
+    }
+
+    if (form.key === '') {
+        form.key = crypto.randomUUID();
     }
 
     // При ошибке проверки onSuccess не вызывается, текст ошибки уже под полем.

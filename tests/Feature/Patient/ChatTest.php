@@ -136,6 +136,39 @@ test('patient sends a message to the doctor', function () {
     Event::assertDispatched(UnreadMessagesChanged::class, fn (UnreadMessagesChanged $event) => $event->user->is($this->doctor));
 });
 
+test('repeated sending with the same key keeps one message', function () {
+    Event::fake([MessageSent::class, UnreadMessagesChanged::class]);
+    $key = (string) Str::uuid();
+
+    $first = $this->actingAs($this->patient)
+        ->postJson(route('patient.chat.store'), ['body' => 'Плохо сплю.', 'key' => $key])
+        ->assertCreated();
+
+    // Ответ потерялся, пациент нажал «Отправить» ещё раз.
+    $this->actingAs($this->patient)
+        ->postJson(route('patient.chat.store'), ['body' => 'Плохо сплю.', 'key' => $key])
+        ->assertOk()
+        ->assertJson(['id' => $first->json('id')]);
+
+    expect(Message::query()->count())->toBe(1);
+    Event::assertDispatchedTimes(MessageSent::class, 1);
+    Event::assertDispatchedTimes(UnreadMessagesChanged::class, 1);
+
+    // Тот же ключ у врача — его собственное сообщение, новый ключ — новое сообщение.
+    $this->actingAs($this->doctor)
+        ->postJson(route('doctor.patients.chat.store', $this->patient), ['body' => 'Во сколько ложитесь?', 'key' => $key])
+        ->assertCreated();
+    $this->actingAs($this->patient)
+        ->postJson(route('patient.chat.store'), ['body' => 'Плохо сплю.', 'key' => (string) Str::uuid()])
+        ->assertCreated();
+    expect(Message::query()->count())->toBe(3);
+
+    $this->actingAs($this->patient)
+        ->postJson(route('patient.chat.store'), ['body' => 'Плохо сплю.', 'key' => 'not-a-key'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('key');
+});
+
 test('empty and too long messages are rejected', function (string $body, string $error) {
     $this->actingAs($this->patient)
         ->postJson(route('patient.chat.store'), ['body' => $body])

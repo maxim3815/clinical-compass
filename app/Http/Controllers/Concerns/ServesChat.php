@@ -58,15 +58,20 @@ trait ServesChat
 
         $validated = $request->validate([
             'body' => ['required', 'string', 'max:'.Message::MAX_LENGTH],
+            // Ключ отправки. Без него (страница открыта до обновления) сообщение просто сохраняется.
+            'key' => ['nullable', 'uuid'],
         ], [
             'body.required' => 'Напишите сообщение.',
             'body.string' => 'Напишите сообщение.',
             'body.max' => 'Сообщение длиннее '.Message::MAX_LENGTH.' символов. Сократите его или разбейте на несколько.',
         ]);
 
-        $message = $sendMessage->handle($careRelationship, $sender, $validated['body']);
+        $message = $sendMessage->handle($careRelationship, $sender, $validated['body'], $validated['key'] ?? null);
 
-        return response()->json(MessagePresenter::present($message), Response::HTTP_CREATED);
+        return response()->json(
+            MessagePresenter::present($message),
+            $message->wasRecentlyCreated ? Response::HTTP_CREATED : Response::HTTP_OK,
+        );
     }
 
     /**

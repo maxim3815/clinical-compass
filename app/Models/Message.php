@@ -19,12 +19,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $care_relationship_id
  * @property int $sender_id
  * @property string $body
+ * @property string|null $client_key Ключ отправки от браузера: повтор с тем же ключом не создаёт второе сообщение.
  * @property CarbonImmutable|null $read_at Когда прочитал получатель.
  * @property CarbonImmutable $created_at
  * @property-read CareRelationship $careRelationship
  * @property-read User $sender
  */
-#[Fillable(['care_relationship_id', 'sender_id', 'body', 'read_at'])]
+#[Fillable(['care_relationship_id', 'sender_id', 'body', 'client_key', 'read_at'])]
 class Message extends Model
 {
     /** @use HasFactory<MessageFactory> */
