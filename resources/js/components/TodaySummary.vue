@@ -34,7 +34,7 @@ const next = computed(() => {
 </script>
 
 <template>
-    <!-- Итог дня под заголовком «Сегодня». Сюда же встанет серия дней с приёмом по плану. -->
+    <!-- Итог дня под заголовком «Сегодня». -->
     <div class="flex flex-col gap-2" data-test="today-summary">
         <div class="flex items-center gap-3">
             <p class="shrink-0 font-medium" data-test="today-progress">
