@@ -218,10 +218,10 @@ useRealtime<InvitationChanged>(channel, 'invitation.changed', (event) => {
                         <NativeSelect id="patients-sort" v-model="sortChoice">
                             <option value="name">По ФИО</option>
                             <option value="adherence">
-                                Сначала низкий приём
+                                Сначала худший приём
                             </option>
                             <option value="-adherence">
-                                Сначала высокий приём
+                                Сначала лучший приём
                             </option>
                         </NativeSelect>
                     </div>

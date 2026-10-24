@@ -126,7 +126,7 @@ function submit(): void {
                     <DialogTitle>Закрыть алерт</DialogTitle>
                     <DialogDescription v-if="alert">
                         {{
-                            `${alertTitle(alert.rule, alert.trigger)}. Ответ ${alert.submitted_at}.`
+                            `${alertTitle(alert.rule, alert.trigger)}. Опросник заполнен ${alert.submitted_at}.`
                         }}
                     </DialogDescription>
                 </DialogHeader>

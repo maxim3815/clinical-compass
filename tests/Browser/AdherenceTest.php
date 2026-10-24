@@ -61,11 +61,11 @@ test('doctor sees how the patient takes the drug and opens a day with a skipped 
         ->assertSee('идёт')
         ->assertSee('утром 100%')
         ->assertSee('вечером 57%')
-        ->assertSee('плохо себя чувствовал или побочные эффекты — 1')
+        ->assertSee('плохо себя чувствовал или были побочные эффекты — 1')
         ->assertDontSee('Тошнило')
         ->click('[data-date="'.$skippedDay->toDateString().'"]')
         ->assertSee($skippedDay->isoFormat('D MMMM').': Часть не принята')
-        ->assertSee('Вечером, 20:00: Не принят: плохо себя чувствовал или побочные эффекты')
+        ->assertSee('Вечером, 20:00: Не принят: плохо себя чувствовал или были побочные эффекты')
         ->assertSee('Тошнило')
         ->assertNoJavaScriptErrors();
 });

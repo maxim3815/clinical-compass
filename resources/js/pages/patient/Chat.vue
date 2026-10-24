@@ -67,8 +67,7 @@ defineOptions({
         >
             <Phone class="mt-0.5 size-5 shrink-0 text-warning" />
             <p>
-                Чат не для экстренной помощи. Врач может ответить не сразу. Если
-                состояние резко ухудшилось, звоните
+                Врач может ответить не сразу. Если вам резко стало хуже, звоните
                 <a
                     href="tel:112"
                     class="rounded-sm font-semibold underline underline-offset-4 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring focus-visible:outline-solid"
@@ -81,7 +80,7 @@ defineOptions({
             v-if="chat"
             :chat="chat"
             :routes="{ messages: messages(), store: store(), read: read() }"
-            empty="Сообщений пока нет. Напишите врачу, если хотите что-то уточнить о лечении."
+            empty="Сообщений пока нет. Если есть вопрос о лечении, напишите врачу."
             placeholder="Сообщение врачу"
         />
 
@@ -92,8 +91,8 @@ defineOptions({
         >
             <UserRoundX class="mt-0.5 size-6 shrink-0 text-muted-foreground" />
             <p>
-                Вы сейчас не прикреплены к врачу. Обратитесь к своему врачу за
-                новым приглашением.
+                Вы сейчас не подключены к врачу в приложении. Попросите врача
+                снова показать QR-код или прислать ссылку.
             </p>
         </div>
     </div>

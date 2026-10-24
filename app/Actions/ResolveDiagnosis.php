@@ -36,7 +36,7 @@ class ResolveDiagnosis
             }
 
             if ($resolvedOn->lt($current->established_on)) {
-                throw ValidationException::withMessages(['resolved_on' => 'Диагноз нельзя снять раньше, чем он установлен.']);
+                throw ValidationException::withMessages(['resolved_on' => 'Дата снятия не может быть раньше даты установления.']);
             }
 
             $current->update(['resolved_on' => $resolvedOn->toDateString(), 'resolved_by_id' => $doctor->id]);

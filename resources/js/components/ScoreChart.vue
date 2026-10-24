@@ -13,7 +13,7 @@ const props = withDefaults(
     defineProps<{
         points: ScorePoint[];
         max: number;
-        // Что на графике, для скринридера: «Беспокойство, сумма баллов».
+        // Что на графике, для скринридера: «Беспокойство, баллы по датам».
         label: string;
         // Линии сетки, кроме 0 и наибольшей суммы. У врача — границы степеней.
         ticks?: number[];
@@ -161,8 +161,8 @@ const summary = computed(() => {
     const point = last.value;
 
     return point === undefined
-        ? `${props.label}: заполнений нет`
-        : `${props.label}: последнее значение ${point.total} из ${props.max}, ${point.date}. Все значения — в таблице ниже.`;
+        ? `${props.label}: ответов пока нет`
+        : `${props.label}: последний результат ${point.total} из ${props.max}, ${point.date}. Все результаты есть в таблице ниже.`;
 });
 
 // Значение выбранной стрелками точки для скринридера: подсказка на графике скрыта от него.
@@ -377,7 +377,7 @@ const gutter = computed(() =>
             <thead>
                 <tr>
                     <th scope="col">Дата</th>
-                    <th scope="col">Сумма баллов из {{ max }}</th>
+                    <th scope="col">Баллы из {{ max }}</th>
                 </tr>
             </thead>
             <tbody>

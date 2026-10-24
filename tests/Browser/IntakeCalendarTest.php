@@ -35,7 +35,7 @@ test('patient on a phone looks through the intake calendar', function () {
         ->assertPathIs('/patient/calendar')
         ->assertAttribute('[data-test="tab-today"]', 'aria-current', 'page')
         ->assertSeeIn('[data-test="calendar-title"]', mb_ucfirst($today->isoFormat('MMMM YYYY')))
-        ->assertSeeIn('[data-test="calendar-summary"]', 'вы отметили как принятые 3 из 6 приёмов по расписанию')
+        ->assertSeeIn('[data-test="calendar-summary"]', 'принято 3 из 6 приёмов по расписанию')
         ->assertAttribute("[data-date=\"{$date(12)}\"]", 'data-result', 'taken')
         ->assertAttribute("[data-date=\"{$date(13)}\"]", 'data-result', 'partial')
         ->assertAttribute("[data-date=\"{$date(14)}\"]", 'data-result', 'none')
@@ -48,7 +48,7 @@ test('patient on a phone looks through the intake calendar', function () {
 
     $page->click("[data-date=\"{$date(13)}\"]")
         ->assertSeeIn('[data-test="calendar-day-details"]', 'Принято не всё')
-        ->assertSeeIn('[data-test="calendar-day-details"]', 'Не принят: плохо себя чувствовал или побочные эффекты')
+        ->assertSeeIn('[data-test="calendar-day-details"]', 'Не принят: плохо себя чувствовал или были побочные эффекты')
         ->assertSeeIn('[data-test="calendar-unwell"]', 'Если самочувствие беспокоит, напишите врачу.')
         ->assertMissing('[data-test="calendar-mark"]')
         ->click("[data-date=\"{$date(12)}\"]")
@@ -64,7 +64,7 @@ test('patient on a phone looks through the intake calendar', function () {
     // Прошлый месяц: день не выбран, следующий месяц — текущий.
     $page->click('[data-test="calendar-previous"]')
         ->assertSeeIn('[data-test="calendar-title"]', mb_ucfirst($previous->isoFormat('MMMM YYYY')))
-        ->assertSeeIn('[data-test="calendar-summary"]', 'вы отметили как принятые 1 из 1 приёма по расписанию')
+        ->assertSeeIn('[data-test="calendar-summary"]', 'принято 1 из 1 приёма по расписанию')
         ->assertMissing('[data-test="calendar-previous"]')
         ->assertMissing('[data-test="calendar-day-details"]')
         ->assertSee('Нажмите на день, чтобы увидеть приёмы.')

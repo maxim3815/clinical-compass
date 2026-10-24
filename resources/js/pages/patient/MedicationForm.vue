@@ -238,8 +238,8 @@ const leaveGuard = useLeaveGuard(() => form.isDirty && !form.processing);
         <header class="flex flex-col gap-1">
             <h1 class="text-2xl font-semibold tracking-tight">{{ title }}</h1>
             <p class="text-muted-foreground">
-                Препарат, который назначил другой врач. Вы будете отмечать его
-                приём, а ваш врач увидит, что вы его принимаете.
+                Препарат, который назначил другой врач. Вы будете отмечать
+                приём, а ваш врач увидит, что вы принимаете этот препарат.
             </p>
         </header>
 
@@ -251,10 +251,12 @@ const leaveGuard = useLeaveGuard(() => form.isDirty && !form.processing);
             <Info class="mt-0.5 size-5 shrink-0 text-muted-foreground" />
             <span v-if="editing.has_started">
                 Вы принимаете препарат с {{ editing.starts_on_label }}.
-                Изменения вступят в силу сразу.
+                Изменения начнут действовать сразу, прошлые отметки останутся
+                как есть.
             </span>
             <span v-else>
-                Приём ещё не начался, изменения сохранятся в нём самом.
+                Приём начнётся позже, поэтому сохранится то, что вы укажете
+                сейчас.
             </span>
         </p>
 
@@ -454,7 +456,7 @@ const leaveGuard = useLeaveGuard(() => form.isDirty && !form.processing);
 
             <div v-else class="grid gap-2">
                 <Label for="max_daily_doses">
-                    Сколько раз в сутки, не больше (необязательно)
+                    Сколько раз в сутки можно принять (необязательно)
                 </Label>
                 <NativeSelect
                     id="max_daily_doses"

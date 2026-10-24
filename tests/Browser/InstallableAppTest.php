@@ -39,7 +39,7 @@ test('patient on a phone installs the app from the banner', function () {
 
     offerInstall($page)
         ->assertSee('Установите приложение')
-        ->assertSee('Приложение откроется с экрана «Домой» одним нажатием.')
+        ->assertSee('На экране телефона появится значок «Компаса», как у других приложений.')
         ->assertScript('document.documentElement.scrollWidth <= window.innerWidth')
         ->click('[data-test="install-button"]')
         ->assertMissing('[data-test="install-banner"]')
@@ -108,7 +108,7 @@ test('patient on a computer installs the app from settings, not from a banner', 
         ->assertSee('Этот браузер не предлагает установить приложение');
 
     offerInstall($page)
-        ->assertSee('Установите приложение: оно откроется с экрана «Домой»')
+        ->assertSee('Установите приложение: оно будет открываться значком')
         ->click('[data-test="install-button"]')
         ->assertSee('Приложение установлено')
         ->assertNoJavaScriptErrors();

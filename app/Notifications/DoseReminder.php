@@ -63,7 +63,7 @@ class DoseReminder extends Notification implements ShouldQueue
             ->renotify()
             ->requireInteraction()
             ->action($this->takeLabel($notifiable, $doses->count()), 'take')
-            ->action('Через 15 минут', 'snooze')
+            ->action('Отложить на 15 мин', 'snooze')
             ->data([
                 'url' => $this->url($doses),
                 'take' => URL::temporarySignedRoute('push.doses.take', $expires, $ids, absolute: false),

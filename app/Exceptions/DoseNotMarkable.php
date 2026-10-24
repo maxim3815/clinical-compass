@@ -18,7 +18,7 @@ class DoseNotMarkable extends RuntimeException
 
     public static function gone(): self
     {
-        return new self('Этот приём уже изменился. Проверьте актуальные приёмы.');
+        return new self('Этот приём уже изменился. Список обновлён.');
     }
 
     public static function notDue(): self

@@ -66,7 +66,7 @@ const next = computed(() => {
             class="flex items-center gap-2 text-muted-foreground"
         >
             <Clock class="size-5 shrink-0" />
-            Следующий приём в {{ next.time }}
+            Следующий приём препаратов в {{ next.time }}
         </p>
     </div>
 </template>

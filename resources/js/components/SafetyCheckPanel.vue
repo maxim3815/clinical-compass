@@ -82,7 +82,7 @@ const cautions = (items: SafetyResult[]) =>
                         />
                         {{
                             caused.length > 0
-                                ? 'У самого препарата по внесённым данным противопоказаний нет.'
+                                ? 'У самого препарата по внесённым данным противопоказаний нет, но смотрите сочетания ниже.'
                                 : 'По внесённым данным противопоказаний нет.'
                         }}
                     </p>
@@ -94,8 +94,8 @@ const cautions = (items: SafetyResult[]) =>
                         :decided="finding.decided"
                     >
                         <p v-if="finding.decided" class="text-muted-foreground">
-                            Решение по этой находке уже принято, обоснование не
-                            нужно.
+                            По этому противопоказанию решение уже принято,
+                            обоснование не нужно.
                         </p>
                     </SafetyFindingCard>
 
@@ -107,7 +107,7 @@ const cautions = (items: SafetyResult[]) =>
 
                 <template v-if="caused.length > 0">
                     <p class="text-sm font-medium">
-                        Появится у других препаратов пациента:
+                        В сочетании с ним, у других препаратов пациента:
                     </p>
                     <SafetyFindingCard
                         v-for="finding in contraindications(caused)"

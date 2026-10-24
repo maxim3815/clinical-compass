@@ -98,7 +98,7 @@ test('yesterday shows doses without a mark and doses marked today', function () 
             ->has('yesterday.groups', 2)
             ->where('yesterday.groups.0.time', '8:00')
             ->where('yesterday.groups.0.doses.0.day', 'вчера')
-            ->where('yesterday.groups.0.doses.0.status_text', 'Пропущен')
+            ->where('yesterday.groups.0.doses.0.status_text', 'Без отметки')
             ->where('yesterday.groups.0.doses.0.missed_dose', 'Пропущенную таблетку не принимайте.')
             ->where('yesterday.groups.1.time', '23:00')
             ->where('yesterday.groups.1.doses.0.status_text', 'Принят в 23:00')
@@ -181,7 +181,7 @@ test('today shows doses of medications added by the patient together with prescr
             ->where('today.groups.0.doses.2.dose', '1 таблетка 250 мг')
             // Что делать при пропуске дозы — из справочника, у «другого» препарата текста нет.
             ->where('yesterday.groups.0.doses.0.missed_dose', 'Пропущенную таблетку не принимайте.')
-            ->where('yesterday.groups.0.doses.2.status_text', 'Пропущен')
+            ->where('yesterday.groups.0.doses.2.status_text', 'Без отметки')
             ->where('yesterday.groups.0.doses.2.missed_dose', null),
         );
 
@@ -226,7 +226,7 @@ test('a female patient sees the reasons and buttons in the feminine', function (
         ->assertInertia(fn (Assert $page) => $page
             ->where('femalePatient', true)
             ->where('skipReasons.0.label', 'Забыла')
-            ->where('skipReasons.1.label', 'Плохо себя чувствовала или побочные эффекты')
+            ->where('skipReasons.1.label', 'Плохо себя чувствовала или были побочные эффекты')
             ->where('today.groups.0.doses.0.status_text', 'Не принят: забыла'),
         );
 });

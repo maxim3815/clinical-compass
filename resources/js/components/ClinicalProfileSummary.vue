@@ -38,8 +38,8 @@ defineProps<{
         </div>
 
         <div class="flex flex-col gap-1.5">
-            <h3 class="text-muted-foreground">Факты</h3>
-            <p v-if="profile.facts.length === 0">Факты не внесены.</p>
+            <h3 class="text-muted-foreground">Состояния и показатели</h3>
+            <p v-if="profile.facts.length === 0">Ничего не внесено.</p>
             <dl v-else class="flex flex-col gap-2" data-test="facts">
                 <div v-for="fact in profile.facts" :key="fact.id">
                     <dt>{{ fact.name }}</dt>

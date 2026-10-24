@@ -81,7 +81,7 @@ const RESULTS: {
     },
     {
         result: 'no_data',
-        label: 'Приёмов по расписанию не было',
+        label: 'Нет приёмов по расписанию',
         class: 'text-muted-foreground ring-1 ring-border ring-inset',
     },
 ];
@@ -91,7 +91,7 @@ const byResult = Object.fromEntries(
 ) as Record<CalendarDayResult, (typeof RESULTS)[number]>;
 
 const LEGEND_LABELS: Partial<Record<CalendarDayResult, string>> = {
-    no_data: 'Приёмов не было',
+    no_data: 'Нет приёмов по расписанию',
 };
 
 // Выбранный день — двойной рамкой внутри клетки (тёмная и светлая), её видно на любом
@@ -130,8 +130,8 @@ const summary = computed(() => {
     const { counted, taken, in_month: inMonth, next } = props.calendar;
 
     if (counted > 0) {
-        // «Отметили как принятые»: пациент мог принять и не отметить, итог не упрекает.
-        return `В ${inMonth} вы отметили как принятые ${taken} из ${counted} ${plural(counted, ['приёма', 'приёмов', 'приёмов'])} по расписанию.`;
+        // «Принято» — по отметкам, как в статусах приёмов: без «вы», итог не упрекает.
+        return `В ${inMonth} принято ${taken} из ${counted} ${plural(counted, ['приёма', 'приёмов', 'приёмов'])} по расписанию.`;
     }
 
     // Следующего месяца нет — это текущий.
@@ -614,7 +614,7 @@ function doseIcon(dose: CalendarDose) {
                                 data-test="calendar-over-limit"
                             >
                                 {{
-                                    `Это больше, чем можно в сутки по назначению: не больше ${times(item.over_limit)}.`
+                                    `По назначению можно не больше ${item.over_limit} ${plural(item.over_limit, ['раза', 'раз', 'раз'])} в сутки.`
                                 }}
                             </span>
                         </li>

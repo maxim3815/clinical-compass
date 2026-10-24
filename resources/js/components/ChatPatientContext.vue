@@ -56,7 +56,9 @@ function regimen(prescription: ChatPatientContext['prescriptions'][number]) {
                 <span class="font-semibold">{{ context.diagnosis.code }}</span>
                 {{ context.diagnosis.name }}
             </p>
-            <p v-else class="text-muted-foreground">Диагноз не указан.</p>
+            <p v-else class="text-muted-foreground">
+                Основной диагноз не указан.
+            </p>
         </div>
 
         <ul

@@ -111,7 +111,7 @@ class ClinicalProfileController extends Controller
 
         $request->validate(
             ['observations' => ['required', 'list']],
-            ['observations' => 'Выберите значение хотя бы у одного факта.'],
+            ['observations' => 'Выберите хотя бы одно значение.'],
         );
 
         /** @var array<int, mixed> $items */
@@ -143,12 +143,12 @@ class ClinicalProfileController extends Controller
                 "{$field}.observed_on" => ['required', 'date_format:Y-m-d', 'before_or_equal:'.$patient->localToday()->toDateString()],
             ];
             $messages += [
-                "{$field}.observation_type_id.not_in" => 'Один факт внесён дважды.',
+                "{$field}.observation_type_id.not_in" => 'Один показатель внесён дважды.',
                 "{$field}.observation_type_id" => 'Выберите, что вносите.',
                 "{$field}.value.min" => 'Значение не меньше '.ObservationType::number((float) $type?->min).'.',
                 "{$field}.value.max" => 'Значение не больше '.ObservationType::number((float) $type?->max).'.',
                 "{$field}.value" => 'Укажите значение.',
-                "{$field}.comment" => 'Комментарий — не больше '.Observation::MAX_COMMENT_LENGTH.' символов.',
+                "{$field}.comment" => 'Комментарий длиннее '.Observation::MAX_COMMENT_LENGTH.' символов. Сократите его.',
                 "{$field}.observed_on.before_or_equal" => 'Дата не может быть позже сегодняшнего дня.',
                 "{$field}.observed_on" => 'Укажите дату.',
             ];
@@ -179,7 +179,7 @@ class ClinicalProfileController extends Controller
             }
         });
 
-        return $this->saved($patient, count($validated['observations']) === 1 ? 'Факт сохранён.' : 'Факты сохранены.');
+        return $this->saved($patient, count($validated['observations']) === 1 ? 'Значение сохранено.' : 'Значения сохранены.');
     }
 
     private function doctor(Request $request): User

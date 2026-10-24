@@ -45,8 +45,8 @@ test('patient answer raises a red banner for the open cabinet, the doctor accept
 
     // Пациентка видит экран помощи: 112 и чат, без обещания звонка врача.
     $patientPage->press('Отправить врачу')
-        ->assertSee('Ответы переданы врачу')
-        ->assertSee('ответ может прийти не сразу')
+        ->assertSee('Ответы отправлены врачу')
+        ->assertSee('он не всегда отвечает сразу')
         ->assertSeeIn('[data-test="help-card"]', 'Позвонить 112')
         ->assertAttribute('[data-test="call-112"]', 'href', 'tel:112')
         ->assertPresent('[data-test="help-write-doctor"]')
@@ -74,7 +74,7 @@ test('patient answer raises a red banner for the open cabinet, the doctor accept
         ->assertPathIs('/patient')
         ->assertSeeIn('[data-test="help-card"]', 'Если вам сейчас тяжело');
 
-    // «Принял»: плашки нет, алерт в очереди и в карточке до решения.
+    // «Принять»: плашки нет, алерт в очереди и в карточке до решения.
     $doctorPage->click('[data-test="urgent-alert-accept"]')
         ->assertSee('Алерт принят.')
         ->assertMissing('[data-test="alert-banner"]')
@@ -84,7 +84,7 @@ test('patient answer raises a red banner for the open cabinet, the doctor accept
         ->click('Морозова Ольга Павловна')
         ->assertSeeIn('[data-test="card-alert"]', 'ждёт решения')
         ->assertSeeIn('[data-test="open-alert"]', 'Принят')
-        ->assertSeeIn('[data-test="alert-delivery"]', 'Показан в открытом кабинете через');
+        ->assertSeeIn('[data-test="alert-delivery"]', ', в открытом кабинете.');
 
     // «Угрозы нет» без комментария не закрывается.
     $doctorPage->click('[data-test="alert-close"]')

@@ -134,7 +134,7 @@ test('pin is four digits', function (?string $pin) {
 
 test('ten wrong pins from one address close the input for 15 minutes', function () {
     $pin = app(IssueAppointmentPin::class)->handle($this->doctor)->pin;
-    $locked = 'Слишком много неверных попыток. Ввод откроется через 15 минут. Если подключиться нужно сейчас, попросите врача прислать ссылку-приглашение.';
+    $locked = 'Слишком много неверных попыток. Попробуйте снова через 15 минут или попросите врача прислать ссылку-приглашение.';
 
     foreach (range(1, PinAttempts::MAX_FAILURES - 1) as $attempt) {
         $this->post(route('join.store', 'smirnova'), ['pin' => wrongPin($pin)])
@@ -147,9 +147,9 @@ test('ten wrong pins from one address close the input for 15 minutes', function 
     // Пока ввод закрыт, не проходит и верный PIN.
     $this->travel(5)->minutes();
     $this->post(route('join.store', 'smirnova'), ['pin' => $pin])
-        ->assertSessionHasErrors(['pin' => 'Слишком много неверных попыток. Ввод откроется через 10 минут. Если подключиться нужно сейчас, попросите врача прислать ссылку-приглашение.']);
+        ->assertSessionHasErrors(['pin' => 'Слишком много неверных попыток. Попробуйте снова через 10 минут или попросите врача прислать ссылку-приглашение.']);
     $this->get(route('join.show', 'smirnova'))
-        ->assertInertia(fn (Assert $page) => $page->where('locked', 'Слишком много неверных попыток. Ввод откроется через 10 минут. Если подключиться нужно сейчас, попросите врача прислать ссылку-приглашение.'));
+        ->assertInertia(fn (Assert $page) => $page->where('locked', 'Слишком много неверных попыток. Попробуйте снова через 10 минут или попросите врача прислать ссылку-приглашение.'));
 
     // С другого адреса ввод открыт.
     $this->withServerVariables(['REMOTE_ADDR' => '93.184.216.34'])

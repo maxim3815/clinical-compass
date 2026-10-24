@@ -104,7 +104,9 @@ function submit(): void {
                         {{ prescription.drug.name }},
                         {{ prescription.strength }},
                         {{ prescription.kind_label.toLowerCase() }}. Назначение
-                        перестанет действовать сейчас и уйдёт в историю.
+                        перестанет действовать сейчас, напоминания пациенту
+                        прекратятся. Отдельного уведомления об отмене он не
+                        получит.
                     </DialogDescription>
                 </DialogHeader>
 

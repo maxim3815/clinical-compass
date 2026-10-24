@@ -36,9 +36,9 @@ test('doctor invites a patient who registers by the link and sees the cabinet', 
         ->assertAttribute('#consent', 'aria-invalid', 'true')
         ->assertValue('login', 'novikov')
         ->assertValue('password', 'secret-password')
-        // Текст согласия открывается в окне на этой же странице, «Согласен» ставит галочку.
+        // Текст согласия открывается в окне на этой же странице, «Даю согласие» ставит галочку.
         ->click('[data-test="consent-text-button"]')
-        ->assertSee('Регистрируясь, пациент соглашается на обработку своих персональных данных')
+        ->assertSee('Регистрируясь, вы соглашаетесь, что лечащий врач будет обрабатывать')
         ->click('[data-test="consent-agree"]')
         ->assertAttribute('#consent', 'aria-checked', 'true')
         ->press('Зарегистрироваться')

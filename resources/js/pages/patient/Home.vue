@@ -230,7 +230,7 @@ function keepInView(card: Element, container: HTMLElement): () => void {
                 <CalendarClock class="size-8 text-muted-foreground" />
                 <p class="font-medium">Врач пока не назначил препараты.</p>
                 <p class="text-muted-foreground">
-                    Когда врач назначит препарат, здесь появятся приёмы на день.
+                    Как только он это сделает, здесь появятся приёмы на день.
                 </p>
             </div>
             <p
@@ -352,8 +352,8 @@ function keepInView(card: Element, container: HTMLElement): () => void {
         >
             <UserRoundX class="mt-0.5 size-6 shrink-0 text-muted-foreground" />
             <p>
-                Вы сейчас не прикреплены к врачу. Обратитесь к своему врачу за
-                новым приглашением.
+                Вы сейчас не подключены к врачу в приложении. Попросите врача
+                снова показать QR-код или прислать ссылку.
             </p>
         </div>
 

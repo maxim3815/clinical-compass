@@ -60,12 +60,12 @@ function share(value: number | null): string {
     return value === null ? '—' : `${value}%`;
 }
 
-// Что было с приёмами периода, без нулей: «вовремя 10 · поздно 2 · пропущено 1».
+// Что было с приёмами периода, без нулей: «вовремя 10 · поздно 2 · без отметки 1».
 function counts(period: RegularPeriod): string[] {
     const items: [string, number][] = [
         ['вовремя', period.on_time],
         ['поздно', period.late],
-        ['пропущено', period.missed],
+        ['без отметки', period.missed],
         ['отмечено позже', period.marked_late],
         ['дней без данных', period.no_data_days],
     ];

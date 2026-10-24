@@ -13,8 +13,8 @@ import {
 const props = defineProps<{
     // Куда уходят; пока null, окно закрыто.
     pending: string | null;
-    // Что пропадёт: «Введённое», «Отмеченные значения фактов».
-    what?: string;
+    // Что пропадёт, целой фразой: «Ваши ответы не сохранятся.»
+    lost?: string;
 }>();
 
 const emit = defineEmits<{
@@ -49,7 +49,7 @@ function focusStay(event: Event): void {
             <DialogHeader>
                 <DialogTitle>Уйти без сохранения?</DialogTitle>
                 <DialogDescription class="text-base">
-                    {{ what ?? 'Введённое' }} не сохранится.
+                    {{ lost ?? 'То, что вы ввели, не сохранится.' }}
                 </DialogDescription>
             </DialogHeader>
             <DialogFooter>

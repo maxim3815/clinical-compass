@@ -51,7 +51,7 @@ class DoseController extends Controller
             'reason.required' => 'Выберите причину.',
             'reason' => 'Выберите причину из списка.',
             'comment.required_if' => 'Для причины «Другое» напишите комментарий.',
-            'comment' => 'Комментарий — не больше '.self::MAX_COMMENT_LENGTH.' символов.',
+            'comment' => 'Комментарий длиннее '.self::MAX_COMMENT_LENGTH.' символов. Сократите его.',
         ]);
 
         try {

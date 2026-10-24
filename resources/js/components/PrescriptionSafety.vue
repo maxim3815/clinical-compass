@@ -112,7 +112,7 @@ const cautions = computed(() =>
                     </template>
                     <template v-if="finding.related.length > 0">
                         {{
-                            `Одно решение закроет находку и у препарата ${finding.related.join(', ')}.`
+                            `Решение закроет противопоказание и у препарата ${finding.related.join(', ')}.`
                         }}
                     </template>
                 </p>
@@ -131,7 +131,7 @@ const cautions = computed(() =>
             <OctagonAlert class="mt-0.5 size-4 shrink-0" />
             <span
                 >{{
-                    `Противопоказано вместе с препаратом ${finding.related.join(', ')}: решение одно, в плашке выше`
+                    `Противопоказано вместе с препаратом ${finding.related.join(', ')}: решение общее, оно выше`
                 }}
                 <ArrowUp class="inline size-4 align-text-bottom"
             /></span>

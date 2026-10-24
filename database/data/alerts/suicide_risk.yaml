@@ -9,8 +9,8 @@ name: Суицидальный риск
 level: critical
 condition: answer('phq9', 9) >= 1
 text: >-
-  Отмечены мысли о том, что лучше умереть, или о причинении себе вреда. Нужна оценка суицидального
-  риска в клинической беседе.
+  Пациент отметил мысли о том, что лучше умереть, или о причинении себе вреда. Оцените суицидальный
+  риск в клинической беседе.
 source:
   document: Instructions for Patient Health Questionnaire (PHQ) and GAD-7 Measures (Pfizer)
   section: Coding and Scoring, с. 2

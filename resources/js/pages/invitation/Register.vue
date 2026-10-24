@@ -43,7 +43,7 @@ function agree(): void {
 defineOptions({
     layout: (props: Props) => ({
         title: 'Регистрация пациента',
-        description: `Вас приглашает врач: ${doctorLine(props.doctor)}. Заполните форму, чтобы создать учётную запись.`,
+        description: `Вас приглашает врач: ${doctorLine(props.doctor)}. Заполните форму, чтобы зарегистрироваться.`,
     }),
 });
 </script>
@@ -89,8 +89,8 @@ defineOptions({
                 aria-describedby="login-hint login-error"
             />
             <p id="login-hint" class="text-muted-foreground">
-                От 3 до 32 символов: латинские буквы, цифры, точка, дефис и
-                подчёркивание.
+                От 3 до 32 знаков: латинские буквы, цифры, точка, дефис и знак
+                «_».
             </p>
             <InputError id="login-error" :message="errors.login" />
         </div>
@@ -173,7 +173,7 @@ defineOptions({
                             Согласие на обработку персональных данных
                         </DialogTitle>
                         <DialogDescription class="sr-only">
-                            Текст согласия, которое даёт пациент при регистрации
+                            Текст согласия, которое вы даёте при регистрации
                         </DialogDescription>
                     </DialogHeader>
                     <ConsentText />
@@ -189,7 +189,7 @@ defineOptions({
                             data-test="consent-agree"
                             @click="agree"
                         >
-                            Согласен
+                            Даю согласие
                         </Button>
                     </DialogFooter>
                 </DialogContent>

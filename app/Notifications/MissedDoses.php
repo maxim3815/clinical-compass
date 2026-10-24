@@ -49,13 +49,14 @@ class MissedDoses extends Notification implements ShouldQueue
     {
         $doses = $this->sorted($this->missed());
 
+        // Сначала — для того, кто принял, но не отметил: свёрнутый пуш показывает первую строку.
         // У «другого» препарата пациента справочника нет: советов о пропуске не даём.
         $lines = $doses->map(fn (DoseEvent $dose): string => $this->drugLine($dose)
-            .($dose->prescription->drug?->missed_dose ? '. '.$dose->prescription->drug->missed_dose : ''));
+            .($dose->prescription->drug?->missed_dose ? '. Если не приняли, '.mb_lcfirst($dose->prescription->drug->missed_dose) : ''));
 
         return (new WebPushMessage)
             ->title('Приём в '.$this->clock($doses).' не отмечен')
-            ->body($lines->push('Если приняли, отметьте в приложении.')->implode("\n"))
+            ->body($lines->prepend('Если вы уже приняли, отметьте это в приложении.')->implode("\n"))
             ->icon('/pwa-192x192.png')
             ->badge('/notification-badge.png')
             // Заменяет последнее напоминание о тех же приёмах: его кнопки уже не работают.

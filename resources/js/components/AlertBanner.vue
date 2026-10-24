@@ -22,7 +22,7 @@ import type { UrgentAlert } from '@/types';
 /**
  * Красная плашка непринятых алертов на всех страницах кабинета врача. Новый алерт приходит
  * событием без перезагрузки, со звуком. Когда плашку видно, браузер сообщает серверу
- * «показан»: от ответа пациента до этой отметки считается время доставки. «Принял» убирает
+ * «показан»: от ответа пациента до этой отметки считается время доставки. «Принять» убирает
  * плашку, алерт остаётся в карточке пациента до решения.
  */
 const page = usePage();
@@ -217,7 +217,7 @@ function accept(alert: UrgentAlert): void {
                         </p>
                         <p class="text-sm">
                             {{
-                                `${alertTitle(alert.rule, alert.trigger)}. Ответ ${alert.at}.`
+                                `${alertTitle(alert.rule, alert.trigger)}. Опросник заполнен ${alert.at}.`
                             }}
                         </p>
                     </div>
@@ -238,12 +238,12 @@ function accept(alert: UrgentAlert): void {
                         class="border-muted-foreground bg-card"
                         :disabled="accepting === alert.id"
                         :aria-busy="accepting === alert.id"
-                        :aria-label="`Принял: ${alert.patient}`"
+                        :aria-label="`Принять алерт: ${alert.patient}`"
                         data-test="urgent-alert-accept"
                         @click="accept(alert)"
                     >
                         <Spinner v-if="accepting === alert.id" />
-                        Принял
+                        Принять
                     </Button>
                 </div>
             </li>

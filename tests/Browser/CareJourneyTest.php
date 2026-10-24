@@ -66,7 +66,7 @@ test('a new patient goes from the invitation to an adherence signal at the docto
     }
 
     $patientPage->press('Отправить врачу')
-        ->assertSee('Ответы переданы врачу')
+        ->assertSee('Ответы отправлены врачу')
         ->assertSeeIn('[data-test="help-card"]', 'Позвонить 112')
         ->click('[data-test="questionnaire-done"]')
         ->assertPathIs('/patient')
@@ -131,8 +131,8 @@ test('a new patient goes from the invitation to an adherence signal at the docto
         ->click('[data-test="alert-close"]')
         ->click('input[name="decision"][value="contacted"]')
         ->click('[data-test="confirm-close-alert"]')
-        ->assertSee('Алерт закрыт: связался с пациентом.')
-        ->assertSeeIn('[data-test="closed-alerts"]', 'Связался с пациентом')
+        ->assertSee('Алерт закрыт: связь с пациентом установлена.')
+        ->assertSeeIn('[data-test="closed-alerts"]', 'Связь с пациентом установлена')
         ->assertNoJavaScriptErrors();
 
     $patientPage->navigate(route('patient.home'))

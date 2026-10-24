@@ -183,14 +183,14 @@ test('medication form explains what is wrong', function (array $overrides, array
     'inactive drug' => [fn () => ['drug_id' => catalogDrug('Агомелатин', attributes: ['is_active' => false])->id], ['drug_id' => 'Выберите препарат из списка.']],
     'unknown drug' => [['drug_id' => 'something'], ['drug_id' => 'Выберите препарат из списка.']],
     'another drug without a name' => [['drug_name' => ' '], ['drug_name' => 'Напишите название препарата.']],
-    'too long name' => [['drug_name' => str_repeat('а', 201)], ['drug_name' => 'Название — не больше 200 символов.']],
+    'too long name' => [['drug_name' => str_repeat('а', 201)], ['drug_name' => 'Название длиннее 200 символов. Сократите его.']],
     'no dose' => [['dose' => ''], ['dose' => 'Напишите дозу, например «1 таблетка 50 мг».']],
-    'too long dose' => [['dose' => str_repeat('а', 101)], ['dose' => 'Доза — не больше 100 символов.']],
+    'too long dose' => [['dose' => str_repeat('а', 101)], ['dose' => 'Доза длиннее 100 символов. Сократите её.']],
     'no kind' => [['kind' => 'sometimes'], ['kind' => 'Выберите, как принимать препарат.']],
     'no intakes' => [['intakes' => []], ['intakes' => 'Добавьте хотя бы один приём.']],
     'same time of day twice' => [
         ['intakes' => [['time_of_day' => 'morning', 'time' => '08:00'], ['time_of_day' => 'morning', 'time' => '09:00']]],
-        ['intakes.1.time_of_day' => 'Время суток у приёмов не должно повторяться.'],
+        ['intakes.1.time_of_day' => 'Для каждого приёма выберите разное время суток.'],
     ],
     'same time twice' => [
         ['intakes' => [['time_of_day' => 'morning', 'time' => '08:00'], ['time_of_day' => 'evening', 'time' => '08:00']]],
@@ -201,7 +201,7 @@ test('medication form explains what is wrong', function (array $overrides, array
     'too many doses a day' => [['kind' => 'as_needed', 'max_daily_doses' => 11], ['max_daily_doses' => 'Укажите от 1 до 10 раз в сутки.']],
     'start in the past' => [['starts_on' => '2026-10-18'], ['starts_on' => 'Дата начала не может быть раньше сегодняшнего дня.']],
     'end before start' => [['starts_on' => '2026-10-25', 'ends_on' => '2026-10-24'], ['ends_on' => 'Дата окончания не может быть раньше даты начала.']],
-    'too long prescriber' => [['prescribed_by' => str_repeat('а', 201)], ['prescribed_by' => 'Не больше 200 символов.']],
+    'too long prescriber' => [['prescribed_by' => str_repeat('а', 201)], ['prescribed_by' => 'Здесь больше 200 символов. Сократите запись.']],
 ]);
 
 test('a catalog drug prescribed by the doctor with the same kind can not be added', function () {
@@ -213,7 +213,7 @@ test('a catalog drug prescribed by the doctor with the same kind can not be adde
     $this->actingAs($this->patient);
 
     $this->post(route('patient.own-medications.store'), ownMedicationPayload(['drug_id' => $this->sertraline->id]))
-        ->assertSessionHasErrors(['drug_id' => 'Ваш врач уже назначил этот препарат на эти даты. Отмечайте его приём по назначению врача.']);
+        ->assertSessionHasErrors(['drug_id' => 'Врач уже назначил вам этот препарат на эти даты. Отмечайте приём в разделе «Назначил врач».']);
 
     expect(Prescription::query()->where('source', PrescriptionSource::Patient)->count())->toBe(0);
 
@@ -230,7 +230,7 @@ test('a catalog drug prescribed by the doctor as needed can not be added as need
 
     $this->actingAs($this->patient)
         ->post(route('patient.own-medications.store'), ownMedicationPayload(['drug_id' => $this->sertraline->id, 'kind' => 'as_needed']))
-        ->assertSessionHasErrors(['drug_id' => 'Ваш врач уже назначил этот препарат «по необходимости» на эти даты. Записывайте приёмы по назначению врача.']);
+        ->assertSessionHasErrors(['drug_id' => 'Врач уже назначил вам этот препарат «по необходимости» на эти даты. Отмечайте приёмы по его назначению на экране «Сегодня».']);
 });
 
 test('patient changes a started medication and gets a new version', function () {
@@ -362,7 +362,7 @@ test('patient stops a medication and its future doses disappear', function () {
     $this->actingAs($this->patient)
         ->post(route('patient.own-medications.stop', $prescription))
         ->assertRedirect(route('patient.medications'))
-        ->assertInertiaFlash('toast', ['type' => 'success', 'message' => 'Приём препарата прекращён.']);
+        ->assertInertiaFlash('toast', ['type' => 'success', 'message' => 'Препарат убран из списка.']);
 
     $stopped = $prescription->fresh();
 
@@ -378,7 +378,7 @@ test('patient stops a medication and its future doses disappear', function () {
 test('changed, stopped or completed medication can not be changed', function (array $attributes) {
     $prescription = ownPrescription($this->patient, attributes: [...$this->weekAgo, ...$attributes]);
     $before = $prescription->fresh()?->toArray();
-    $toast = ['type' => 'error', 'message' => 'Препарат уже изменён, прекращён или закончился. Проверьте актуальный список.'];
+    $toast = ['type' => 'error', 'message' => 'Этот препарат уже изменили или убрали, либо его приём закончился. Список обновлён.'];
     $this->actingAs($this->patient);
 
     $this->get(route('patient.own-medications.edit', $prescription))

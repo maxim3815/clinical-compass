@@ -29,7 +29,7 @@ test('patient and doctor exchange messages without reloading the page', function
         ->assertPathIs('/patient')
         ->click('[data-test="tab-chat"]')
         ->assertPathIs('/patient/chat')
-        ->assertSee('Чат не для экстренной помощи')
+        ->assertSee('Врач может ответить не сразу')
         ->fill('body', 'Здравствуйте! Третью ночь плохо сплю.')
         ->press('Отправить');
     waitForText($patientPage, 'Отправлено')

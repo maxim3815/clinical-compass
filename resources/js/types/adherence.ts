@@ -60,7 +60,7 @@ export type RegularPeriod = PeriodBase & {
     skipped: {
         label: string;
         count: number;
-        // «Плохо себя чувствовал или побочные эффекты».
+        // «Плохо себя чувствовал или были побочные эффекты».
         unwell: boolean;
     }[];
     missed: number;

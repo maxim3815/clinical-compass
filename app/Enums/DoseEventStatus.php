@@ -18,7 +18,7 @@ enum DoseEventStatus: string
             self::Scheduled => 'Запланирован',
             self::Taken => 'Принят',
             self::Skipped => 'Не принят',
-            self::Missed => 'Пропущен',
+            self::Missed => 'Без отметки',
         };
     }
 

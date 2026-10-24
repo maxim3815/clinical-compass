@@ -4,6 +4,7 @@ import { ClipboardList, ExternalLink } from '@lucide/vue';
 import AssessmentController from '@/actions/App/Http/Controllers/Patient/AssessmentController';
 import ScoreChart from '@/components/ScoreChart.vue';
 import { Button } from '@/components/ui/button';
+import { plural } from '@/lib/plural';
 import { home, wellbeing } from '@/routes/patient';
 import type { AssessmentStatus, PatientScale } from '@/types';
 
@@ -57,8 +58,8 @@ defineOptions({
                         Пора ответить на вопросы
                     </h2>
                     <p>
-                        Как вы себя чувствовали последние две недели. Ответы
-                        увидит врач.
+                        Расскажите, как вы себя чувствовали последние две
+                        недели. Ответы увидит врач.
                     </p>
                 </div>
             </div>
@@ -78,10 +79,10 @@ defineOptions({
                 Последний раз вы отвечали {{ status.last }}.
             </p>
             <p>
-                Следующий раз —
+                Следующие вопросы появятся
                 <span class="font-semibold">{{ status.next }}</span
-                >. Если самочувствие изменилось, ответьте на вопросы в любой
-                день: врач увидит ответы.
+                >. Если самочувствие изменилось, можно ответить раньше: врач
+                увидит ответы.
             </p>
             <Button variant="outline" size="lg" as-child>
                 <Link
@@ -96,7 +97,8 @@ defineOptions({
             v-else
             class="rounded-2xl border border-dashed p-4 text-muted-foreground"
         >
-            Вопросы о самочувствии появятся, когда вас прикрепят к врачу.
+            Вопросы о самочувствии появятся, когда вы подключитесь к врачу в
+            приложении.
         </p>
 
         <section
@@ -114,8 +116,9 @@ defineOptions({
                     {{ scale.title }}
                 </h2>
                 <p class="text-muted-foreground">
-                    Опросник {{ scale.name }}: сумма от 0 до {{ scale.max }},
-                    чем ниже, тем лучше.
+                    {{
+                        `Опросник ${scale.name}: от 0 до ${scale.max} ${plural(scale.max, ['балла', 'баллов', 'баллов'])}, чем ниже, тем лучше.`
+                    }}
                 </p>
             </div>
 
@@ -123,7 +126,7 @@ defineOptions({
                 v-if="scale.points.length"
                 :points="scale.points"
                 :max="scale.max"
-                :label="`${scale.title}, сумма баллов по датам`"
+                :label="`${scale.title}, баллы по датам`"
                 large
             />
             <p

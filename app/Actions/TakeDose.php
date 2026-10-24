@@ -75,7 +75,7 @@ class TakeDose
             'time' => $candidates[0]->gt($now)
                 ? 'Это время ещё не наступило.'
                 : 'Укажите время не раньше '.$dose->dueFrom()->setTimezone($patient->localTimezone())->format('G:i')
-                    .': за '.$minutes.' '.Plural::choose($minutes, ['минуту', 'минуты', 'минут']).' до планового.',
+                    .', за '.$minutes.' '.Plural::choose($minutes, ['минуту', 'минуты', 'минут']).' до планового приёма.',
         ]);
     }
 }

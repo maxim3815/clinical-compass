@@ -259,7 +259,7 @@ const questionnaires = computed(() => {
     );
     const status = props.wellbeing.status;
     const due = status?.due
-        ? `срок ${status.due_since?.slice(0, 5)} не заполнен`
+        ? `срок ${status.due_since?.slice(0, 5)}: нет ответов`
         : null;
 
     if (filled.length === 0 && due === null) {
@@ -324,8 +324,7 @@ const unreadLabel = computed(
                 </span>
             </p>
             <p v-else class="text-sm text-muted-foreground">
-                Основной диагноз не указан: показания к назначению не
-                проверяются.
+                Основной диагноз не указан.
                 <Link
                     :href="diagnosesHref"
                     class="text-primary underline underline-offset-4"
@@ -609,7 +608,7 @@ const unreadLabel = computed(
                             Приём препаратов
                         </h2>
                         <p class="text-sm text-muted-foreground">
-                            Доля принятых по контрольным периодам курса: дни
+                            Доля принятых приёмов в каждом периоде курса: дни
                             1–7, 8–14, 15–28, дальше каждые 28 дней.
                         </p>
                     </div>
@@ -635,7 +634,7 @@ const unreadLabel = computed(
                         v-if="!hasCourses"
                         class="rounded-xl border border-dashed bg-card p-4 text-sm text-muted-foreground"
                     >
-                        Пациент пока не принимает препараты по назначению.
+                        Курсов приёма пока нет.
                     </p>
 
                     <AdherenceCourse
@@ -679,8 +678,7 @@ const unreadLabel = computed(
                             История назначений
                         </h2>
                         <p class="text-sm text-muted-foreground">
-                            Прежние версии изменённых назначений, отменённые и
-                            завершённые назначения.
+                            Прежние версии, отменённые и завершённые назначения.
                         </p>
                     </div>
 

@@ -92,8 +92,8 @@ function titleId(prescription: Prescription): string {
                         <TriangleAlert
                             class="mt-0.5 size-5 shrink-0 text-warning"
                         />
-                        Выберите время приёма: без него не будет напоминаний и
-                        отметок на «Сегодня».
+                        Выберите время приёма, иначе не будет напоминаний и
+                        препарата на экране «Сегодня».
                     </p>
                 </template>
                 <template v-if="prescription.kind === 'regular'" #actions>
@@ -164,7 +164,7 @@ function titleId(prescription: Prescription): string {
                         data-test="stop-medication-button"
                         @click="stopping = prescription"
                     >
-                        Прекратить приём
+                        Больше не принимаю
                     </Button>
                 </template>
             </PrescriptionDetails>

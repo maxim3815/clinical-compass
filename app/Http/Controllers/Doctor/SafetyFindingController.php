@@ -24,8 +24,8 @@ class SafetyFindingController extends Controller
         $validated = $request->validate([
             'justification' => ['required', 'string', 'max:'.SafetyAcknowledgement::MAX_JUSTIFICATION_LENGTH],
         ], [
-            'justification.required' => 'Напишите обоснование: почему приём продолжается вопреки предупреждению.',
-            'justification' => 'Обоснование — не больше '.SafetyAcknowledgement::MAX_JUSTIFICATION_LENGTH.' символов.',
+            'justification.required' => 'Напишите, почему продолжаете приём вопреки противопоказанию.',
+            'justification' => 'Обоснование длиннее '.SafetyAcknowledgement::MAX_JUSTIFICATION_LENGTH.' символов. Сократите его.',
         ]);
 
         /** @var User $doctor */
@@ -33,7 +33,7 @@ class SafetyFindingController extends Controller
         $decided = $continueDespiteFinding->handle($doctor, $safetyFinding, (string) $validated['justification']);
 
         Inertia::flash('toast', $decided->isEmpty()
-            ? ['type' => 'info', 'message' => 'Решение по этой находке уже принято или она больше не актуальна.']
+            ? ['type' => 'info', 'message' => 'По этому противопоказанию решение уже принято или оно больше не актуально.']
             : ['type' => 'success', 'message' => 'Решение сохранено, приём продолжается.']);
 
         return to_route('doctor.patients.show', $patient);

@@ -51,8 +51,8 @@ function messages(count: number): string {
             v-if="patients.length > 0"
             class="-mt-2 text-sm text-muted-foreground"
         >
-            Число у «Пациентов» в меню — алерты, противопоказания без решения и
-            новые пропуски.
+            Число у «Пациентов» в меню показывает пациентов с алертом,
+            противопоказанием без решения или новыми пропусками.
         </p>
 
         <p
@@ -61,8 +61,8 @@ function messages(count: number): string {
             data-test="attention-empty"
         >
             <CircleCheck class="size-5 shrink-0 text-success" />
-            Алертов, сигналов о приёме, противопоказаний без решения и новых
-            сообщений нет.
+            Сейчас никто не требует внимания: нет алертов, сигналов о приёме,
+            противопоказаний без решения и новых сообщений.
         </p>
 
         <ul v-else class="divide-y rounded-xl border bg-card shadow-xs">
@@ -88,7 +88,7 @@ function messages(count: number): string {
                             >{{ patient.diagnosis.code }}
                             {{ patient.diagnosis.name }}</template
                         >
-                        <template v-else>диагноз не указан</template>
+                        <template v-else>основной диагноз не указан</template>
                     </p>
                 </div>
 

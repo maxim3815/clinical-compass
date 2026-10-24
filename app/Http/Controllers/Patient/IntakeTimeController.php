@@ -113,7 +113,7 @@ class IntakeTimeController extends Controller
      */
     private function outdated(): RedirectResponse
     {
-        Inertia::flash('toast', ['type' => 'error', 'message' => 'Назначение уже изменилось или закончилось. Проверьте актуальные назначения.']);
+        Inertia::flash('toast', ['type' => 'error', 'message' => 'Назначение уже изменилось или закончилось. Список обновлён.']);
 
         return to_route('patient.medications');
     }

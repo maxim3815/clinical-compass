@@ -78,7 +78,7 @@ class OwnMedicationController extends Controller
             return $this->outdated();
         }
 
-        Inertia::flash('toast', ['type' => 'success', 'message' => 'Приём препарата прекращён.']);
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Препарат убран из списка.']);
 
         return to_route('patient.medications');
     }
@@ -101,7 +101,7 @@ class OwnMedicationController extends Controller
      */
     private function outdated(): RedirectResponse
     {
-        Inertia::flash('toast', ['type' => 'error', 'message' => 'Препарат уже изменён, прекращён или закончился. Проверьте актуальный список.']);
+        Inertia::flash('toast', ['type' => 'error', 'message' => 'Этот препарат уже изменили или убрали, либо его приём закончился. Список обновлён.']);
 
         return to_route('patient.medications');
     }

@@ -48,7 +48,7 @@ const open = ref(props.findings.length === 1);
                 @click="open = !open"
             >
                 {{ open ? 'Свернуть' : 'Подробнее' }}
-                <span class="sr-only">о находках «с осторожностью»</span>
+                <span class="sr-only">о предупреждениях «с осторожностью»</span>
                 <ChevronDown
                     class="transition-transform"
                     :class="{ 'rotate-180': open }"

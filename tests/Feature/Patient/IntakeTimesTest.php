@@ -194,7 +194,7 @@ test('closed or completed prescriptions send the patient back to the medications
     $this->actingAs($this->patient)
         ->get(route('patient.intake-times.edit', $prescription))
         ->assertRedirect(route('patient.medications'))
-        ->assertInertiaFlash('toast', ['type' => 'error', 'message' => 'Назначение уже изменилось или закончилось. Проверьте актуальные назначения.']);
+        ->assertInertiaFlash('toast', ['type' => 'error', 'message' => 'Назначение уже изменилось или закончилось. Список обновлён.']);
 
     $this->actingAs($this->patient)
         ->put(route('patient.intake-times.update', $prescription), ['times' => ['morning' => '08:00']])

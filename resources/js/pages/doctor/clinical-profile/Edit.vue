@@ -327,9 +327,8 @@ function resolve(diagnosis: ClinicalDiagnosis): void {
                 <p class="text-muted-foreground">Пациент: {{ patient.name }}</p>
             </div>
             <p class="max-w-3xl text-sm text-muted-foreground">
-                По этим данным проверяется безопасность назначений. Пациент их
-                не видит. Факт не перезаписывается: новое значение сохраняется
-                отдельной записью, прежние остаются в истории.
+                По этим данным приложение проверяет безопасность назначений.
+                Пациент их не видит. Прежние значения остаются в истории.
             </p>
         </header>
 
@@ -347,7 +346,8 @@ function resolve(diagnosis: ClinicalDiagnosis): void {
                             Пол
                         </h2>
                         <p class="text-sm text-muted-foreground">
-                            Нужен, чтобы проверялись беременность и лактация.
+                            Без него не проверить правила о беременности и
+                            грудном вскармливании.
                         </p>
                     </div>
                     <form
@@ -403,8 +403,8 @@ function resolve(diagnosis: ClinicalDiagnosis): void {
                             Диагнозы
                         </h2>
                         <p class="text-sm text-muted-foreground">
-                            По МКБ-10. Диагноз не удаляется, а снимается с
-                            датой.
+                            По МКБ-10. Неактуальный диагноз снимите с датой, в
+                            истории он останется.
                         </p>
                     </div>
 
@@ -704,8 +704,9 @@ function resolve(diagnosis: ClinicalDiagnosis): void {
                             >
                                 {{ diagnosis.code }} {{ diagnosis.name }} · с
                                 {{ diagnosis.established_on }} по
-                                {{ diagnosis.resolved_on }}, снял
-                                {{ diagnosis.resolved_by }}
+                                {{ diagnosis.resolved_on }} ({{
+                                    diagnosis.resolved_by
+                                }})
                             </li>
                         </ul>
                     </details>
@@ -720,12 +721,11 @@ function resolve(diagnosis: ClinicalDiagnosis): void {
             >
                 <div>
                     <h2 id="facts-title" class="text-lg font-semibold">
-                        Факты
+                        Состояния и показатели
                     </h2>
                     <p class="text-sm text-muted-foreground">
-                        Состояния и показатели из противопоказаний препаратов
-                        справочника. Отметьте новые значения и сохраните их
-                        вместе.
+                        От них зависят противопоказания препаратов. Отметьте
+                        новые значения и сохраните их одной кнопкой.
                     </p>
                 </div>
                 <p
@@ -826,7 +826,7 @@ function resolve(diagnosis: ClinicalDiagnosis): void {
                                 @click="saveFacts"
                             >
                                 <Spinner v-if="factsForm.processing" />
-                                Сохранить факты
+                                Сохранить значения
                             </Button>
                         </template>
                     </div>
@@ -837,7 +837,7 @@ function resolve(diagnosis: ClinicalDiagnosis): void {
 
         <LeaveConfirmDialog
             :pending="leaveGuard.pending.value"
-            what="Отмеченные значения фактов"
+            lost="Отмеченные значения не сохранятся."
             @leave="leaveGuard.leave"
             @stay="leaveGuard.stay"
         />

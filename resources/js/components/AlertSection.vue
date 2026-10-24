@@ -11,7 +11,7 @@ import { CHIP_ICON, DANGER_CHIP } from '@/lib/chips';
 import type { PatientAlert } from '@/types';
 
 /**
- * Алерты в карточке пациента: открытые — сверху, с «Принял» и «Закрыть с решением»,
+ * Алерты в карточке пациента: открытые — сверху, с «Принять» и «Закрыть с решением»,
  * ниже история закрытых: что сработало, через сколько показан, кто принял и чем закрыл.
  */
 const props = defineProps<{
@@ -40,7 +40,7 @@ function accept(alert: PatientAlert): void {
             preserveState: true,
             onStart: () => (accepting.value = alert.id),
             onFinish: () => (accepting.value = null),
-            // Кнопка «Принял» исчезла: следующий шаг — решение.
+            // Кнопка «Принять» исчезла: следующий шаг — решение.
             onSuccess: async () => {
                 await nextTick();
                 document
@@ -55,22 +55,22 @@ function accept(alert: PatientAlert): void {
 
 // Одной строкой: текст и <template v-if> подряд на сервере сливаются в один узел.
 function delivery(alert: PatientAlert): string {
-    const push = alert.pushed ? ' Пуш врачу отправлен.' : '';
+    const push = alert.pushed ? ' Уведомление врачу отправлено.' : '';
 
     if (alert.shown === null) {
-        return `Ответ ${alert.submitted_at}. На экране врача ещё не показан.${push}`;
+        return `Опросник заполнен ${alert.submitted_at}. На экране врача ещё не показан.${push}`;
     }
 
     const how = alert.shown.realtime
         ? 'в открытом кабинете'
-        : 'когда открыли кабинет';
+        : 'при входе в кабинет';
 
-    return `Ответ ${alert.submitted_at}. Показан ${how} через ${alert.shown.after}.${push}`;
+    return `Опросник заполнен ${alert.submitted_at}. Показан через ${alert.shown.after}, ${how}.${push}`;
 }
 
 // Кто принял и закрыл — обычно один врач: ФИО один раз в конце.
 function history(alert: PatientAlert): string {
-    const parts = [`Ответ ${alert.submitted_at}`];
+    const parts = [`Заполнен ${alert.submitted_at}`];
     const by = new Set(
         [alert.acknowledged?.by, alert.closed?.by].filter(
             (name): name is string => Boolean(name),
@@ -176,7 +176,7 @@ function history(alert: PatientAlert): string {
                     @click="accept(alert)"
                 >
                     <Spinner v-if="accepting === alert.id" />
-                    Принял
+                    Принять
                 </Button>
                 <Button
                     :data-alert-close="alert.id"

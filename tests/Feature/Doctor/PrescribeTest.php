@@ -204,7 +204,7 @@ test('invalid prescription is rejected', function (array $overrides, string $fie
     'same time of day twice' => [
         ['intakes' => [['time_of_day' => 'morning', 'tablets' => 1], ['time_of_day' => 'morning', 'tablets' => 1]]],
         'intakes.1.time_of_day',
-        'Время суток у приёмов не должно повторяться.',
+        'Для каждого приёма выберите разное время суток.',
     ],
     'unknown time of day' => [['intakes' => [['time_of_day' => 'night', 'tablets' => 1]]], 'intakes.0.time_of_day', 'Выберите время суток.'],
     'extra intake field' => [
@@ -222,7 +222,7 @@ test('invalid prescription is rejected', function (array $overrides, string $fie
     'as needed zero times a day' => [['kind' => 'as_needed', 'tablets' => 1, 'max_daily_doses' => 0], 'max_daily_doses', 'Укажите от 1 до 10 раз в сутки.'],
     'as needed too often' => [['kind' => 'as_needed', 'tablets' => 1, 'max_daily_doses' => 11], 'max_daily_doses', 'Укажите от 1 до 10 раз в сутки.'],
     'as needed with a quarter of a tablet' => [['kind' => 'as_needed', 'tablets' => 0.75, 'max_daily_doses' => 2], 'tablets', 'Таблетку можно делить только пополам.'],
-    'instruction too long' => [['instruction' => str_repeat('а', 1001)], 'instruction', 'Инструкция для пациента — не больше 1000 символов.'],
+    'instruction too long' => [['instruction' => str_repeat('а', 1001)], 'instruction', 'Инструкция длиннее 1000 символов. Сократите её.'],
     'no start' => [['starts_on' => null], 'starts_on', 'Укажите дату начала.'],
     'start in another format' => [['starts_on' => '19.10.2026'], 'starts_on', 'Укажите дату начала.'],
     'start yesterday' => [['starts_on' => '2026-10-18'], 'starts_on', 'Дата начала не может быть раньше сегодняшнего дня по времени пациента.'],

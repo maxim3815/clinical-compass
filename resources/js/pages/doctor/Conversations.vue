@@ -57,8 +57,7 @@ useRealtime(
         <header class="flex flex-col gap-1">
             <h1 class="text-2xl font-semibold tracking-tight">Сообщения</h1>
             <p class="text-muted-foreground">
-                Переписка с пациентами. Сначала диалоги с непрочитанными
-                сообщениями.
+                Сверху диалоги, где есть непрочитанные сообщения.
             </p>
         </header>
 

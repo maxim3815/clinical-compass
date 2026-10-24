@@ -22,7 +22,7 @@ const isActive = (item: NavItem): boolean =>
 // В свёрнутом меню чисел не видно: подсказка у иконки называет их словами.
 const tooltip = (item: NavItem): string =>
     item.badge
-        ? `${item.title} — ${item.badgeLabel ?? 'непрочитанных'}: ${item.badge}`
+        ? `${item.title}, ${item.badgeLabel ?? 'непрочитанных'}: ${item.badge}`
         : item.title;
 </script>
 

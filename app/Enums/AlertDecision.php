@@ -16,8 +16,8 @@ enum AlertDecision: string
     public function label(): string
     {
         return match ($this) {
-            self::Contacted => 'Связался с пациентом',
-            self::Appointment => 'Назначил очный приём',
+            self::Contacted => 'Связь с пациентом установлена',
+            self::Appointment => 'Назначен очный приём',
             self::Emergency => 'Экстренная помощь или госпитализация',
             self::NoThreat => 'Угрозы нет',
         };

@@ -14,7 +14,7 @@ enum SafetyDecisionKind: string
     public function label(): string
     {
         return match ($this) {
-            self::Prescribed => 'Назначено вопреки предупреждению',
+            self::Prescribed => 'Назначено вопреки противопоказанию',
             self::Continued => 'Приём продолжен',
         };
     }

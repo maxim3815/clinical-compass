@@ -185,7 +185,7 @@ final class IntakeCalendar
             'status_text' => match ($event->status) {
                 DoseEventStatus::Missed => 'Нет отметки',
                 DoseEventStatus::Scheduled => 'Ещё не отмечен',
-                default => DoseEventPresenter::statusText($event, $timezone, $female) ?? $event->status->label(),
+                default => DoseEventPresenter::statusText($event, $timezone, $female, late: false) ?? $event->status->label(),
             },
             'skip_comment' => $event->skip_comment,
         ];

@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { useDoseWords } from '@/composables/useDoseWords';
+import { plural } from '@/lib/plural';
 import type { AsNeeded } from '@/types';
 
 const props = defineProps<{
@@ -51,6 +52,20 @@ watch(
     () => form.clearErrors('day', 'time'),
 );
 
+// «Сегодня принято 1 раз, можно не больше 3 раз в сутки»: предел, а не цель, как в «1 из 3».
+const counter = computed(() => {
+    const taken = props.prescription.taken_today;
+    const limit = props.prescription.max_daily_doses;
+    const text =
+        taken === 0
+            ? 'Сегодня ещё не принимали'
+            : `Сегодня принято ${taken} ${plural(taken, ['раз', 'раза', 'раз'])}`;
+
+    return limit === null
+        ? text
+        : `${text}, можно не больше ${limit} ${plural(limit, ['раза', 'раз', 'раз'])} в сутки`;
+});
+
 const limitReached = computed(
     () =>
         props.prescription.max_daily_doses !== null &&
@@ -65,7 +80,7 @@ function submit(confirmed = false): void {
             dialog.value = null;
             form.reset();
         },
-        // Лимит за сутки исчерпан: пациент подтверждает запись. Прежнее «Приём записан.»
+        // Лимит за сутки исчерпан: пациент подтверждает отметку. Прежнее «Приём отмечен.»
         // рядом с вопросом сбивало бы с толку.
         onError: (errors) => {
             if (errors.confirmed) {
@@ -104,7 +119,7 @@ const nameId = computed(() => `as-needed-${props.prescription.id}-name`);
 
 const cancelForm = useForm({});
 
-// Запись удаляется только после вопроса: случайное касание не стирает приём.
+// Отметка убирается только после вопроса: случайное касание не стирает приём.
 const deleting = ref<AsNeeded['doses'][number] | null>(null);
 
 function askDelete(dose: AsNeeded['doses'][number]): void {
@@ -146,10 +161,7 @@ function cancel(): void {
             :class="limitReached ? 'text-warning' : ''"
             data-test="as-needed-counter"
         >
-            Сегодня принято {{ prescription.taken_today
-            }}<template v-if="prescription.max_daily_doses !== null">
-                из {{ prescription.max_daily_doses }}</template
-            >
+            {{ counter }}
         </p>
 
         <div class="flex flex-col gap-1">
@@ -182,7 +194,7 @@ function cancel(): void {
         <ul
             v-if="prescription.doses.length"
             class="flex flex-col divide-y border-t"
-            aria-label="Записанные приёмы"
+            aria-label="Отмеченные приёмы"
         >
             <li
                 v-for="dose in prescription.doses"
@@ -196,11 +208,11 @@ function cancel(): void {
                     variant="ghost"
                     :disabled="cancelForm.processing"
                     class="px-3 text-primary"
-                    :aria-label="`Удалить запись: ${dose.day.toLowerCase()} в ${dose.time}`"
+                    :aria-label="`Убрать отметку: ${dose.day.toLowerCase()} в ${dose.time}`"
                     data-test="delete-as-needed"
                     @click="askDelete(dose)"
                 >
-                    Удалить запись
+                    Убрать отметку
                 </Button>
             </li>
         </ul>
@@ -211,11 +223,11 @@ function cancel(): void {
                 data-test="as-needed-delete-dialog"
             >
                 <DialogHeader>
-                    <DialogTitle class="text-xl">Удалить запись?</DialogTitle>
+                    <DialogTitle class="text-xl">Убрать отметку?</DialogTitle>
                     <DialogDescription class="text-base">
                         {{ prescription.drug }}:
                         {{ deleting.day.toLowerCase() }} в {{ deleting.time }}.
-                        Удаляйте, если отметили приём по ошибке.
+                        Уберите, если отметили приём по ошибке.
                     </DialogDescription>
                 </DialogHeader>
                 <DialogFooter>
@@ -225,7 +237,7 @@ function cancel(): void {
                         size="lg"
                         @click="open = false"
                     >
-                        Не удалять
+                        Не убирать
                     </Button>
                     <Button
                         type="button"
@@ -236,7 +248,7 @@ function cancel(): void {
                         @click="cancel"
                     >
                         <Spinner v-if="cancelForm.processing" class="size-5" />
-                        Удалить
+                        Убрать
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -247,12 +259,12 @@ function cancel(): void {
             >
                 <DialogHeader>
                     <DialogTitle class="text-xl">
-                        Записать ещё один приём?
+                        Отметить ещё один приём?
                     </DialogTitle>
                     <DialogDescription class="text-base">
-                        {{ form.errors.confirmed }} Если вы приняли препарат ещё
-                        раз, всё равно запишите приём: так врачу будет проще
-                        подобрать лечение.
+                        {{ form.errors.confirmed }} Если вы приняли его ещё раз,
+                        отметьте и этот приём: так врачу будет проще подобрать
+                        лечение.
                     </DialogDescription>
                 </DialogHeader>
                 <DialogFooter>
@@ -262,7 +274,7 @@ function cancel(): void {
                         size="lg"
                         @click="open = false"
                     >
-                        Не записывать
+                        Не отмечать
                     </Button>
                     <Button
                         type="button"
@@ -273,7 +285,7 @@ function cancel(): void {
                         @click="submit(true)"
                     >
                         <Spinner v-if="form.processing" class="size-5" />
-                        Записать
+                        Отметить
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -356,7 +368,7 @@ function cancel(): void {
                             data-test="save-as-needed"
                         >
                             <Spinner v-if="form.processing" class="size-5" />
-                            Записать
+                            Отметить
                         </Button>
                     </DialogFooter>
                 </form>

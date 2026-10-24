@@ -76,7 +76,7 @@ test('doctor changes a prescription and cancels it with a reason', function () {
         ->click('Иванов Пётр Алексеевич')
         ->assertSee('Вечером: 1 таблетка, 25 мг')
         ->click('Изменить')
-        ->assertSee('Изменения вступят в силу сразу')
+        ->assertSee('Изменения заработают сразу')
         ->select('[name="intakes.0.tablets"]', '1.5')
         ->press('Сохранить изменения')
         ->assertPathIs("/doctor/patients/{$patient->id}")

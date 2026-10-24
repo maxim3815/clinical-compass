@@ -22,7 +22,7 @@ defineOptions({
                 href: home(),
             },
             {
-                title: 'Ответы переданы',
+                title: 'Ответы отправлены',
                 href: wellbeing(),
             },
         ],
@@ -44,7 +44,7 @@ const details = computed(() =>
 </script>
 
 <template>
-    <Head title="Ответы переданы врачу" />
+    <Head title="Ответы отправлены врачу" />
 
     <div class="flex flex-col gap-6 p-4" data-test="questionnaire-sent">
         <section
@@ -56,7 +56,7 @@ const details = computed(() =>
                 class="text-2xl font-semibold tracking-tight outline-none"
                 tabindex="-1"
             >
-                Ответы переданы врачу
+                Ответы отправлены врачу
             </h1>
             <p class="text-muted-foreground">{{ details }}</p>
         </section>
@@ -76,7 +76,7 @@ const details = computed(() =>
             </Button>
             <!-- На экране помощи лишний выбор не нужен: только 112, чат и «Готово». -->
             <Button v-if="!help" variant="outline" size="lg" as-child>
-                <Link :href="wellbeing()">Посмотреть самочувствие</Link>
+                <Link :href="wellbeing()">Посмотреть прошлые ответы</Link>
             </Button>
         </div>
     </div>

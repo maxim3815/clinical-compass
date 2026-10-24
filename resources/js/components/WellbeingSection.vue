@@ -95,9 +95,9 @@ function highlighted(filling: AssessmentFilling) {
                 Самочувствие
             </h2>
             <p class="text-sm text-muted-foreground">
-                Опросники заполняет пациент: GAD-7 (тревога) и PHQ-9
-                (депрессия), за последние 2 недели. Сроки — день 0, 7, 14, 28,
-                дальше каждые 4 недели.
+                Пациент заполняет GAD-7 (тревога) и PHQ-9 (депрессия) за
+                последние 2 недели. Сроки от начала наблюдения: день 0, 7, 14,
+                28, дальше каждые 4 недели.
             </p>
         </div>
 
@@ -111,7 +111,7 @@ function highlighted(filling: AssessmentFilling) {
                 Срок {{ wellbeing.status.due_since }}: ответов пока нет.
             </template>
             <template v-else>
-                Следующий срок — {{ wellbeing.status.next }}.
+                Следующие опросники пациент получит {{ wellbeing.status.next }}.
             </template>
         </p>
 
@@ -194,7 +194,7 @@ function highlighted(filling: AssessmentFilling) {
                             data-test="wellbeing-since-first"
                         >
                             {{
-                                `с первого заполнения ${scale.first.date}: ${scale.first.total} → ${scale.latest.total}`
+                                `с первого заполнения ${scale.first.date}: было ${scale.first.total}, стало ${scale.latest.total}`
                             }}
                         </p>
                     </template>
@@ -208,7 +208,7 @@ function highlighted(filling: AssessmentFilling) {
                     :points="scale.points"
                     :max="scale.max"
                     :ticks="scale.thresholds"
-                    :label="`${scale.name}, сумма баллов по датам`"
+                    :label="`${scale.name}, баллы по датам`"
                 />
             </article>
 

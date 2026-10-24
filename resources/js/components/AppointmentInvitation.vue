@@ -297,7 +297,7 @@ useRealtime<InvitationChanged>(
                     </div>
 
                     <p class="text-sm text-muted-foreground">
-                        Без камеры — открыть адрес и ввести код:
+                        Без камеры можно открыть адрес и ввести код:
                         <span
                             class="block text-base font-semibold break-words text-foreground sm:text-lg"
                             data-test="appointment-address"

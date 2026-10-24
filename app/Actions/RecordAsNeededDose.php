@@ -60,7 +60,7 @@ class RecordAsNeededDose
             $now = CarbonImmutable::now();
 
             if ($date->lt($current->starts_on)) {
-                throw ValidationException::withMessages(['day' => 'В этот день назначение ещё не действовало.']);
+                throw ValidationException::withMessages(['day' => 'В этот день препарат ещё не был назначен.']);
             }
 
             $takenAt = $time === null ? $now : CarbonImmutable::parse($date->toDateString().' '.$time, $patient->localTimezone())->utc();

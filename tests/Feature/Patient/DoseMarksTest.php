@@ -55,7 +55,7 @@ test('patient marks a dose taken now, on time or late', function (string $now, s
 })->with([
     'an hour early' => ['07:00', 'Принят в 7:00'],
     'an hour late' => ['09:00', 'Принят в 9:00'],
-    'later' => ['09:01', 'Принят поздно, в 9:01'],
+    'later' => ['09:01', 'Принят в 9:01'],
 ]);
 
 test('patient marks the time a dose was taken', function (string $time, string $statusText) {
@@ -79,7 +79,7 @@ test('patient marks the time a dose was taken', function (string $time, string $
 })->with([
     ['07:00', 'Принят в 7:00'],
     ['09:00', 'Принят в 9:00'],
-    ['10:30', 'Принят поздно, в 10:30'],
+    ['10:30', 'Принят в 10:30'],
 ]);
 
 test('the time of a dose is not earlier than an hour before it and not in the future', function (string $time, string $error) {
@@ -91,7 +91,7 @@ test('the time of a dose is not earlier than an hour before it and not in the fu
 
     expect($morning->refresh()->status)->toBe(DoseEventStatus::Scheduled);
 })->with([
-    ['06:59', 'Укажите время не раньше 7:00: за 60 минут до планового.'],
+    ['06:59', 'Укажите время не раньше 7:00, за 60 минут до планового приёма.'],
     ['12:01', 'Это время ещё не наступило.'],
     ['8 утра', 'Укажите время в формате ЧЧ:ММ.'],
 ]);
@@ -163,7 +163,7 @@ test('a reason is required and «Другое» needs a comment', function (arra
     'no reason' => [[], ['reason' => 'Выберите причину.']],
     'unknown reason' => [['reason' => 'bored'], ['reason' => 'Выберите причину из списка.']],
     'other without comment' => [['reason' => 'other', 'comment' => '  '], ['comment' => 'Для причины «Другое» напишите комментарий.']],
-    'long comment' => [['reason' => 'unwell', 'comment' => str_repeat('а', 501)], ['comment' => 'Комментарий — не больше 500 символов.']],
+    'long comment' => [['reason' => 'unwell', 'comment' => str_repeat('а', 501)], ['comment' => 'Комментарий длиннее 500 символов. Сократите его.']],
     'unknown mark' => [['status' => 'missed'], ['status' => 'Отметка указана неверно.']],
 ]);
 
@@ -364,7 +364,7 @@ test('«Принял всё» marks the unmarked doses of a group taken', functi
     // Вчерашний приём принят сейчас: время отметки совпадает со временем приёма и отдельно не показывается.
     $this->get(route('patient.home'))
         ->assertInertia(fn (Assert $page) => $page
-            ->where('yesterday.groups.0.doses.0.status_text', 'Принят поздно, 19.10 в 12:00')
+            ->where('yesterday.groups.0.doses.0.status_text', 'Принят 19.10 в 12:00')
             ->where('yesterday.groups.0.doses.0.marked_late', null),
         );
 

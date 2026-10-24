@@ -351,7 +351,7 @@ const leaveGuard = useLeaveGuard(
 
         <LeaveConfirmDialog
             :pending="leaveGuard.pending.value"
-            what="Ни один ответ"
+            lost="Ваши ответы не сохранятся."
             @leave="leaveGuard.leave"
             @stay="leaveGuard.stay"
         />

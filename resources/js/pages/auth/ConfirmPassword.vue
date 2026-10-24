@@ -11,8 +11,7 @@ import { store } from '@/routes/password/confirm';
 defineOptions({
     layout: {
         title: 'Подтвердите пароль',
-        description:
-            'Это действие защищено. Введите пароль, с которым вы входите в кабинет.',
+        description: 'Чтобы продолжить, введите ваш пароль.',
     },
 });
 </script>

@@ -109,7 +109,7 @@ test('invalid cancellation is rejected', function (array $data, string $field, s
     expect($prescription->refresh()->closed_at)->toBeNull();
 })->with([
     'unknown reason' => [['reason' => 'tired'], 'reason', 'Выберите причину из списка.'],
-    'comment too long' => [['reason' => 'other', 'comment' => str_repeat('а', 1001)], 'comment', 'Комментарий — не больше 1000 символов.'],
+    'comment too long' => [['reason' => 'other', 'comment' => str_repeat('а', 1001)], 'comment', 'Комментарий длиннее 1000 символов. Сократите его.'],
 ]);
 
 test('history shows the latest closed prescriptions first', function () {

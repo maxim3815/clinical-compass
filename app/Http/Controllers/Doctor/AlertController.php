@@ -78,7 +78,7 @@ class AlertController extends Controller
             'decision.required' => 'Выберите решение.',
             'decision' => 'Выберите решение из списка.',
             'comment.required' => 'Напишите, почему угрозы нет.',
-            'comment' => 'Комментарий — не больше '.self::MAX_COMMENT_LENGTH.' символов.',
+            'comment' => 'Комментарий длиннее '.self::MAX_COMMENT_LENGTH.' символов. Сократите его.',
         ]);
 
         /** @var User $doctor */

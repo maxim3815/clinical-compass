@@ -292,7 +292,7 @@ test('changed, cancelled or completed prescription can not be changed by the doc
         ...$attributes,
     ]);
     $before = $prescription->fresh()?->toArray();
-    $toast = ['type' => 'error', 'message' => 'Назначение уже изменено, отменено или завершено. Проверьте актуальные назначения.'];
+    $toast = ['type' => 'error', 'message' => 'Назначение уже изменено, отменено или завершено. Карточка обновлена.'];
     $card = route('doctor.patients.show', $this->patient);
 
     $this->actingAs($this->doctor)

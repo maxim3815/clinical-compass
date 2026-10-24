@@ -74,8 +74,8 @@ trait WritesOwnMedications
         if ($exists) {
             throw ValidationException::withMessages([
                 'drug_id' => match ($data->kind) {
-                    PrescriptionKind::Regular => 'Ваш врач уже назначил этот препарат на эти даты. Отмечайте его приём по назначению врача.',
-                    PrescriptionKind::AsNeeded => 'Ваш врач уже назначил этот препарат «по необходимости» на эти даты. Записывайте приёмы по назначению врача.',
+                    PrescriptionKind::Regular => 'Врач уже назначил вам этот препарат на эти даты. Отмечайте приём в разделе «Назначил врач».',
+                    PrescriptionKind::AsNeeded => 'Врач уже назначил вам этот препарат «по необходимости» на эти даты. Отмечайте приёмы по его назначению на экране «Сегодня».',
                 },
             ]);
         }

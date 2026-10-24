@@ -37,8 +37,8 @@ function print(): void {
                 </h1>
                 <p class="text-muted-foreground">
                     Распечатайте и поставьте на стол. Пациент наводит камеру на
-                    QR-код и вводит код из окна «Пригласить на приёме». Без кода
-                    по QR-коду подключиться нельзя.
+                    QR-код и вводит 4 цифры из окна «Пригласить на приёме»: без
+                    них QR-код не сработает.
                 </p>
             </div>
             <Button data-test="print-card" @click="print">
@@ -77,7 +77,7 @@ function print(): void {
                 <li>2. Введите 4 цифры, которые назовёт врач.</li>
             </ol>
             <p class="text-muted-foreground">
-                Без камеры — откройте адрес<br />
+                Если камеры нет, откройте адрес<br />
                 <span class="font-medium break-words text-foreground">{{
                     address.short
                 }}</span>

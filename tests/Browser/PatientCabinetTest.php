@@ -22,7 +22,7 @@ test('patient on a phone sees the doctor and changes the timezone', function () 
         ->assertScript(FITS_SCREEN)
         ->select('timezone', 'Asia/Yekaterinburg')
         ->press('Сохранить')
-        ->assertSee('Профиль обновлён.')
+        ->assertSee('Профиль сохранён.')
         ->assertNoJavaScriptErrors();
 
     expect($patient->refresh()->patientProfile?->timezone)->toBe(RussianTimezone::Yekaterinburg);
@@ -37,7 +37,7 @@ test('patient without a doctor sees what to do', function () {
         ->fill('password', 'password')
         ->press('Войти')
         ->assertPathIs('/patient')
-        ->assertSee('Вы сейчас не прикреплены к врачу')
+        ->assertSee('Вы сейчас не подключены к врачу в приложении')
         ->assertScript(FITS_SCREEN)
         ->assertNoJavaScriptErrors();
 });

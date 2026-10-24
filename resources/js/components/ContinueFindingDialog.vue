@@ -40,7 +40,7 @@ const description = computed(() => {
     const { drug, finding: item } = finding.value;
     const related =
         item.related.length > 0
-            ? ` Решение относится и к находке у препарата ${item.related.join(', ')}.`
+            ? ` Решение закроет противопоказание и у препарата ${item.related.join(', ')}.`
             : '';
 
     return `${drug}: ${item.text}${related}`;
@@ -117,9 +117,8 @@ function submit(): void {
                         id="continue_justification-hint"
                         class="text-sm text-muted-foreground"
                     >
-                        Например: попросил прекратить второй препарат, назначил
-                        ЭКГ. Обоснование сохранится в находке и в журнале
-                        аудита.
+                        Например: второй препарат отменён, назначена ЭКГ.
+                        Обоснование сохранится в журнале аудита.
                     </p>
                     <InputError
                         id="continue_justification-error"

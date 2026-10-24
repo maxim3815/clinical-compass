@@ -111,7 +111,7 @@ class PrescriptionController extends Controller
         ], [
             'reason' => 'Выберите причину из списка.',
             'comment.required_if' => 'Для причины «Другое» напишите комментарий.',
-            'comment' => 'Комментарий — не больше '.self::MAX_CANCEL_COMMENT_LENGTH.' символов.',
+            'comment' => 'Комментарий длиннее '.self::MAX_CANCEL_COMMENT_LENGTH.' символов. Сократите его.',
         ]);
 
         /** @var User $doctor */
@@ -148,7 +148,7 @@ class PrescriptionController extends Controller
      */
     private function notChangeable(User $patient): RedirectResponse
     {
-        Inertia::flash('toast', ['type' => 'error', 'message' => 'Назначение уже изменено, отменено или завершено. Проверьте актуальные назначения.']);
+        Inertia::flash('toast', ['type' => 'error', 'message' => 'Назначение уже изменено, отменено или завершено. Карточка обновлена.']);
 
         return to_route('doctor.patients.show', $patient);
     }

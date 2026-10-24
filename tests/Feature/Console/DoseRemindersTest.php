@@ -120,7 +120,7 @@ test('marked doses are not reminded', function () {
 test('a snoozed reminder comes when the snooze ends and holds back the regular repeat', function () {
     remindAt('05:00');
 
-    // «Через 15 минут» в 8:25: повтор в 8:30 ждёт, напоминание приходит в 8:40.
+    // «Отложить на 15 мин» в 8:25: повтор в 8:30 ждёт, напоминание приходит в 8:40.
     $this->travelTo(CarbonImmutable::parse('2026-10-19 05:25', 'UTC'));
     app(SnoozeDoses::class)->handle($this->patient, [$this->dose]);
 
@@ -173,7 +173,7 @@ test('the reminder shows the time, drugs and doses and carries signed buttons', 
     expect($message['title'])->toBe('Приём в 8:00')
         ->and($message['body'])->toBe("Атаракс, 1 таблетка, 25 мг. Может вызывать сонливость.\nЭсциталопрам, 1 таблетка, 10 мг. За 30 минут до еды.")
         ->and($message['tag'])->toBe('dose-'.CarbonImmutable::parse('2026-10-19 05:00', 'UTC')->getTimestamp())
-        ->and(array_column($message['actions'], 'title'))->toBe(['Принял всё', 'Через 15 минут'])
+        ->and(array_column($message['actions'], 'title'))->toBe(['Принял всё', 'Отложить на 15 мин'])
         ->and($message['data']['url'])->toBe('/patient?doses='.urlencode($ids))
         ->and($message['data']['take'])->toStartWith('/push/doses/take?');
 
@@ -191,5 +191,5 @@ test('the reminder button speaks to a female patient in the feminine', function 
 
     $message = (new DoseReminder($doses))->toWebPush($this->patient->refresh())->toArray();
 
-    expect(array_column($message['actions'], 'title'))->toBe(['Приняла', 'Через 15 минут']);
+    expect(array_column($message['actions'], 'title'))->toBe(['Приняла', 'Отложить на 15 мин']);
 });

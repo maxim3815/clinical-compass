@@ -73,7 +73,7 @@ test('offline page needs nothing from the network and tells how to mark a dose l
 
     expect($html)
         ->toContain('<h1>Нет подключения к интернету</h1>')
-        ->toContain('кнопка «Принял в другое время» на экране «Сегодня»')
+        ->toMatch('/отметьте приём на экране\s+«Сегодня»/u')
         ->toContain('>Повторить</button>')
         ->toContain('Страница откроется сама, когда сеть появится.')
         // Стили, скрипт и знак приложения — внутри файла.

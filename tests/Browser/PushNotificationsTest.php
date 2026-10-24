@@ -151,11 +151,11 @@ test('the notifications page follows the permission when the browser changes it'
     // Тихий запрос Chrome на Android закрылся сам: разрешения нет, кнопка остаётся.
     $page->script('() => window.answerPermissionPrompt("default")');
     $page->click('[data-test="push-enable"]');
-    waitForText($page, 'Браузер не получил разрешения')->assertPresent('[data-test="push-enable"]');
+    waitForText($page, 'Уведомления не включились')->assertPresent('[data-test="push-enable"]');
 
     // После нескольких закрытых запросов Chrome блокирует сайт сам.
     $page->script('() => window.changePermission("denied")');
-    waitForPushState($page, '[data-test="push-denied"]')->assertDontSee('Браузер не получил разрешения');
+    waitForPushState($page, '[data-test="push-denied"]')->assertDontSee('Уведомления не включились');
 
     // Пользователь разрешил уведомления в настройках сайта: подписку создаёт кнопка.
     $page->script('() => window.changePermission("granted")');
@@ -266,7 +266,7 @@ test('a message in a hidden chat tab stays unread until the tab is shown', funct
             ->press('Войти')
             ->assertPathIs('/patient')
             ->navigate(route('patient.chat.show'))
-            ->assertSee('Чат не для экстренной помощи')
+            ->assertSee('Врач может ответить не сразу')
             // Тестовый сервер отвечает, только пока тест ждёт: даём странице подписаться на канал.
             ->wait(1);
 

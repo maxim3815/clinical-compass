@@ -27,7 +27,7 @@ class PrescriptionRequest extends FormRequest
 {
     public const int MAX_INSTRUCTION_LENGTH = 1000;
 
-    public const string ADDED_BY_PATIENT = 'Этот препарат пациент добавил сам, врач его не меняет.';
+    public const string ADDED_BY_PATIENT = 'Этот препарат пациент добавил сам, изменить его может только он.';
 
     private DrugStrength|false|null $strength = false;
 
@@ -104,7 +104,7 @@ class PrescriptionRequest extends FormRequest
             'intakes.max' => 'В сутки можно назначить не больше '.Prescription::MAX_INTAKES.' приёмов.',
             'intakes' => 'Добавьте хотя бы один приём.',
             'intakes.*.array' => 'Приём описан неверно.',
-            'intakes.*.time_of_day.distinct' => 'Время суток у приёмов не должно повторяться.',
+            'intakes.*.time_of_day.distinct' => 'Для каждого приёма выберите разное время суток.',
             'intakes.*.time_of_day' => 'Выберите время суток.',
             'intakes.*.tablets.multiple_of' => 'Таблетку можно делить только пополам.',
             'intakes.*.tablets.integer' => 'Таблетку этой дозировки делить нельзя.',
@@ -113,7 +113,7 @@ class PrescriptionRequest extends FormRequest
             'tablets.integer' => 'Таблетку этой дозировки делить нельзя.',
             'tablets' => $tablets,
             'max_daily_doses' => 'Укажите от 1 до '.Prescription::MAX_DAILY_DOSES.' раз в сутки.',
-            'instruction' => 'Инструкция для пациента — не больше '.self::MAX_INSTRUCTION_LENGTH.' символов.',
+            'instruction' => 'Инструкция длиннее '.self::MAX_INSTRUCTION_LENGTH.' символов. Сократите её.',
             'starts_on.after_or_equal' => 'Дата начала не может быть раньше сегодняшнего дня по времени пациента.',
             'starts_on' => 'Укажите дату начала.',
             'ends_on.after_or_equal' => $this->hasStarted()
@@ -122,7 +122,7 @@ class PrescriptionRequest extends FormRequest
             'ends_on' => 'Проверьте дату окончания.',
             'safety_seen' => SafetyAcknowledgement::STALE,
             'safety_seen.*' => SafetyAcknowledgement::STALE,
-            'justification' => 'Обоснование — не больше '.SafetyAcknowledgement::MAX_JUSTIFICATION_LENGTH.' символов.',
+            'justification' => 'Обоснование длиннее '.SafetyAcknowledgement::MAX_JUSTIFICATION_LENGTH.' символов. Сократите его.',
         ];
     }
 

@@ -51,7 +51,7 @@ test('invalid input is rejected', function () {
         '--password' => 'short',
     ])->assertFailed()
         ->expectsOutputToContain('Логин может состоять только из латинских букв')
-        ->expectsOutputToContain('не короче 8');
+        ->expectsOutputToContain('не меньше 8 символов');
 
     expect(User::query()->count())->toBe(0);
 });

@@ -108,8 +108,8 @@ const texts = computed(() => [
                 class="rounded-lg border border-dashed p-3 text-sm text-muted-foreground"
                 data-test="drug-inactive"
             >
-                Препарат убран из справочника: назначить его заново нельзя,
-                действующие назначения продолжают работать.
+                Препарат убран из справочника: назначить его нельзя, действующие
+                назначения остаются в силе.
             </p>
 
             <dl

@@ -38,7 +38,7 @@ test('patient records an as-needed dose now', function () {
     $this->actingAs($this->patient)
         ->post(route('patient.as-needed-doses.store', $this->prescription), ['day' => 'today'])
         ->assertRedirect(route('patient.home'))
-        ->assertInertiaFlash('toast', ['type' => 'success', 'message' => 'Приём записан.']);
+        ->assertInertiaFlash('toast', ['type' => 'success', 'message' => 'Приём отмечен.']);
 
     expect(asNeededLog($this->patient))->toBe(['2026-10-19 12:00 0.5'])
         ->and($this->patient->asNeededDoses()->sole()->prescription_id)->toBe($this->prescription->id);
@@ -87,7 +87,7 @@ test('an as-needed dose is not recorded in the future, without time for yesterda
 })->with([
     'future' => [['day' => 'today', 'time' => '12:01'], ['time' => 'Это время ещё не наступило.']],
     'yesterday without time' => [['day' => 'yesterday'], ['time' => 'Укажите время приёма.']],
-    'before the prescription' => [['day' => 'yesterday', 'time' => '10:00'], ['day' => 'В этот день назначение ещё не действовало.']],
+    'before the prescription' => [['day' => 'yesterday', 'time' => '10:00'], ['day' => 'В этот день препарат ещё не был назначен.']],
     'unknown day' => [['day' => 'tomorrow'], ['day' => 'Выберите день.']],
     'bad time' => [['day' => 'today', 'time' => '25:00'], ['time' => 'Укажите время в формате ЧЧ:ММ.']],
 ]);
@@ -106,7 +106,7 @@ test('a dose over the daily limit is recorded after the patient confirms it', fu
 
     $this->post(route('patient.as-needed-doses.store', $this->prescription), ['day' => 'today', 'confirmed' => true])
         ->assertSessionHasNoErrors()
-        ->assertInertiaFlash('toast', ['type' => 'success', 'message' => 'Приём записан.']);
+        ->assertInertiaFlash('toast', ['type' => 'success', 'message' => 'Приём отмечен.']);
 
     $this->get(route('patient.home'))
         ->assertInertia(fn (Assert $page) => $page->where('asNeeded.0.taken_today', 3));
@@ -140,7 +140,7 @@ test('a changed, cancelled or upcoming prescription does not take as-needed dose
     $this->actingAs($this->patient)
         ->post(route('patient.as-needed-doses.store', $this->prescription), ['day' => 'today'])
         ->assertRedirect(route('patient.home'))
-        ->assertInertiaFlash('toast', ['type' => 'error', 'message' => 'Назначение уже изменилось или закончилось. Проверьте актуальные назначения.']);
+        ->assertInertiaFlash('toast', ['type' => 'error', 'message' => 'Назначение уже изменилось или закончилось. Список обновлён.']);
 
     expect($this->patient->asNeededDoses()->count())->toBe(0);
 })->with([
@@ -172,7 +172,7 @@ test('patient cancels as-needed doses of today and yesterday only', function () 
     foreach ([$today, $yesterday] as $dose) {
         $this->delete(route('patient.as-needed-doses.destroy', $dose))
             ->assertRedirect(route('patient.home'))
-            ->assertInertiaFlash('toast', ['type' => 'success', 'message' => 'Запись о приёме удалена.']);
+            ->assertInertiaFlash('toast', ['type' => 'success', 'message' => 'Отметка убрана.']);
     }
 
     $this->delete(route('patient.as-needed-doses.destroy', $old))

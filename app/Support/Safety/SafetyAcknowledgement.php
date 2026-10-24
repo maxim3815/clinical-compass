@@ -11,9 +11,9 @@ use Illuminate\Validation\ValidationException;
  */
 final readonly class SafetyAcknowledgement
 {
-    public const string STALE = 'Данные пациента изменились, проверьте предупреждения ещё раз.';
+    public const string STALE = 'Данные пациента изменились, посмотрите проверку безопасности ещё раз.';
 
-    public const string JUSTIFICATION_REQUIRED = 'Есть противопоказание: напишите обоснование назначения вопреки предупреждению.';
+    public const string JUSTIFICATION_REQUIRED = 'Есть противопоказание: напишите, почему всё равно назначаете препарат.';
 
     public const int MAX_JUSTIFICATION_LENGTH = 2000;
 

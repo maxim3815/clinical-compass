@@ -65,7 +65,7 @@ test('patient marks a dose while the server is down and again after it is back',
 
     // Вместо окна с сырой страницей ошибки — понятное сообщение, отметка осталась доступной.
     $page->click('[data-test="take-dose"]')
-        ->assertSee('Сервер временно не отвечает. Попробуйте ещё раз через минуту.')
+        ->assertSee('Приложение временно не отвечает. Попробуйте ещё раз через минуту.')
         ->assertScript('document.querySelector("dialog iframe") === null')
         ->assertPresent('[data-test="take-dose"]');
     expect(doseOn($patient, $day->toDateString(), 'morning')->status)->toBe(DoseEventStatus::Scheduled);

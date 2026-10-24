@@ -94,7 +94,7 @@ function take(): void {
                     {{ dose.skip_comment }}
                 </p>
                 <p v-if="dose.marked_late" class="text-muted-foreground">
-                    Отмечено позже, {{ dose.marked_late }}
+                    Отмечено {{ dose.marked_late }}
                 </p>
             </div>
             <Button

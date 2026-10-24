@@ -47,12 +47,12 @@ class AsNeededDoseController extends Controller
                 (bool) ($validated['confirmed'] ?? false),
             );
         } catch (PrescriptionNotChangeable) {
-            Inertia::flash('toast', ['type' => 'error', 'message' => 'Назначение уже изменилось или закончилось. Проверьте актуальные назначения.']);
+            Inertia::flash('toast', ['type' => 'error', 'message' => 'Назначение уже изменилось или закончилось. Список обновлён.']);
 
             return to_route('patient.home');
         }
 
-        Inertia::flash('toast', ['type' => 'success', 'message' => 'Приём записан.']);
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Приём отмечен.']);
 
         return to_route('patient.home');
     }
@@ -72,7 +72,7 @@ class AsNeededDoseController extends Controller
             return to_route('patient.home');
         }
 
-        Inertia::flash('toast', ['type' => 'success', 'message' => 'Запись о приёме удалена.']);
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Отметка убрана.']);
 
         return to_route('patient.home');
     }

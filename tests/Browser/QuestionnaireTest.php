@@ -61,15 +61,15 @@ test('patient answers both questionnaires on a phone and sees the wellbeing char
     }
 
     $page->press('Отправить врачу')
-        ->assertSee('Ответы переданы врачу')
+        ->assertSee('Ответы отправлены врачу')
         ->assertSee('Смирнова Анна Сергеевна увидит их в вашей карточке.')
         // «Назад» после отправки не открывает заполненную вторую часть для повторной отправки.
         ->back()
         ->assertSee('Часть 1 из 2')
         ->assertDontSee('Отправить врачу')
         ->forward()
-        ->assertSee('Ответы переданы врачу')
-        ->click('Посмотреть самочувствие')
+        ->assertSee('Ответы отправлены врачу')
+        ->click('Посмотреть прошлые ответы')
         ->assertPathIs('/patient/wellbeing')
         ->assertSee('Чем ниже число, тем лучше.')
         ->assertSeeIn('#scale-gad7-title', 'Беспокойство')
@@ -81,7 +81,7 @@ test('patient answers both questionnaires on a phone and sees the wellbeing char
         ->assertScript(FITS_SCREEN)
         ->click('[data-test="tab-today"]')
         ->assertMissing('[data-test="questionnaire-card"]')
-        ->assertSeeIn('[data-test="wellbeing-link"]', 'Следующий раз')
+        ->assertSeeIn('[data-test="wellbeing-link"]', 'Следующие вопросы появятся')
         ->assertNoJavaScriptErrors();
 
     expect(Assessment::query()->orderBy('id')->pluck('total')->all())->toBe([15, 8]);

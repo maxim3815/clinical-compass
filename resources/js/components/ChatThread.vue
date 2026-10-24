@@ -348,7 +348,7 @@ async function scrollToBottom(): Promise<void> {
                 v-else-if="!isPatient"
                 class="hidden text-xs text-muted-foreground md:block"
             >
-                Ctrl+Enter или ⌘+Enter — отправить
+                Ctrl+Enter или ⌘+Enter отправит сообщение
             </p>
         </form>
     </div>

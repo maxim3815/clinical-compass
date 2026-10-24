@@ -41,7 +41,7 @@ test('patient on a phone marks doses during the day', function () {
         ->assertSee('Отметка сохранена.')
         ->assertSee('Принят в 8:30')
         ->assertSeeIn('[data-test="today-progress"]', 'Отмечено 1 из 2')
-        ->assertSee('Следующий приём в 20:00')
+        ->assertSee('Следующий приём препаратов в 20:00')
         ->assertScript(FITS_SCREEN)
         ->assertNoJavaScriptErrors();
 
@@ -55,22 +55,22 @@ test('patient on a phone marks doses during the day', function () {
         ->click('input[name="reason"][value="unwell"]')
         ->fill('#skip_comment', 'Тошнило')
         ->click('[data-test="save-dose-mark"]')
-        ->assertSee('Не принят: плохо себя чувствовал или побочные эффекты')
+        ->assertSee('Не принят: плохо себя чувствовал или были побочные эффекты')
         ->assertSee('Тошнило')
         ->click('[data-test="take-as-needed"]')
-        ->assertSee('Приём записан.')
-        ->assertSee('Сегодня принято 1 из 1')
+        ->assertSee('Приём отмечен.')
+        ->assertSee('Сегодня принято 1 раз, можно не больше 1 раза в сутки')
         ->click('[data-test="take-as-needed"]')
-        ->assertSee('Записать ещё один приём?')
+        ->assertSee('Отметить ещё один приём?')
         ->assertSee('Сегодня вы уже приняли препарат 1 раз, а врач разрешил не больше 1 раза в сутки.')
         ->click('[data-test="confirm-as-needed"]')
-        ->assertSee('Сегодня принято 2 из 1')
-        // Лишнюю запись удаляют после вопроса.
+        ->assertSee('Сегодня принято 2 раза, можно не больше 1 раза в сутки')
+        // Лишнюю отметку убирают после вопроса.
         ->click('[data-test="as-needed-dose"]:first-child [data-test="delete-as-needed"]')
-        ->assertSee('Удалить запись?')
+        ->assertSee('Убрать отметку?')
         ->click('[data-test="confirm-delete-as-needed"]')
-        ->assertSee('Запись о приёме удалена.')
-        ->assertSee('Сегодня принято 1 из 1')
+        ->assertSee('Отметка убрана.')
+        ->assertSee('Сегодня принято 1 раз, можно не больше 1 раза в сутки')
         ->assertScript(FITS_SCREEN)
         ->assertNoJavaScriptErrors();
 

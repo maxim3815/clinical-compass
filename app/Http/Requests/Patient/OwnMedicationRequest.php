@@ -82,14 +82,14 @@ class OwnMedicationRequest extends FormRequest
             'drug_id.required' => 'Выберите препарат.',
             'drug_id' => 'Выберите препарат из списка.',
             'drug_name.required' => 'Напишите название препарата.',
-            'drug_name' => 'Название — не больше '.Prescription::MAX_DRUG_NAME_LENGTH.' символов.',
+            'drug_name' => 'Название длиннее '.Prescription::MAX_DRUG_NAME_LENGTH.' символов. Сократите его.',
             'dose.required' => 'Напишите дозу, например «1 таблетка 50 мг».',
-            'dose' => 'Доза — не больше '.Prescription::MAX_DOSE_LENGTH.' символов.',
+            'dose' => 'Доза длиннее '.Prescription::MAX_DOSE_LENGTH.' символов. Сократите её.',
             'kind' => 'Выберите, как принимать препарат.',
             'intakes.max' => 'В сутки можно указать не больше '.Prescription::MAX_INTAKES.' приёмов.',
             'intakes' => 'Добавьте хотя бы один приём.',
             'intakes.*.array' => 'Приём описан неверно.',
-            'intakes.*.time_of_day.distinct' => 'Время суток у приёмов не должно повторяться.',
+            'intakes.*.time_of_day.distinct' => 'Для каждого приёма выберите разное время суток.',
             'intakes.*.time_of_day' => 'Выберите время суток.',
             'intakes.*.time.distinct' => 'Время совпадает с другим приёмом.',
             'intakes.*.time.required' => 'Укажите время приёма.',
@@ -101,7 +101,7 @@ class OwnMedicationRequest extends FormRequest
                 ? 'Дата окончания не может быть раньше сегодняшнего дня.'
                 : 'Дата окончания не может быть раньше даты начала.',
             'ends_on' => 'Проверьте дату окончания.',
-            'prescribed_by' => 'Не больше '.Prescription::MAX_PRESCRIBED_BY_LENGTH.' символов.',
+            'prescribed_by' => 'Здесь больше '.Prescription::MAX_PRESCRIBED_BY_LENGTH.' символов. Сократите запись.',
         ];
     }
 

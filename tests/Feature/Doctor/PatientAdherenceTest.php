@@ -142,7 +142,7 @@ test('a period counts taken, not taken and missed doses', function () {
             'late' => 1,
             'skipped' => [
                 ['label' => 'Забыл', 'count' => 1, 'unwell' => false],
-                ['label' => 'Плохо себя чувствовал или побочные эффекты', 'count' => 1, 'unwell' => true],
+                ['label' => 'Плохо себя чувствовал или были побочные эффекты', 'count' => 1, 'unwell' => true],
                 ['label' => 'Закончился препарат', 'count' => 1, 'unwell' => false],
             ],
             'missed' => 1,
@@ -201,7 +201,7 @@ test('a day of the strip lists its doses', function () {
                 'time_of_day' => 'Вечером',
                 'time' => '20:00',
                 'status' => 'skipped',
-                'status_text' => 'Не принят: плохо себя чувствовал или побочные эффекты',
+                'status_text' => 'Не принят: плохо себя чувствовал или были побочные эффекты',
                 'unwell' => true,
                 'skip_comment' => 'Тошнило',
                 'marked_late' => false,
@@ -215,7 +215,7 @@ test('a day of the strip lists its doses', function () {
         ])
         ->and(array_map(fn (array $dose): array => [$dose['status_text'], $dose['marked_late'], $dose['marked_at']], $days['2026-10-17']['doses']))->toBe([
             ['Принят поздно, в 15:00', true, null],
-            ['Пропущен', false, null],
+            ['Без отметки', false, null],
         ])
         ->and($days['2026-10-20'])->toMatchArray(['today' => true, 'result' => 'pending'])
         ->and($days['2026-10-20']['doses'][0]['status_text'])->toBe('Запланирован');

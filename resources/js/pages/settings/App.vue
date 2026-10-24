@@ -28,7 +28,7 @@ const { ready, installed, method, install } = useInstallApp();
         <Heading
             variant="small"
             title="Приложение"
-            description="Компас на экране «Домой» телефона"
+            description="Значок «Компаса» на экране телефона"
         />
 
         <div v-if="ready" class="flex flex-col items-start gap-3">
@@ -43,8 +43,8 @@ const { ready, installed, method, install } = useInstallApp();
 
             <template v-else-if="method === 'prompt'">
                 <p>
-                    Установите приложение: оно откроется с экрана «Домой» одним
-                    нажатием, как обычное приложение.
+                    Установите приложение: оно будет открываться значком, как
+                    другие приложения.
                 </p>
                 <Button size="lg" data-test="install-button" @click="install">
                     Установить
@@ -67,7 +67,8 @@ const { ready, installed, method, install } = useInstallApp();
             >
                 Этот браузер не предлагает установить приложение. На телефоне
                 откройте сайт в Chrome на Android или в Safari на iPhone. Если
-                приложение уже установлено, откройте его с экрана «Домой».
+                приложение уже установлено, запустите его значком на экране
+                телефона.
             </p>
         </div>
     </div>

@@ -331,7 +331,7 @@ test('patient sees the help screen after such answers and the card with 112 unti
         ->get(route('patient.home'))
         ->assertInertia(fn (Assert $page) => $page->where('help', false));
 
-    // Ответ «совсем нет» — обычный экран «Ответы переданы».
+    // Ответ «совсем нет» — обычный экран «Ответы отправлены».
     $this->travel(1)->days();
     $sent = ($this->answer)(0)->headers->get('Location');
 

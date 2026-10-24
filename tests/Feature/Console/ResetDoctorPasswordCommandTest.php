@@ -61,7 +61,7 @@ test('short password is rejected', function () {
         ->expectsQuestion('Новый пароль', 'short')
         ->expectsQuestion('Повторите пароль', 'short')
         ->assertFailed()
-        ->expectsOutputToContain('не короче 8');
+        ->expectsOutputToContain('не меньше 8 символов');
 
     expect(Hash::check('password', $doctor->refresh()->password))->toBeTrue();
 });

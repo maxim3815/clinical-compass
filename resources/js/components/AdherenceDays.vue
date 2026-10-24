@@ -50,7 +50,7 @@ const results: {
     },
     {
         result: 'pending',
-        label: 'ещё не наступили',
+        label: 'день ещё идёт',
         class: 'border border-dashed border-muted-foreground',
     },
     {
@@ -204,8 +204,8 @@ function asNeededClass(day: AsNeededDay): string {
             v-else-if="course.kind === 'as_needed'"
             class="text-sm text-muted-foreground"
         >
-            В клетке — сколько раз принят препарат за день, красным — больше,
-            чем разрешено в сутки.
+            Число в клетке показывает, сколько раз пациент принял препарат за
+            день. Красным отмечены дни, когда приёмов больше разрешённого.
         </p>
 
         <div

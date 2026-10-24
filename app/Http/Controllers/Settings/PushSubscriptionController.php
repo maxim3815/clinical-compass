@@ -39,7 +39,7 @@ class PushSubscriptionController extends Controller
                 'url:https',
                 function (string $attribute, mixed $value, Closure $fail): void {
                     if (! $this->isPushService((string) $value)) {
-                        $fail('Уведомления в этом браузере не поддерживаются.');
+                        $fail('Этот браузер не умеет показывать уведомления.');
                     }
                 },
             ],
