@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\DoseEventStatus;
+use App\Enums\HelpEventType;
 use App\Enums\PrescriptionCancelReason;
 use App\Enums\PrescriptionSource;
 use App\Enums\UserRole;
@@ -10,6 +11,7 @@ use App\Models\AlertRule;
 use App\Models\Assessment;
 use App\Models\DoseEvent;
 use App\Models\Drug;
+use App\Models\HelpEvent;
 use App\Models\Message;
 use App\Models\Prescription;
 use App\Models\SafetyFinding;
@@ -177,9 +179,14 @@ test('demo seeder builds the planned doctors, patients and courses and can be ru
         ->and($last('patient_norm2', 'gad7'))->toBe(1)
         ->and($last('patient_2b', 'gad7'))->toBe(14)
         ->and($status('patient4'))->toMatchArray(['due' => true, 'last' => null])
-        // Правило алертинга загружено, алерт появляется на показе, когда Морозова отвечает сама.
-        ->and(AlertRule::query()->active()->pluck('code')->all())->toBe(['suicide_risk'])
-        ->and(Alert::query()->count())->toBe(0);
+        // Правила алертинга загружены, алерт появляется на показе, когда Морозова отвечает сама
+        // или нажимает «Сообщить врачу».
+        ->and(AlertRule::query()->active()->orderBy('code')->pluck('code')->all())->toBe(['help_request', 'suicide_risk'])
+        ->and(Alert::query()->count())->toBe(0)
+        // Тихий след на экране помощи у Лебедева: врач видит его в карточке без алерта.
+        ->and(HelpEvent::query()->whereRelation('patient', 'login', 'patient_3c')->orderBy('created_at')->pluck('type')->all())
+        ->toBe([HelpEventType::Opened, HelpEventType::CallCrisisLine])
+        ->and(HelpEvent::query()->count())->toBe(2);
 
     $this->get(route('invitation.show', DemoSeeder::INVITATION_TOKEN))
         ->assertOk()

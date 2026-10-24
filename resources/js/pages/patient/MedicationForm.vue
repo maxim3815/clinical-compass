@@ -61,8 +61,9 @@ const props = defineProps<Props>();
 defineOptions({
     layout: (props: Props) => ({
         breadcrumbs: [
+            // Как вкладка: «Мои препараты» рядом с кнопкой помощи на узком телефоне не помещается.
             {
-                title: 'Мои препараты',
+                title: 'Препараты',
                 href: medications(),
             },
             props.prescription === null

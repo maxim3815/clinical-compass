@@ -151,13 +151,23 @@ class User extends Authenticatable
     }
 
     /**
-     * Алерты по ответам пациента.
+     * Алерты по ответам пациента и по его «Сообщить врачу».
      *
      * @return HasMany<Alert, $this>
      */
     public function alerts(): HasMany
     {
         return $this->hasMany(Alert::class, 'patient_id');
+    }
+
+    /**
+     * Открытия экрана помощи и звонки с него.
+     *
+     * @return HasMany<HelpEvent, $this>
+     */
+    public function helpEvents(): HasMany
+    {
+        return $this->hasMany(HelpEvent::class, 'patient_id');
     }
 
     /**

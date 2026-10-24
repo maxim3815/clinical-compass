@@ -11,6 +11,7 @@ use App\Models\AuditLog;
 use App\Models\CareRelationship;
 use App\Models\User;
 use App\Notifications\UrgentAlert;
+use App\Support\Alerts\AlertDelivery;
 use App\Support\Alerts\AlertEngine;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Artisan;
@@ -161,7 +162,7 @@ test('the rule check is queued in the same transaction as the answers', function
 test('a repeated check does not raise a second alert for the same answers', function () {
     ($this->answer)(3);
 
-    (new CheckAlertRules(Assessment::query()->get()))->handle(app(AlertEngine::class));
+    (new CheckAlertRules(Assessment::query()->get()))->handle(app(AlertEngine::class), app(AlertDelivery::class));
 
     expect(Alert::query()->count())->toBe(1);
 
@@ -186,12 +187,14 @@ test('doctor sees the banner, the queue and the counter, accepts and closes the 
                 'patient' => 'Морозова Ольга Павловна',
                 'rule' => 'Суицидальный риск',
                 'trigger' => 'PHQ-9, вопрос 9: «почти каждый день»',
+                'kind' => 'answers',
                 'at' => '01.10.2026 19:00',
+                'repeats' => null,
                 'shown' => false,
             ]])
             ->where('patients.data.0.alert', true)
             ->where('attention.0.id', $this->patient->id)
-            ->where('attention.0.alerts', [['rule' => 'Суицидальный риск', 'trigger' => 'PHQ-9, вопрос 9: «почти каждый день»', 'acknowledged' => false]]));
+            ->where('attention.0.alerts', [['rule' => 'Суицидальный риск', 'trigger' => 'PHQ-9, вопрос 9: «почти каждый день»', 'acknowledged' => false, 'repeated' => false]]));
 
     // Браузер врача показал плашку: время доставки считается от ответа пациента.
     $this->travel(1500)->milliseconds();

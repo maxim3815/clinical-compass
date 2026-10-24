@@ -2,18 +2,15 @@
 
 namespace App\Jobs;
 
-use App\Events\AlertsChanged;
 use App\Models\Alert;
 use App\Models\Assessment;
-use App\Notifications\UrgentAlert;
+use App\Support\Alerts\AlertDelivery;
 use App\Support\Alerts\AlertEngine;
 use App\Support\Alerts\AlertMatch;
-use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
-use Throwable;
 
 /**
  * Проверка правил алертинга по опросникам, отправленным вместе. Задача ставится в очередь
@@ -21,8 +18,7 @@ use Throwable;
  * сохраняются вместе или не сохраняются вовсе.
  *
  * Сработавшее правило создаёт алерт лечащему врачу, а доставка идёт тут же, без новых задач:
- * событие в открытый кабинет и пуш. Доставка не повторяется: если Reverb или сервис пушей
- * недоступны, врач увидит алерт, когда откроет кабинет, а метка шага останется пустой.
+ * событие в открытый кабинет и пуш (AlertDelivery).
  */
 class CheckAlertRules implements ShouldQueue
 {
@@ -47,13 +43,13 @@ class CheckAlertRules implements ShouldQueue
         $this->onQueue('alerts');
     }
 
-    public function handle(AlertEngine $engine): void
+    public function handle(AlertEngine $engine, AlertDelivery $delivery): void
     {
         foreach ($engine->check($this->assessments) as $match) {
             $alert = $this->create($match);
 
             if ($alert !== null) {
-                DB::afterCommit(fn () => $this->deliver($alert));
+                DB::afterCommit(fn () => $delivery->deliver($alert));
             }
         }
     }
@@ -83,26 +79,5 @@ class CheckAlertRules implements ShouldQueue
         ]);
 
         return $alert->wasRecentlyCreated ? $alert : null;
-    }
-
-    private function deliver(Alert $alert): void
-    {
-        $doctor = $alert->doctor;
-
-        try {
-            AlertsChanged::dispatch($doctor, true);
-            $alert->update(['broadcast_at' => CarbonImmutable::now()]);
-        } catch (Throwable $e) {
-            report($e);
-        }
-
-        try {
-            if ($doctor->pushSubscriptions()->exists()) {
-                $doctor->notifyNow(new UrgentAlert($alert));
-                $alert->update(['pushed_at' => CarbonImmutable::now()]);
-            }
-        } catch (Throwable $e) {
-            report($e);
-        }
     }
 }

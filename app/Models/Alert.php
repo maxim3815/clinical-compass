@@ -13,13 +13,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Алерт: правило сработало на ответах пациента. Открыт, пока врач не закрыл его решением;
- * «Принял» только убирает красную плашку. Каждое срабатывание — новый алерт.
+ * Алерт: правило сработало на ответах пациента или пациент сам нажал «Сообщить врачу» на экране
+ * помощи. Открыт, пока врач не закрыл его решением; «Принял» только убирает красную плашку.
+ * Каждое срабатывание по ответам — новый алерт. Повторное «Сообщить врачу», пока алерт по кнопке
+ * открыт, пишется в тот же алерт и снова поднимает плашку, даже принятую.
  *
- * Метки времени шагов хранятся с миллисекундами: пациент отправил ответы, алерт создан,
- * событие ушло в Reverb, пуш отправлен, алерт показан на экране врача, принят, закрыт.
+ * Метки времени шагов хранятся с миллисекундами: пациент отправил ответы или нажал кнопку, алерт
+ * создан, событие ушло в Reverb, пуш отправлен, алерт показан на экране врача, принят, закрыт.
  *
- * @phpstan-type Evidence array{type: 'answer', scale: string, name: string, item: int, text: string, score: int, label: string}|array{type: 'total', scale: string, name: string, total: int, max: int}
+ * @phpstan-type AnswerEvidence array{type: 'answer', scale: string, name: string, item: int, text: string, score: int, label: string}|array{type: 'total', scale: string, name: string, total: int, max: int}
+ * @phpstan-type Evidence AnswerEvidence|array{type: 'help_request'}
  *
  * @property int $id
  * @property int $patient_id
@@ -27,9 +30,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $alert_rule_id
  * @property string $rule_version
  * @property AlertLevel $level
- * @property int $assessment_id
+ * @property int|null $assessment_id У алерта по кнопке опросника нет.
  * @property list<Evidence> $evidence
- * @property CarbonImmutable $submitted_at
+ * @property CarbonImmutable $submitted_at Пациент отправил ответы или нажал «Сообщить врачу».
+ * @property int $repeat_count Повторные «Сообщить врачу», пока алерт открыт.
+ * @property CarbonImmutable|null $repeated_at Последнее повторное нажатие.
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable|null $broadcast_at
  * @property CarbonImmutable|null $pushed_at
@@ -45,7 +50,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property-read User $patient
  * @property-read User $doctor
  * @property-read AlertRule $rule
- * @property-read Assessment $assessment
+ * @property-read Assessment|null $assessment
  * @property-read User|null $acknowledgedBy
  * @property-read User|null $closedBy
  */
@@ -58,6 +63,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'assessment_id',
     'evidence',
     'submitted_at',
+    'repeat_count',
+    'repeated_at',
     'broadcast_at',
     'pushed_at',
     'shown_at',
@@ -130,9 +137,28 @@ class Alert extends Model
      */
     public function trigger(): string
     {
-        return implode('; ', array_map(fn (array $entry): string => $entry['type'] === 'answer'
-            ? "{$entry['name']}, вопрос {$entry['item']}: «".mb_lcfirst($entry['label']).'»'
-            : "{$entry['name']}: сумма {$entry['total']} из {$entry['max']}", $this->evidence));
+        return implode('; ', array_map(fn (array $entry): string => match ($entry['type']) {
+            'answer' => "{$entry['name']}, вопрос {$entry['item']}: «".mb_lcfirst($entry['label']).'»',
+            'total' => "{$entry['name']}: сумма {$entry['total']} из {$entry['max']}",
+            'help_request' => 'кнопка «Сообщить врачу»',
+        }, $this->evidence));
+    }
+
+    /**
+     * Пациент сам нажал «Сообщить врачу», а не сработало правило по ответам.
+     */
+    public function isHelpRequest(): bool
+    {
+        return $this->assessment_id === null;
+    }
+
+    /**
+     * Нужна красная плашка: алерт ещё не принят или после принятия пациент снова нажал кнопку.
+     */
+    public function awaitsAcknowledgement(): bool
+    {
+        return $this->closed_at === null && ($this->acknowledged_at === null
+            || ($this->repeated_at !== null && $this->repeated_at->greaterThan($this->acknowledged_at)));
     }
 
     /**
@@ -155,14 +181,17 @@ class Alert extends Model
     }
 
     /**
-     * Алерты, которые врач ещё не принял: по ним красная плашка.
+     * Алерты, которые ждут «Принять»: врач их ещё не принял или пациент снова нажал «Сообщить
+     * врачу» после принятия. По ним красная плашка.
      *
      * @param  Builder<self>  $query
      */
     #[Scope]
-    protected function unacknowledged(Builder $query): void
+    protected function awaitingAcknowledgement(Builder $query): void
     {
-        $query->whereNull('acknowledged_at')->whereNull('closed_at');
+        $query->whereNull('closed_at')->where(fn (Builder $query) => $query
+            ->whereNull('acknowledged_at')
+            ->orWhereColumn('repeated_at', '>', 'acknowledged_at'));
     }
 
     /**
@@ -176,6 +205,8 @@ class Alert extends Model
             'level' => AlertLevel::class,
             'evidence' => 'array',
             'submitted_at' => 'datetime',
+            'repeat_count' => 'integer',
+            'repeated_at' => 'datetime',
             'broadcast_at' => 'datetime',
             'pushed_at' => 'datetime',
             'shown_at' => 'datetime',

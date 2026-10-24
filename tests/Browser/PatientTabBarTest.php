@@ -51,7 +51,7 @@ test('patient moves between sections with the tab bar on a phone', function () {
         ->click('[data-test="add-medication-button"]')
         ->assertPathIs('/patient/medications/create')
         ->assertMissing('[data-test="tab-bar"]')
-        ->assertSeeIn('[data-test="back-link"]', 'Мои препараты')
+        ->assertSeeIn('[data-test="back-link"]', 'Препараты')
         ->assertScript(FITS_SCREEN)
         ->click('[data-test="back-link"]')
         ->assertPathIs('/patient/medications')

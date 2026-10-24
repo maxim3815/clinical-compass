@@ -108,9 +108,13 @@ useRealtime(channel, 'patient-signals.changed', () =>
     router.reload({ only: ['patients', 'attention'] }),
 );
 
-// Алерт появился, принят или закрыт: пациент в очереди первым или ушёл из неё.
+// Алерт появился, принят или закрыт: пациент в очереди первым или ушёл из неё. Плашку
+// и число в меню перезагрузка тоже берёт с сервера: её ответ приходит после того, как плашка
+// обновилась событием, и со старыми значениями перетёр бы их.
 useRealtime(channel, 'alerts.changed', () =>
-    router.reload({ only: ['patients', 'attention'] }),
+    router.reload({
+        only: ['patients', 'attention', 'urgentAlerts', 'patientSignals'],
+    }),
 );
 
 // Новое или прочитанное сообщение меняет число непрочитанных у пациента.

@@ -14,7 +14,7 @@ import AlertController from '@/actions/App/Http/Controllers/Doctor/AlertControll
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { useRealtime } from '@/composables/useRealtime';
-import { alertTitle } from '@/lib/alerts';
+import { alertRepeats, alertSubmitted, alertTitle } from '@/lib/alerts';
 import { playAlertSound, unlockAlertSound } from '@/lib/alertSound';
 import { show } from '@/routes/doctor/patients';
 import type { UrgentAlert } from '@/types';
@@ -23,7 +23,8 @@ import type { UrgentAlert } from '@/types';
  * Красная плашка непринятых алертов на всех страницах кабинета врача. Новый алерт приходит
  * событием без перезагрузки, со звуком. Когда плашку видно, браузер сообщает серверу
  * «показан»: от ответа пациента до этой отметки считается время доставки. «Принять» убирает
- * плашку, алерт остаётся в карточке пациента до решения.
+ * плашку, алерт остаётся в карточке пациента до решения. Если пациент снова нажал «Сообщить
+ * врачу», алерт возвращается в плашку и звучит ещё раз.
  */
 const page = usePage();
 const alerts = computed(() => page.props.urgentAlerts);
@@ -42,8 +43,17 @@ const visible = computed(() =>
 const realtime = new Set<number>();
 // Отметка «показан» уже ушла из этой вкладки.
 const reported = new Set<number>();
-// Звук уже прозвучал в этой вкладке.
-const heard = new Set<number>();
+// Звук уже прозвучал в этой вкладке: по алерту и числу повторов «Сообщить врачу».
+const heard = new Set<string>();
+
+function soundKey(alert: UrgentAlert): string {
+    return `${alert.id}:${alert.repeats?.count ?? 0}`;
+}
+
+// Повтор «Сообщить врачу» виден с первых слов: «Срочно, повторно: <ФИО>».
+function bannerTitle(alert: UrgentAlert): string {
+    return `${alert.repeats ? 'Срочно, повторно' : 'Срочно'}: ${alert.patient}`;
+}
 const accepting = ref<number | null>(null);
 // Скринридер читает только новый алерт, а не всю плашку с кнопками.
 const announcement = ref('');
@@ -53,19 +63,27 @@ useRealtime<{ alerts: UrgentAlert[]; count: number }>(
     `App.Models.User.${page.props.auth.user.id}`,
     'alerts.changed',
     (event) => {
+        // Новый алерт или новый повтор «Сообщить врачу» в уже известном.
         const fresh = event.alerts.filter(
-            (alert) => !alerts.value.some((known) => known.id === alert.id),
+            (alert) =>
+                !alerts.value.some(
+                    (known) => soundKey(known) === soundKey(alert),
+                ),
         );
 
         fresh.forEach((alert) => realtime.add(alert.id));
 
         if (fresh.length > 0) {
-            announcement.value = fresh
-                .map(
-                    (alert) =>
-                        `Срочно: ${alert.patient}. ${alertTitle(alert.rule, alert.trigger)}.`,
-                )
-                .join(' ');
+            // Сначала пусто: повтор с тем же текстом иначе не изменит область, и скринридер промолчит.
+            announcement.value = '';
+            void nextTick(() => {
+                announcement.value = fresh
+                    .map(
+                        (alert) =>
+                            `${bannerTitle(alert)}. ${alertTitle(alert.rule, alert.trigger)}${alert.repeats ? `, ${alertRepeats(alert.repeats)}` : ''}.`,
+                    )
+                    .join(' ');
+            });
         }
 
         // Одним обновлением: два replaceProp подряд перетирают друг друга.
@@ -105,15 +123,17 @@ function reportShown(): void {
     }
 }
 
-// Звук — на алерт, которого врач ещё не видел: пришёл событием или впервые на экране.
+// Звук — на алерт, которого врач ещё не видел: пришёл событием или впервые на экране,
+// и на повтор «Сообщить врачу».
 function ring(): void {
     const fresh = alerts.value.filter(
         (alert) =>
-            !heard.has(alert.id) && (!alert.shown || realtime.has(alert.id)),
+            !heard.has(soundKey(alert)) &&
+            (!alert.shown || alert.repeats !== null || realtime.has(alert.id)),
     );
 
     if (fresh.length > 0) {
-        fresh.forEach((alert) => heard.add(alert.id));
+        fresh.forEach((alert) => heard.add(soundKey(alert)));
         playAlertSound();
     }
 }
@@ -213,11 +233,11 @@ function accept(alert: UrgentAlert): void {
                     <Siren class="mt-0.5 size-6 shrink-0 text-danger" />
                     <div class="flex min-w-0 flex-col">
                         <p class="font-semibold text-danger">
-                            {{ `Срочно: ${alert.patient}` }}
+                            {{ bannerTitle(alert) }}
                         </p>
                         <p class="text-sm">
                             {{
-                                `${alertTitle(alert.rule, alert.trigger)}. Опросник заполнен ${alert.at}.`
+                                `${alertTitle(alert.rule, alert.trigger)}. ${alertSubmitted(alert.kind, alert.at)}${alert.repeats ? `, ${alertRepeats(alert.repeats)}` : ''}.`
                             }}
                         </p>
                     </div>

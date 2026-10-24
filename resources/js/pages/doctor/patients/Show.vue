@@ -3,6 +3,7 @@ import { Form, Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
     ArrowDown,
     KeyRound,
+    LifeBuoy,
     MessageCircle,
     OctagonAlert,
     Pencil,
@@ -19,6 +20,7 @@ import AdherenceSignal from '@/components/AdherenceSignal.vue';
 import AlertSection from '@/components/AlertSection.vue';
 import CancelPrescriptionDialog from '@/components/CancelPrescriptionDialog.vue';
 import ClinicalProfileSummary from '@/components/ClinicalProfileSummary.vue';
+import HelpEventsSection from '@/components/HelpEventsSection.vue';
 import CloseAlertDialog from '@/components/CloseAlertDialog.vue';
 import ContinueFindingDialog from '@/components/ContinueFindingDialog.vue';
 import OneTimeLink from '@/components/OneTimeLink.vue';
@@ -29,7 +31,7 @@ import WellbeingSection from '@/components/WellbeingSection.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useRealtime } from '@/composables/useRealtime';
-import { alertTitle } from '@/lib/alerts';
+import { alertState, alertTitle } from '@/lib/alerts';
 import { CHIP_ICON, DANGER_CHIP } from '@/lib/chips';
 import { formatAge, plural } from '@/lib/plural';
 import { index, show } from '@/routes/doctor/patients';
@@ -39,6 +41,7 @@ import type {
     AdherenceSignal as Signal,
     AlertDecisionOption,
     ClinicalProfile,
+    HelpEvent,
     PatientAlert,
     Prescription,
     SafetyCard,
@@ -66,8 +69,10 @@ const props = defineProps<{
     adherenceSignal: Signal;
     cancelReasons: SelectOption[];
     clinicalProfile: ClinicalProfile;
-    // Алерты по ответам пациента, сначала новые.
+    // Алерты по ответам пациента и по «Сообщить врачу», сначала новые.
     alerts: PatientAlert[];
+    // Открытия экрана помощи и звонки с него за 30 дней, сначала новые.
+    helpEvents: HelpEvent[];
     alertDecisions: AlertDecisionOption[];
     alertCommentLimit: number;
     // Опросники пациента: суммы, степени, изменение и ответы.
@@ -99,14 +104,23 @@ const cancelling = ref<Prescription | null>(null);
 const closingAlert = ref<PatientAlert | null>(null);
 
 // Новый, принятый или закрытый алерт — в том числе в другой вкладке: блок алертов обновляется.
+// Плашку и число в меню перезагрузка берёт тоже, иначе её ответ перетёр бы их старыми значениями.
 useRealtime(
     `App.Models.User.${page.props.auth.user.id}`,
     'alerts.changed',
-    () => router.reload({ only: ['alerts'] }),
+    () =>
+        router.reload({
+            only: ['alerts', 'helpEvents', 'urgentAlerts', 'patientSignals'],
+        }),
 );
 
 const openAlerts = computed(() =>
     props.alerts.filter((alert) => !alert.closed),
+);
+
+// Открыт алерт по «Сообщить врачу»: открытия экрана помощи нужны рядом с ним.
+const helpRequestOpen = computed(() =>
+    openAlerts.value.some((alert) => alert.kind === 'help_request'),
 );
 
 // Плашка в шапке — о новом открытом алерте, остальные числом.
@@ -117,7 +131,10 @@ const alertChip = computed(() => {
         return null;
     }
 
-    const state = latest.acknowledged ? 'ждёт решения' : 'не принят';
+    const state = alertState(
+        latest.awaits_acknowledgement,
+        latest.acknowledged !== null && latest.repeats !== null,
+    );
     const more =
         openAlerts.value.length > 1
             ? ` · ещё ${openAlerts.value.length - 1}`
@@ -339,6 +356,7 @@ const unreadLabel = computed(
             <ul
                 v-if="
                     alertChip !== null ||
+                    helpEvents.length > 0 ||
                     awaiting.length > 0 ||
                     adherenceSignal.raised ||
                     adherenceSignal.share !== null ||
@@ -424,6 +442,20 @@ const unreadLabel = computed(
                         <ArrowDown class="size-4 shrink-0" />
                     </a>
                 </li>
+                <!-- Тихий след: серая плашка, без тревоги. -->
+                <li v-if="helpEvents.length > 0">
+                    <a
+                        href="#help-events"
+                        class="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 hover:underline pointer-coarse:min-h-11"
+                        data-test="card-help-events"
+                    >
+                        <LifeBuoy
+                            class="size-4 shrink-0 text-muted-foreground"
+                        />
+                        {{ `Экран помощи: ${helpEvents[0].at}` }}
+                        <ArrowDown class="size-4 shrink-0" />
+                    </a>
+                </li>
             </ul>
         </header>
 
@@ -443,6 +475,14 @@ const unreadLabel = computed(
                     :chat-href="chat(patient.id)"
                     :class="openAlerts.length > 0 ? 'order-0' : 'order-5'"
                     @close="(alert) => (closingAlert = alert)"
+                />
+
+                <!-- Пациент просит связаться: открытия экрана помощи — сразу под алертом. -->
+                <HelpEventsSection
+                    v-if="helpEvents.length > 0 && helpRequestOpen"
+                    :events="helpEvents"
+                    near-alert
+                    class="order-0"
                 />
 
                 <section
@@ -719,6 +759,12 @@ const unreadLabel = computed(
 
                     <ClinicalProfileSummary :profile="clinicalProfile" />
                 </section>
+
+                <HelpEventsSection
+                    v-if="helpEvents.length > 0 && !helpRequestOpen"
+                    :events="helpEvents"
+                    class="order-3"
+                />
 
                 <section
                     class="order-6 flex flex-col gap-3 rounded-xl border bg-card p-4 text-sm shadow-xs"

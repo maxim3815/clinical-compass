@@ -36,7 +36,7 @@ defineOptions({
         breadcrumbs: [
             props.fromToday
                 ? { title: 'Сегодня', href: home() }
-                : { title: 'Мои препараты', href: medications() },
+                : { title: 'Препараты', href: medications() },
             {
                 title: 'Время приёма',
                 href: IntakeTimeController.edit(props.prescription.id),

@@ -2,6 +2,7 @@
 
 namespace App\Support\Alerts;
 
+use App\Enums\AlertTrigger;
 use App\Models\AlertRule;
 use App\Models\Assessment;
 use Illuminate\Database\Eloquent\Collection;
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\Collection;
  * Проверка правил алертинга по опросникам, которые пациент отправил вместе. Ядро ничего не знает
  * о конкретных шкалах и порогах: они в условиях правил.
  *
- * @phpstan-import-type Evidence from \App\Models\Alert
+ * @phpstan-import-type AnswerEvidence from \App\Models\Alert
  */
 final readonly class AlertEngine
 {
@@ -29,15 +30,15 @@ final readonly class AlertEngine
         $submission = new AlertSubmission($assessments);
         $matches = [];
 
-        foreach (AlertRule::query()->active()->orderBy('code')->get() as $rule) {
-            $references = $this->language->references($rule->condition);
+        foreach (AlertRule::query()->active()->triggeredBy(AlertTrigger::Answers)->orderBy('code')->get() as $rule) {
+            $references = $this->language->references((string) $rule->condition);
             $scales = array_values(array_unique(array_column($references, 1)));
 
             if ($scales === [] || array_any($scales, fn (string $scale): bool => ! $submission->has($scale))) {
                 continue;
             }
 
-            if ($this->language->evaluateFor($rule->condition, $submission)) {
+            if ($this->language->evaluateFor((string) $rule->condition, $submission)) {
                 $matches[] = new AlertMatch(
                     $rule,
                     $submission->assessment($scales[0]),
@@ -51,7 +52,7 @@ final readonly class AlertEngine
 
     /**
      * @param  array{0: 'answer', 1: string, 2: int}|array{0: 'total', 1: string}  $reference
-     * @return Evidence
+     * @return AnswerEvidence
      */
     private function evidence(array $reference, AlertSubmission $submission): array
     {

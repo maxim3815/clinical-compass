@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Actions\CreateDoctor;
 use App\Actions\InvitePatient;
 use App\Enums\AccessLinkPurpose;
+use App\Enums\HelpEventType;
 use App\Events\AlertsChanged;
 use App\Events\MessageSent;
 use App\Events\MessagesRead;
@@ -12,7 +13,10 @@ use App\Events\PatientSignalsChanged;
 use App\Events\UnreadMessagesChanged;
 use App\Jobs\CheckAlertRules;
 use App\Models\AccessLink;
+use App\Models\HelpEvent;
 use App\Models\User;
+use App\Support\DisplayTime;
+use Carbon\CarbonImmutable;
 use Closure;
 use Database\Seeders\Demo\DemoHistory;
 use Database\Seeders\Demo\DemoPatients;
@@ -78,6 +82,7 @@ class DemoSeeder extends Seeder
         $this->command->callSilently('app:dose-events:mark-missed');
 
         $this->invitation($doctors['doctor'], 'Новиков Артём Сергеевич');
+        $this->helpTrace('patient_3c');
     }
 
     /**
@@ -110,6 +115,30 @@ class DemoSeeder extends Seeder
     {
         return User::query()->where('login', $login)->first()
             ?? $createDoctor->handle($name, $login, self::PASSWORD);
+    }
+
+    /**
+     * Тихий след на экране помощи для показа: Лебедев бросил приём и молчит, но позапрошлой
+     * ночью открывал экран помощи и нажимал звонок на кризисную линию, не сообщив врачу.
+     * Врач видит это строками в карточке, алерта нет.
+     */
+    private function helpTrace(string $login): void
+    {
+        $patient = User::query()->where('login', $login)->first();
+
+        if ($patient === null || $patient->helpEvents()->exists()) {
+            return;
+        }
+
+        $night = CarbonImmutable::now(DisplayTime::TIMEZONE)->subDays(2)->setTime(2, 14);
+
+        foreach ([[HelpEventType::Opened, 0], [HelpEventType::CallCrisisLine, 40]] as [$type, $seconds]) {
+            (new HelpEvent)->forceFill([
+                'patient_id' => $patient->id,
+                'type' => $type,
+                'created_at' => $night->addSeconds($seconds)->utc(),
+            ])->save();
+        }
     }
 
     private function invitation(User $doctor, string $patientName): void

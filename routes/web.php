@@ -22,6 +22,7 @@ use App\Http\Controllers\Patient\AsNeededDoseController;
 use App\Http\Controllers\Patient\AssessmentController;
 use App\Http\Controllers\Patient\ChatController as PatientChatController;
 use App\Http\Controllers\Patient\DoseController;
+use App\Http\Controllers\Patient\HelpController;
 use App\Http\Controllers\Patient\HomeController as PatientHomeController;
 use App\Http\Controllers\Patient\IntakeCalendarController;
 use App\Http\Controllers\Patient\IntakeTimeController;
@@ -175,6 +176,11 @@ Route::middleware('auth')->group(function () {
         Route::get('questionnaires/{assessment}/sent', [AssessmentController::class, 'sent'])
             ->whereNumber('assessment')
             ->name('questionnaires.sent');
+
+        // Экран помощи: открытие и звонки — тихие строки для врача, «Сообщить врачу» — алерт.
+        Route::get('help', [HelpController::class, 'show'])->name('help.show');
+        Route::post('help/report', [HelpController::class, 'report'])->middleware('throttle:30,1')->name('help.report');
+        Route::post('help/calls', [HelpController::class, 'call'])->middleware('throttle:60,1')->name('help.calls');
 
         Route::get('chat', [PatientChatController::class, 'show'])->name('chat.show');
         Route::get('chat/messages', [PatientChatController::class, 'messages'])->name('chat.messages');

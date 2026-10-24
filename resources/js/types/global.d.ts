@@ -1,5 +1,5 @@
 import type { Directive } from 'vue';
-import type { UrgentAlert } from '@/types/alerts';
+import type { CrisisLine, UrgentAlert } from '@/types/alerts';
 import type { Auth } from '@/types/auth';
 import type { FlashToast } from '@/types/ui';
 
@@ -32,12 +32,18 @@ declare module '@inertiajs/core' {
             vapidPublicKey: string | null;
             // Пациентка: кнопки отметки приёма в женском роде.
             femalePatient: boolean;
+            // Кризисная линия на экране помощи пациента, у врача null.
+            crisisLine: CrisisLine | null;
             [key: string]: unknown;
         };
         flashDataType: {
             toast?: FlashToast;
             invitationUrl?: string;
             passwordResetUrl?: string;
+            // Пациент нажал «Сообщить врачу»: время отправки ЧЧ:ММ.
+            helpReportedAt?: string;
+            // «Сообщить врачу» не принято: врача нет или правило по кнопке выключено.
+            helpReportRefused?: boolean;
         };
     }
 }

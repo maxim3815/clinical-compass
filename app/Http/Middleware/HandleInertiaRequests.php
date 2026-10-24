@@ -53,6 +53,11 @@ class HandleInertiaRequests extends Middleware
             'patientSignals' => fn (): int => $request->user()?->role === UserRole::Doctor ? PatientSignals::count($request->user()) : 0,
             // Непринятые алерты врача: красная плашка на всех страницах кабинета. Дальше — событиями.
             'urgentAlerts' => fn (): array => $request->user()?->role === UserRole::Doctor ? AlertPresenter::banner($request->user()) : [],
+            // Кризисная линия на экране помощи пациента и в карточке «Если вам сейчас тяжело».
+            'crisisLine' => fn (): ?array => $request->user()?->role === UserRole::Patient ? [
+                'label' => (string) config('help.crisis_line'),
+                'href' => 'tel:'.preg_replace('/\D/', '', (string) config('help.crisis_line')),
+            ] : null,
             // Открытый ключ VAPID: с ним браузер подписывается на пуши (страница «Уведомления»).
             'vapidPublicKey' => fn (): ?string => $request->user() === null ? null : config('webpush.vapid.public_key'),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',

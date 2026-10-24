@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AlertLevel;
+use App\Enums\AlertTrigger;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -10,18 +11,20 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Правило алертинга из database/data/alerts/<код>.yaml. Условие пишется на языке выражений
- * над ответами опросников (App\Support\Alerts\AlertLanguage).
+ * Правило алертинга из database/data/alerts/<код>.yaml. Правило по ответам опросника задаёт
+ * условие на языке выражений над ответами (App\Support\Alerts\AlertLanguage). Правило по кнопке
+ * «Сообщить врачу» условия не имеет: его поднимает сам пациент на экране помощи.
  *
  * @property int $id
  * @property string $code
  * @property string $name «Суицидальный риск»
  * @property AlertLevel $level
- * @property string $condition
+ * @property AlertTrigger $trigger
+ * @property string|null $condition Только у правила по ответам.
  * @property string $text Что сработало и что делать, для врача.
- * @property string $source_document
- * @property string $source_section
- * @property string $source_url
+ * @property string|null $source_document
+ * @property string|null $source_section
+ * @property string|null $source_url
  * @property string|null $source_quote
  * @property string $version
  * @property bool $is_active
@@ -32,6 +35,7 @@ use Illuminate\Database\Eloquent\Model;
     'code',
     'name',
     'level',
+    'trigger',
     'condition',
     'text',
     'source_document',
@@ -56,6 +60,7 @@ class AlertRule extends Model
             'code' => $this->code,
             'version' => $this->version,
             'level' => $this->level->value,
+            'trigger' => $this->trigger->value,
             'condition' => $this->condition,
             'text' => $this->text,
             'source' => $this->source(),
@@ -63,10 +68,16 @@ class AlertRule extends Model
     }
 
     /**
-     * @return array{document: string, section: string, url: string, quote: string|null}
+     * Источник правила. У правила по кнопке его может не быть: основание — просьба пациента.
+     *
+     * @return array{document: string, section: string, url: string, quote: string|null}|null
      */
-    public function source(): array
+    public function source(): ?array
     {
+        if ($this->source_document === null || $this->source_section === null || $this->source_url === null) {
+            return null;
+        }
+
         return [
             'document' => $this->source_document,
             'section' => $this->source_section,
@@ -85,6 +96,15 @@ class AlertRule extends Model
     }
 
     /**
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function triggeredBy(Builder $query, AlertTrigger $trigger): void
+    {
+        $query->where('trigger', $trigger->value);
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -93,6 +113,7 @@ class AlertRule extends Model
     {
         return [
             'level' => AlertLevel::class,
+            'trigger' => AlertTrigger::class,
             'is_active' => 'boolean',
         ];
     }

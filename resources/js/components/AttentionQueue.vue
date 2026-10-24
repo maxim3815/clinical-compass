@@ -8,7 +8,7 @@ import {
     TriangleAlert,
 } from '@lucide/vue';
 import AdherenceSignal from '@/components/AdherenceSignal.vue';
-import { alertTitle } from '@/lib/alerts';
+import { alertState, alertTitle } from '@/lib/alerts';
 import { CHIP_ICON, DANGER_CHIP, MESSAGE_CHIP } from '@/lib/chips';
 import { formatAge, plural } from '@/lib/plural';
 import { show } from '@/routes/doctor/patients';
@@ -24,7 +24,7 @@ function alertLabel(alerts: AttentionAlert[]): string {
     const [latest] = alerts;
     const more = alerts.length > 1 ? ` · ещё ${alerts.length - 1}` : '';
 
-    return `${alertTitle(latest.rule, latest.trigger)} · ${latest.acknowledged ? 'ждёт решения' : 'не принят'}${more}`;
+    return `${alertTitle(latest.rule, latest.trigger)} · ${alertState(!latest.acknowledged, latest.repeated)}${more}`;
 }
 
 function messages(count: number): string {

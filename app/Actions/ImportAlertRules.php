@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Enums\AlertLevel;
+use App\Enums\AlertTrigger;
 use App\Exceptions\InvalidAlertRules;
 use App\Models\AlertRule;
 use App\Models\Scale;
@@ -21,22 +22,28 @@ use Symfony\Component\Yaml\Yaml;
  * повторная загрузка тех же файлов ничего не меняет. Правило, которого в файлах больше нет,
  * выключается, а не удаляется: на него ссылаются алерты.
  *
+ * Правило срабатывает по ответам опросника (trigger: answers, по умолчанию) или по кнопке
+ * «Сообщить врачу» на экране помощи (trigger: help_request). У правила по ответам обязательны
+ * условие и источник. У правила по кнопке условия нет, источник необязателен, и такое правило
+ * одно.
+ *
  * Опросники должны быть загружены раньше: условия ссылаются на них по коду.
  *
  * @phpstan-type RuleData array{
  *     code: string,
  *     name: string,
  *     level: string,
- *     condition: string,
+ *     trigger?: string,
+ *     condition?: string,
  *     text: string,
- *     source: array{document: string, section: string, url: string, quote?: string|null},
+ *     source?: array{document: string, section: string, url: string, quote?: string|null},
  * }
  */
 class ImportAlertRules
 {
     public const string DEFAULT_PATH = 'database/data/alerts';
 
-    private const array FIELDS = ['code', 'name', 'level', 'condition', 'text', 'source'];
+    private const array FIELDS = ['code', 'name', 'level', 'trigger', 'condition', 'text', 'source'];
 
     private const array SOURCE_FIELDS = ['document', 'section', 'url', 'quote'];
 
@@ -89,6 +96,7 @@ class ImportAlertRules
     {
         $scales = Scale::query()->active()->get()->keyBy('code');
         $errors = [];
+        $helpRequests = [];
 
         foreach ($files as $name => $rule) {
             if (! is_array($rule) || array_is_list($rule)) {
@@ -101,16 +109,20 @@ class ImportAlertRules
                 $errors[] = "{$name}: неизвестное поле {$field}.";
             }
 
+            $byAnswers = ($rule['trigger'] ?? AlertTrigger::Answers->value) === AlertTrigger::Answers->value;
+
             $validator = Validator::make($rule, [
                 'code' => ['required', 'string', 'max:64', 'regex:/^'.AlertRule::CODE_PATTERN.'$/'],
                 'name' => ['required', 'string', 'max:255'],
                 'level' => ['required', Rule::enum(AlertLevel::class)],
-                'condition' => ['required', 'string'],
+                'trigger' => ['sometimes', 'required', 'string', Rule::enum(AlertTrigger::class)],
+                // У правила по кнопке условия нет: его поднимает сам пациент.
+                'condition' => $byAnswers ? ['required', 'string'] : ['prohibited'],
                 'text' => ['required', 'string'],
-                'source' => ['required', 'array'],
-                'source.document' => ['required', 'string', 'max:255'],
-                'source.section' => ['required', 'string', 'max:255'],
-                'source.url' => ['required', 'string', 'max:2048', 'url:https,http'],
+                'source' => [$byAnswers ? 'required' : 'sometimes', 'array'],
+                'source.document' => ['required_with:source', 'string', 'max:255'],
+                'source.section' => ['required_with:source', 'string', 'max:255'],
+                'source.url' => ['required_with:source', 'string', 'max:2048', 'url:https,http'],
                 'source.quote' => ['nullable', 'string'],
             ], [], array_combine(self::FIELDS, self::FIELDS));
 
@@ -124,11 +136,19 @@ class ImportAlertRules
                 $errors[] = "{$name}: файл правила {$code} должен называться {$code}.yaml.";
             }
 
-            if (is_string($rule['condition'] ?? null)) {
+            if ($byAnswers && is_string($rule['condition'] ?? null)) {
                 foreach ($this->conditionErrors($rule['condition'], $scales->all()) as $message) {
                     $errors[] = "{$name}: condition: {$message}";
                 }
             }
+
+            if (($rule['trigger'] ?? null) === AlertTrigger::HelpRequest->value) {
+                $helpRequests[] = $name;
+            }
+        }
+
+        if (count($helpRequests) > 1) {
+            $errors[] = 'Правило по кнопке «Сообщить врачу» должно быть одно, а их '.count($helpRequests).': '.implode(', ', $helpRequests).'.';
         }
 
         if ($errors !== []) {
@@ -184,26 +204,31 @@ class ImportAlertRules
         $updated = [];
 
         foreach ($rules as $data) {
+            $trigger = $data['trigger'] ?? AlertTrigger::Answers->value;
             $attributes = [
                 'name' => $data['name'],
                 'level' => $data['level'],
-                'condition' => $data['condition'],
+                'condition' => $data['condition'] ?? null,
                 'text' => $data['text'],
-                'source_document' => $data['source']['document'],
-                'source_section' => $data['source']['section'],
-                'source_url' => $data['source']['url'],
+                'source_document' => $data['source']['document'] ?? null,
+                'source_section' => $data['source']['section'] ?? null,
+                'source_url' => $data['source']['url'] ?? null,
                 'source_quote' => $data['source']['quote'] ?? null,
             ];
 
+            // Вид срабатывания входит в версию, только если это не ответы: версии правил,
+            // загруженных до появления кнопки, не меняются.
+            $versioned = $trigger === AlertTrigger::Answers->value ? $attributes : [...$attributes, 'trigger' => $trigger];
+
             $rule = $existing->get($data['code']) ?? new AlertRule(['code' => $data['code']]);
             $isNew = ! $rule->exists;
-            $version = hash('sha256', $data['code'].'|'.json_encode($attributes, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+            $version = hash('sha256', $data['code'].'|'.json_encode($versioned, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
 
             if (! $isNew && $rule->version === $version && $rule->is_active) {
                 continue;
             }
 
-            $rule->fill([...$attributes, 'version' => $version, 'is_active' => true])->save();
+            $rule->fill([...$attributes, 'trigger' => $trigger, 'version' => $version, 'is_active' => true])->save();
 
             if ($isNew) {
                 $created[] = $data['code'];

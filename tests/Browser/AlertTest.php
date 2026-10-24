@@ -49,6 +49,7 @@ test('patient answer raises a red banner for the open cabinet, the doctor accept
         ->assertSee('он не всегда отвечает сразу')
         ->assertSeeIn('[data-test="help-card"]', 'Позвонить 112')
         ->assertAttribute('[data-test="call-112"]', 'href', 'tel:112')
+        ->assertAttribute('[data-test="call-crisis-line"]', 'href', 'tel:88003334434')
         ->assertPresent('[data-test="help-write-doctor"]')
         ->assertScript(FITS_SCREEN)
         ->assertNoJavaScriptErrors();

@@ -6,13 +6,19 @@ import { computed, nextTick, ref } from 'vue';
 import AlertController from '@/actions/App/Http/Controllers/Doctor/AlertController';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
-import { alertTitle } from '@/lib/alerts';
+import {
+    alertRepeats,
+    alertState,
+    alertSubmitted,
+    alertTitle,
+} from '@/lib/alerts';
 import { CHIP_ICON, DANGER_CHIP } from '@/lib/chips';
 import type { PatientAlert } from '@/types';
 
 /**
  * Алерты в карточке пациента: открытые — сверху, с «Принять» и «Закрыть с решением»,
  * ниже история закрытых: что сработало, через сколько показан, кто принял и чем закрыл.
+ * Алерт по «Сообщить врачу» показывает и повторные нажатия: после повтора «Принять» нужно снова.
  */
 const props = defineProps<{
     patientId: number;
@@ -53,24 +59,34 @@ function accept(alert: PatientAlert): void {
     );
 }
 
+function capitalize(text: string): string {
+    return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 // Одной строкой: текст и <template v-if> подряд на сервере сливаются в один узел.
 function delivery(alert: PatientAlert): string {
     const push = alert.pushed ? ' Уведомление врачу отправлено.' : '';
 
+    const submitted = alertSubmitted(alert.kind, alert.submitted_at);
+
     if (alert.shown === null) {
-        return `Опросник заполнен ${alert.submitted_at}. На экране врача ещё не показан.${push}`;
+        return `${submitted}. На экране врача ещё не показан.${push}`;
     }
 
     const how = alert.shown.realtime
         ? 'в открытом кабинете'
         : 'при входе в кабинет';
 
-    return `Опросник заполнен ${alert.submitted_at}. Показан через ${alert.shown.after}, ${how}.${push}`;
+    return `${submitted}. Показан через ${alert.shown.after}, ${how}.${push}`;
 }
 
 // Кто принял и закрыл — обычно один врач: ФИО один раз в конце.
 function history(alert: PatientAlert): string {
-    const parts = [`Заполнен ${alert.submitted_at}`];
+    const parts = [
+        alert.kind === 'help_request'
+            ? `Нажато ${alert.submitted_at}`
+            : `Заполнен ${alert.submitted_at}`,
+    ];
     const by = new Set(
         [alert.acknowledged?.by, alert.closed?.by].filter(
             (name): name is string => Boolean(name),
@@ -79,6 +95,10 @@ function history(alert: PatientAlert): string {
 
     if (alert.shown) {
         parts.push(`показан через ${alert.shown.after}`);
+    }
+
+    if (alert.repeats) {
+        parts.push(alertRepeats(alert.repeats));
     }
 
     if (alert.acknowledged) {
@@ -139,7 +159,7 @@ function history(alert: PatientAlert): string {
                     {{ alertTitle(alert.rule, alert.trigger) }}
                 </h3>
                 <span
-                    v-if="alert.acknowledged"
+                    v-if="!alert.awaits_acknowledgement && alert.acknowledged"
                     class="rounded-md border px-2 py-1 text-sm font-medium text-muted-foreground"
                     data-test="alert-status"
                     >{{
@@ -151,11 +171,19 @@ function history(alert: PatientAlert): string {
                     class="text-sm"
                     :class="DANGER_CHIP"
                     data-test="alert-status"
-                    ><Siren :class="CHIP_ICON" />Не принят</span
+                    ><Siren :class="CHIP_ICON" />{{
+                        capitalize(
+                            alertState(
+                                true,
+                                alert.acknowledged !== null &&
+                                    alert.repeats !== null,
+                            ),
+                        )
+                    }}</span
                 >
             </div>
 
-            <ul class="flex flex-col gap-1">
+            <ul v-if="alert.answers.length > 0" class="flex flex-col gap-1">
                 <li v-for="answer in alert.answers" :key="answer">
                     {{ answer }}
                 </li>
@@ -164,10 +192,18 @@ function history(alert: PatientAlert): string {
             <p class="text-sm text-muted-foreground" data-test="alert-delivery">
                 {{ delivery(alert) }}
             </p>
+            <!-- Повтор — после первого нажатия, по порядку времени. -->
+            <p
+                v-if="alert.repeats"
+                class="font-medium text-danger"
+                data-test="alert-repeats"
+            >
+                {{ `Нажато ${alertRepeats(alert.repeats)}.` }}
+            </p>
 
             <div class="flex flex-wrap gap-2">
                 <Button
-                    v-if="!alert.acknowledged"
+                    v-if="alert.awaits_acknowledgement"
                     variant="outline"
                     :disabled="accepting === alert.id"
                     :aria-busy="accepting === alert.id"
@@ -194,7 +230,7 @@ function history(alert: PatientAlert): string {
                 </Button>
             </div>
 
-            <details class="text-sm text-muted-foreground">
+            <details v-if="alert.source" class="text-sm text-muted-foreground">
                 <summary
                     class="w-fit cursor-pointer rounded-sm hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring focus-visible:outline-solid pointer-coarse:py-2.5"
                 >

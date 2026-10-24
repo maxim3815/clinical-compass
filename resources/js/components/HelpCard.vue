@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { LifeBuoy, MessageCircle, Phone } from '@lucide/vue';
+import { LifeBuoy, MessageCircle } from '@lucide/vue';
+import HelpCallButtons from '@/components/HelpCallButtons.vue';
 import { Button } from '@/components/ui/button';
 import { show as chat } from '@/routes/patient/chat';
 
 /**
- * Куда обратиться, если тяжело: 112 и чат с врачом. На «Сегодня» — пока врач не закрыл алерт
- * по ответам, после отправки опросника — на экране помощи. Самого алерта пациент не видит [медик].
+ * Куда обратиться, если тяжело: 112, кризисная линия и чат с врачом. На «Сегодня» — пока врач
+ * не закрыл алерт, после отправки опросника — когда ответы подпали под правило алертинга.
+ * Самого алерта пациент не видит [медик].
  */
 defineProps<{
     // На «Сегодня» короче: карточка не должна сдвигать приёмы с первого экрана.
@@ -27,21 +29,23 @@ defineProps<{
                     Если вам сейчас тяжело
                 </h2>
                 <p v-if="compact">
-                    Позвоните 112: отвечают круглосуточно, звонок бесплатный.
+                    Позвоните 112 или на кризисную линию. Звонок бесплатный.
                 </p>
                 <p v-else>
-                    Позвоните 112: отвечают круглосуточно, звонок бесплатный.
+                    Позвоните 112 или на кризисную линию. Звонок бесплатный.
                     Можно написать врачу, но он не всегда отвечает сразу.
                 </p>
             </div>
         </div>
-        <Button size="xl" as-child>
-            <a href="tel:112" data-test="call-112">
-                <Phone />
-                Позвонить 112
-            </a>
-        </Button>
-        <Button variant="outline" size="lg" class="bg-card" as-child>
+        <HelpCallButtons />
+        <Button
+            :variant="compact ? 'ghost' : 'outline'"
+            size="lg"
+            :class="
+                compact ? 'self-start text-primary' : 'rounded-full bg-card'
+            "
+            as-child
+        >
             <Link :href="chat()" data-test="help-write-doctor">
                 <MessageCircle />
                 Написать врачу

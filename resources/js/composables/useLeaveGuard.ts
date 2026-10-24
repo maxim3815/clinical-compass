@@ -1,10 +1,12 @@
 import { router } from '@inertiajs/vue3';
 import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { show as help } from '@/routes/patient/help';
 
 /**
  * Уход со страницы с несохранённым вводом переспрашивает. Переход внутри приложения ждёт
  * ответа в окне (`LeaveConfirmDialog`), закрытие вкладки и перезагрузка — системного вопроса
- * браузера. Отправка формы не переспрашивает: это не уход.
+ * браузера. Отправка формы не переспрашивает: это не уход. Экран помощи открывается сразу:
+ * в кризисе лишний вопрос дороже потерянного ввода.
  */
 export function useLeaveGuard(isDirty: () => boolean) {
     // Куда врач или пациент собрались уйти; пока null, окно закрыто.
@@ -12,7 +14,12 @@ export function useLeaveGuard(isDirty: () => boolean) {
     let allowed = false;
 
     const removeGuard = router.on('before', (event) => {
-        if (allowed || event.detail.visit.method !== 'get' || !isDirty()) {
+        if (
+            allowed ||
+            event.detail.visit.method !== 'get' ||
+            event.detail.visit.url.pathname === help.url() ||
+            !isDirty()
+        ) {
             return;
         }
 

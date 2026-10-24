@@ -12,12 +12,14 @@ use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
- * Врач принял алерт: красная плашка уходит, алерт остаётся открытым до решения.
+ * Врач принял алерт: красная плашка уходит, алерт остаётся открытым до решения. Если пациент
+ * после принятия снова нажал «Сообщить врачу», плашка возвращается, и врач принимает алерт ещё
+ * раз: время принятия обновляется, в журнале аудита обе записи.
  */
 class AcknowledgeAlert
 {
     /**
-     * @return bool false, если алерт уже приняли или закрыли
+     * @return bool false, если алерт уже приняли (и повторов после этого не было) или закрыли
      */
     public function handle(User $doctor, Alert $alert): bool
     {
@@ -28,7 +30,7 @@ class AcknowledgeAlert
         return DB::transaction(function () use ($doctor, $alert): bool {
             $alert = Alert::query()->lockForUpdate()->findOrFail($alert->id);
 
-            if ($alert->acknowledged_at !== null || $alert->closed_at !== null) {
+            if (! $alert->awaitsAcknowledgement()) {
                 return false;
             }
 

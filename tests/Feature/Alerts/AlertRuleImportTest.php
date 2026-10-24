@@ -1,35 +1,44 @@
 <?php
 
 use App\Enums\AlertLevel;
+use App\Enums\AlertTrigger;
 use App\Models\AlertRule;
 use Illuminate\Support\Facades\Artisan;
 
 beforeEach(fn () => loadScales());
 
-test('alert rule file loads once', function () {
+test('alert rule files load once', function () {
     $this->artisan('app:alerts:import')
         ->assertSuccessful()
-        ->expectsOutputToContain('Правила алертинга обновлены. Правил в файлах: 1.');
+        ->expectsOutputToContain('Правила алертинга обновлены. Правил в файлах: 2.');
 
-    $rule = AlertRule::query()->sole();
+    $rule = AlertRule::query()->where('code', 'suicide_risk')->sole();
+    $help = AlertRule::query()->where('code', 'help_request')->sole();
 
-    expect($rule->code)->toBe('suicide_risk')
-        ->and($rule->name)->toBe('Суицидальный риск')
+    expect($rule->name)->toBe('Суицидальный риск')
         ->and($rule->level)->toBe(AlertLevel::Critical)
+        ->and($rule->trigger)->toBe(AlertTrigger::Answers)
         ->and($rule->condition)->toBe("answer('phq9', 9) >= 1")
         ->and($rule->source_url)->toStartWith('https://www.phqscreeners.com/')
         ->and($rule->source_quote)->toContain('answer positively to the 9th question of the PHQ-9');
 
+    expect($help->name)->toBe('Просьба о помощи')
+        ->and($help->level)->toBe(AlertLevel::Critical)
+        ->and($help->trigger)->toBe(AlertTrigger::HelpRequest)
+        ->and($help->condition)->toBeNull()
+        ->and($help->source())->toBeNull()
+        ->and($help->text)->toContain('попросил связаться с экрана помощи');
+
     $this->artisan('app:alerts:import')
         ->assertSuccessful()
-        ->expectsOutputToContain('Правила алертинга не изменились. Правил в файлах: 1.');
+        ->expectsOutputToContain('Правила алертинга не изменились. Правил в файлах: 2.');
 
-    expect($rule->refresh()->version)->toBe(AlertRule::query()->sole()->version);
+    expect($rule->refresh()->version)->toBe(AlertRule::query()->where('code', 'suicide_risk')->sole()->version);
 });
 
 test('changed rule gets a new version, a new rule is added by a file and a removed one is deactivated', function () {
     loadAlertRules();
-    $version = AlertRule::query()->sole()->version;
+    $version = AlertRule::query()->where('code', 'suicide_risk')->sole()->version;
 
     // Порог меняется правкой файла, новое правило — новым файлом, без изменения кода.
     $code = Artisan::call('app:alerts:import', ['path' => alertRulesDirectory(
@@ -47,7 +56,7 @@ test('changed rule gets a new version, a new rule is added by a file and a remov
     expect($code)->toBe(0)
         ->and(Artisan::output())->toContain('Добавлены')->toContain('Изменены')
         ->and(AlertRule::query()->where('code', 'suicide_risk')->sole()->version)->not->toBe($version)
-        ->and(AlertRule::query()->active()->count())->toBe(2);
+        ->and(AlertRule::query()->active()->count())->toBe(3);
 
     Artisan::call('app:alerts:import', ['path' => alertRulesDirectory()]);
 
@@ -95,5 +104,44 @@ test('broken rule file names the problem and loads nothing', function (Closure $
     'source without link' => [
         fn (array $rule): array => [...$rule, 'source' => array_diff_key($rule['source'], ['url' => true])],
         'source.url',
+    ],
+    'unknown trigger' => [
+        fn (array $rule): array => [...$rule, 'trigger' => 'chat'],
+        'suicide_risk.yaml: Значение поля trigger отсутствует в списке разрешённых',
+    ],
+    'answers rule without source' => [
+        fn (array $rule): array => array_diff_key($rule, ['source' => true]),
+        'suicide_risk.yaml: Поле source обязательно',
+    ],
+]);
+
+test('help request rule has no condition and is the only one', function (array $extra, string $error) {
+    $code = Artisan::call('app:alerts:import', ['path' => alertRulesDirectory(extra: $extra)]);
+    $output = preg_replace('/\s+/u', ' ', Artisan::output());
+
+    expect($code)->toBe(1)
+        ->and($output)->toContain($error)
+        ->and(AlertRule::query()->count())->toBe(0);
+})->with([
+    'condition on the button' => [
+        ['help_request.yaml' => [
+            'code' => 'help_request',
+            'name' => 'Просьба о помощи',
+            'level' => 'critical',
+            'trigger' => 'help_request',
+            'condition' => "answer('phq9', 9) >= 1",
+            'text' => 'Пациент нажал «Сообщить врачу».',
+        ]],
+        'help_request.yaml: Значение поля condition запрещено',
+    ],
+    'second button rule' => [
+        ['help_again.yaml' => [
+            'code' => 'help_again',
+            'name' => 'Ещё одна кнопка',
+            'level' => 'critical',
+            'trigger' => 'help_request',
+            'text' => 'Пациент нажал «Сообщить врачу».',
+        ]],
+        'Правило по кнопке «Сообщить врачу» должно быть одно, а их 2',
     ],
 ]);

@@ -15,6 +15,7 @@ use App\Support\Adherence\AdherenceSignals;
 use App\Support\Adherence\PatientAdherence;
 use App\Support\Alerts\AlertPresenter;
 use App\Support\Alerts\AlertSignals;
+use App\Support\Alerts\HelpEventPresenter;
 use App\Support\Assessments\PatientAssessments;
 use App\Support\AttentionQueue;
 use App\Support\DisplayTime;
@@ -148,8 +149,10 @@ class PatientController extends Controller
             'unread' => UnreadMessages::byPatient($doctor, [$patient->id])[$patient->id] ?? 0,
             'cancelReasons' => PrescriptionCancelReason::options(),
             'clinicalProfile' => ClinicalProfilePresenter::present($patient),
-            // Алерты по ответам пациента: открытые и история, решения врача для закрытия.
+            // Алерты по ответам пациента и по «Сообщить врачу»: открытые и история, решения врача для закрытия.
             'alerts' => AlertPresenter::forPatient($patient),
+            // Тихие строки: когда пациент открывал экран помощи и нажимал на нём звонки.
+            'helpEvents' => HelpEventPresenter::forPatient($patient),
             'alertDecisions' => AlertDecision::options(),
             'alertCommentLimit' => AlertController::MAX_COMMENT_LENGTH,
             // Опросники, которые заполняет пациент: суммы, степени, изменение и ответы.

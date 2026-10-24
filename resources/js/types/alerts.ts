@@ -1,7 +1,20 @@
 import type { SelectOption } from './prescriptions';
 
 /**
- * Непринятый алерт: красная плашка на всех страницах кабинета врача.
+ * Вид алерта: сработало правило по ответам опросника или пациент нажал «Сообщить врачу».
+ */
+export type AlertKind = 'answers' | 'help_request';
+
+/**
+ * Повторные «Сообщить врачу», пока алерт открыт: сколько раз и когда последний.
+ */
+export type AlertRepeats = {
+    count: number;
+    at: string;
+};
+
+/**
+ * Алерт, который ждёт «Принять»: красная плашка на всех страницах кабинета врача.
  */
 export type UrgentAlert = {
     id: number;
@@ -11,10 +24,30 @@ export type UrgentAlert = {
     rule: string;
     // Что сработало: «PHQ-9, вопрос 9: «почти каждый день»».
     trigger: string;
-    // Когда пациент ответил, ДД.ММ.ГГГГ ЧЧ:ММ.
+    kind: AlertKind;
+    // Когда пациент ответил или нажал кнопку, ДД.ММ.ГГГГ ЧЧ:ММ.
     at: string;
+    repeats: AlertRepeats | null;
     // Плашку уже показали врачу (на этом или другом устройстве).
     shown: boolean;
+};
+
+/**
+ * Кризисная линия на экране помощи пациента.
+ */
+export type CrisisLine = {
+    // Номер для показа: «8-800-333-44-34».
+    label: string;
+    // Ссылка для звонка: «tel:88003334434».
+    href: string;
+};
+
+/**
+ * Тихая строка в карточке пациента: открыт экран помощи или нажат звонок.
+ */
+export type HelpEvent = {
+    at: string;
+    label: string;
 };
 
 /**
@@ -23,7 +56,10 @@ export type UrgentAlert = {
 export type AttentionAlert = {
     rule: string;
     trigger: string;
+    // Принят и после этого не было повторного «Сообщить врачу».
     acknowledged: boolean;
+    // Пациент снова нажимал «Сообщить врачу» после «Принять».
+    repeated: boolean;
 };
 
 /**
@@ -35,15 +71,20 @@ export type PatientAlert = {
     // Что сработало и что делать, для врача.
     text: string;
     trigger: string;
-    // Вопросы целиком с ответом пациента.
+    // Вопросы целиком с ответом пациента. У алерта по кнопке пусто.
     answers: string[];
+    // У правила по кнопке источника может не быть.
     source: {
         document: string;
         section: string;
         url: string;
         quote: string | null;
-    };
+    } | null;
+    kind: AlertKind;
     submitted_at: string;
+    repeats: AlertRepeats | null;
+    // Не принят или пациент снова нажал «Сообщить врачу» после «Принять».
+    awaits_acknowledgement: boolean;
     shown: {
         at: string;
         // Через сколько после ответа пациента: «1,2 с».

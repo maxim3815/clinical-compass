@@ -452,8 +452,9 @@ function loadAlertRules(): void
 }
 
 /**
- * Каталог правил алертинга во временной папке: копия файла приложения с правкой $change
- * и дополнительные файлы $extra (имя файла => содержимое).
+ * Каталог правил алертинга во временной папке: копии файлов приложения (правило по ответам
+ * с правкой $change и правило по кнопке «Сообщить врачу») и дополнительные файлы $extra
+ * (имя файла => содержимое; файл с тем же именем заменяет копию).
  *
  * @param  (Closure(array<string, mixed>): array<string, mixed>)|null  $change
  * @param  array<string, array<string, mixed>>  $extra
@@ -465,6 +466,7 @@ function alertRulesDirectory(?Closure $change = null, array $extra = []): string
 
     $rule = Yaml::parseFile(base_path('database/data/alerts/suicide_risk.yaml'));
     file_put_contents("{$directory}/suicide_risk.yaml", Yaml::dump($change === null ? $rule : $change($rule), 4));
+    copy(base_path('database/data/alerts/help_request.yaml'), "{$directory}/help_request.yaml");
 
     foreach ($extra as $name => $data) {
         file_put_contents("{$directory}/{$name}", Yaml::dump($data, 4));

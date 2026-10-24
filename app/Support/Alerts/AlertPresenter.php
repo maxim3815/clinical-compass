@@ -14,18 +14,21 @@ use Illuminate\Database\Eloquent\Builder;
  * Алерты для врача: красная плашка на всех страницах кабинета, причина в очереди «Требуют
  * внимания» и история в карточке пациента. Алерты видит текущий лечащий врач пациента:
  * при передаче пациента открытые алерты переходят к новому врачу.
+ *
+ * Вид алерта (`kind`): `answers` — сработало правило по ответам опросника, `help_request` —
+ * пациент нажал «Сообщить врачу». У алерта по кнопке есть повторы (`repeats`).
  */
 final class AlertPresenter
 {
     /**
-     * Непринятые алерты пациентов врача, сначала новые: по ним красная плашка.
+     * Алерты пациентов врача, которые ждут «Принять», сначала новые: по ним красная плашка.
      *
      * @return list<array<string, mixed>>
      */
     public static function banner(User $doctor): array
     {
         return array_values(self::ofPatientsOf($doctor)
-            ->unacknowledged()
+            ->awaitingAcknowledgement()
             ->with(['patient', 'rule'])
             ->orderByDesc('created_at')
             ->orderByDesc('id')
@@ -36,7 +39,9 @@ final class AlertPresenter
                 'patient' => $alert->patient->name,
                 'rule' => $alert->rule->name,
                 'trigger' => $alert->trigger(),
+                'kind' => self::kind($alert),
                 'at' => DisplayTime::format($alert->submitted_at),
+                'repeats' => self::repeats($alert),
                 'shown' => $alert->shown_at !== null,
             ])
             ->all());
@@ -45,7 +50,7 @@ final class AlertPresenter
     /**
      * Открытые алерты пациентов врача: причина в очереди «Требуют внимания».
      *
-     * @return array<int, list<array{rule: string, trigger: string, acknowledged: bool}>> id пациента => алерты, сначала новые
+     * @return array<int, list<array{rule: string, trigger: string, acknowledged: bool, repeated: bool}>> id пациента => алерты, сначала новые
      */
     public static function openByPatient(User $doctor): array
     {
@@ -59,7 +64,9 @@ final class AlertPresenter
             ->map(fn ($alerts): array => array_values($alerts->map(fn (Alert $alert): array => [
                 'rule' => $alert->rule->name,
                 'trigger' => $alert->trigger(),
-                'acknowledged' => $alert->acknowledged_at !== null,
+                'acknowledged' => ! $alert->awaitsAcknowledgement(),
+                // Пациент снова нажимал «Сообщить врачу» после того, как врач уже принимал алерт.
+                'repeated' => $alert->acknowledged_at !== null && $alert->repeat_count > 0,
             ])->all()))
             ->all();
     }
@@ -126,7 +133,11 @@ final class AlertPresenter
                 array_filter($alert->evidence, fn (array $entry): bool => $entry['type'] === 'answer'),
             )),
             'source' => $alert->rule->source(),
+            'kind' => self::kind($alert),
             'submitted_at' => DisplayTime::format($alert->submitted_at),
+            'repeats' => self::repeats($alert),
+            // Пациент снова нажал «Сообщить врачу» после «Принять»: кнопка «Принять» нужна снова.
+            'awaits_acknowledgement' => $alert->awaitsAcknowledgement(),
             'shown' => $alert->shown_at === null || $delivery === null ? null : [
                 'at' => DisplayTime::format($alert->shown_at),
                 'after' => self::duration($delivery),
@@ -143,6 +154,27 @@ final class AlertPresenter
                 'decision' => $alert->decision->label(),
                 'comment' => $alert->decision_comment,
             ],
+        ];
+    }
+
+    /**
+     * @return 'answers'|'help_request'
+     */
+    private static function kind(Alert $alert): string
+    {
+        return $alert->isHelpRequest() ? 'help_request' : 'answers';
+    }
+
+    /**
+     * Повторные «Сообщить врачу»: сколько раз и когда последний.
+     *
+     * @return array{count: int, at: string}|null
+     */
+    private static function repeats(Alert $alert): ?array
+    {
+        return $alert->repeated_at === null ? null : [
+            'count' => $alert->repeat_count,
+            'at' => DisplayTime::format($alert->repeated_at),
         ];
     }
 
