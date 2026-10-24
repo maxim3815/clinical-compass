@@ -10,7 +10,7 @@ beforeEach(fn () => loadScales());
 test('alert rule files load once', function () {
     $this->artisan('app:alerts:import')
         ->assertSuccessful()
-        ->expectsOutputToContain('Правила алертинга обновлены. Правил в файлах: 2.');
+        ->expectsOutputToContain('Правила алертинга обновлены. Правил в файлах: 3.');
 
     $rule = AlertRule::query()->where('code', 'suicide_risk')->sole();
     $help = AlertRule::query()->where('code', 'help_request')->sole();
@@ -29,9 +29,16 @@ test('alert rule files load once', function () {
         ->and($help->source())->toBeNull()
         ->and($help->text)->toContain('попросил связаться с экрана помощи');
 
+    $adverse = AlertRule::query()->where('code', 'adverse_event')->sole();
+
+    expect($adverse->name)->toBe('Срочный побочный эффект')
+        ->and($adverse->trigger)->toBe(AlertTrigger::AdverseEvent)
+        ->and($adverse->condition)->toBeNull()
+        ->and($adverse->source())->toBeNull();
+
     $this->artisan('app:alerts:import')
         ->assertSuccessful()
-        ->expectsOutputToContain('Правила алертинга не изменились. Правил в файлах: 2.');
+        ->expectsOutputToContain('Правила алертинга не изменились. Правил в файлах: 3.');
 
     expect($rule->refresh()->version)->toBe(AlertRule::query()->where('code', 'suicide_risk')->sole()->version);
 });

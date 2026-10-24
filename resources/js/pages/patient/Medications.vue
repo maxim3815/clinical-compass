@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
-import { CalendarDays, Clock, Plus, TriangleAlert } from '@lucide/vue';
+import {
+    CalendarDays,
+    Clock,
+    Plus,
+    Thermometer,
+    TriangleAlert,
+} from '@lucide/vue';
 import { computed, ref } from 'vue';
 import IntakeTimeController from '@/actions/App/Http/Controllers/Patient/IntakeTimeController';
 import OwnMedicationController from '@/actions/App/Http/Controllers/Patient/OwnMedicationController';
@@ -8,6 +14,7 @@ import PrescriptionDetails from '@/components/PrescriptionDetails.vue';
 import StopMedicationDialog from '@/components/StopMedicationDialog.vue';
 import { Button } from '@/components/ui/button';
 import { calendar, medications } from '@/routes/patient';
+import { index as sideEffects } from '@/routes/patient/side-effects';
 import type { Prescription } from '@/types';
 
 const props = defineProps<{
@@ -58,6 +65,12 @@ function titleId(prescription: Prescription): string {
                 <Link :href="calendar()" data-test="calendar-link">
                     <CalendarDays />
                     Календарь приёма
+                </Link>
+            </Button>
+            <Button variant="outline" size="lg" as-child>
+                <Link :href="sideEffects()" data-test="side-effects-link">
+                    <Thermometer />
+                    Побочные эффекты
                 </Link>
             </Button>
         </div>

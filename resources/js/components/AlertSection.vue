@@ -7,6 +7,7 @@ import AlertController from '@/actions/App/Http/Controllers/Doctor/AlertControll
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import {
+    alertAction,
     alertRepeats,
     alertState,
     alertSubmitted,
@@ -18,7 +19,8 @@ import type { PatientAlert } from '@/types';
 /**
  * Алерты в карточке пациента: открытые — сверху, с «Принять» и «Закрыть с решением»,
  * ниже история закрытых: что сработало, через сколько показан, кто принял и чем закрыл.
- * Алерт по «Сообщить врачу» показывает и повторные нажатия: после повтора «Принять» нужно снова.
+ * Алерт по «Сообщить врачу» и по срочному побочному эффекту показывает и повторы: после повтора
+ * «Принять» нужно снова.
  */
 const props = defineProps<{
     patientId: number;
@@ -82,11 +84,7 @@ function delivery(alert: PatientAlert): string {
 
 // Кто принял и закрыл — обычно один врач: ФИО один раз в конце.
 function history(alert: PatientAlert): string {
-    const parts = [
-        alert.kind === 'help_request'
-            ? `Нажато ${alert.submitted_at}`
-            : `Заполнен ${alert.submitted_at}`,
-    ];
+    const parts = [`${alertAction(alert.kind)} ${alert.submitted_at}`];
     const by = new Set(
         [alert.acknowledged?.by, alert.closed?.by].filter(
             (name): name is string => Boolean(name),
@@ -98,7 +96,7 @@ function history(alert: PatientAlert): string {
     }
 
     if (alert.repeats) {
-        parts.push(alertRepeats(alert.repeats));
+        parts.push(alertRepeats(alert.repeats, alert.kind));
     }
 
     if (alert.acknowledged) {
@@ -177,6 +175,7 @@ function history(alert: PatientAlert): string {
                                 true,
                                 alert.acknowledged !== null &&
                                     alert.repeats !== null,
+                                alert.kind,
                             ),
                         )
                     }}</span
@@ -188,17 +187,30 @@ function history(alert: PatientAlert): string {
                     {{ answer }}
                 </li>
             </ul>
+            <ul
+                v-if="alert.symptoms.length > 0"
+                class="flex flex-col gap-1"
+                data-test="alert-symptoms"
+            >
+                <li v-for="symptom in alert.symptoms" :key="symptom">
+                    {{ symptom }}
+                </li>
+            </ul>
             <p class="text-sm">{{ alert.text }}</p>
             <p class="text-sm text-muted-foreground" data-test="alert-delivery">
                 {{ delivery(alert) }}
             </p>
-            <!-- Повтор — после первого нажатия, по порядку времени. -->
+            <!-- Повтор — после первого действия пациента, по порядку времени. -->
             <p
                 v-if="alert.repeats"
                 class="font-medium text-danger"
                 data-test="alert-repeats"
             >
-                {{ `Нажато ${alertRepeats(alert.repeats)}.` }}
+                {{
+                    alert.kind === 'adverse_event'
+                        ? `${capitalize(alertRepeats(alert.repeats, alert.kind))}.`
+                        : `${alertAction(alert.kind)} ${alertRepeats(alert.repeats)}.`
+                }}
             </p>
 
             <div class="flex flex-wrap gap-2">

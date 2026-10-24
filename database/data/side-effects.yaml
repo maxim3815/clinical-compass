@@ -1,0 +1,223 @@
+# Побочные эффекты для окна «Побочные эффекты» у пациента. Загружается вместе со справочником
+# препаратов командой `php artisan app:drugs:import`, формат описан в README.
+#
+# symptoms — словарь симптомов: name — простыми словами для пациента, term — термин для врача
+# (без запятых: у врача термины перечисляются через запятую).
+# Порядок словаря — порядок в списке у пациента.
+#
+# drugs — у каждого препарата группы симптомов из раздела 4 «Возможные нежелательные реакции» его
+# листка-вкладыша (документ — source препарата в drugs.yaml):
+#   common    — часто: частые и очень частые реакции;
+#   uncommon  — реже: нечастые и редкие, которые пациент замечает сам;
+#   urgent    — сообщить врачу сразу: листок велит немедленно сообщить врачу или прекратить приём,
+#               но ожидание ответа врача не угрожает жизни. Врачу уходит алерт;
+#   emergency — нужна помощь сейчас: то, что может угрожать жизни. Пациенту первой показывается
+#               «Позвоните 112», врачу уходит алерт.
+# instruction — слова листка о приёме препарата, только у emergency: их пациент видит после отправки.
+# У пациента симптом берёт самую срочную группу среди препаратов, которые он сейчас принимает.
+#
+# Мыслей о вреде себе здесь нет, хотя листки СИОЗС их называют: в окне ссылка на экран помощи.
+# Снижение гемоглобина и повышение КФК пациент сам не заметит, это лабораторный контроль.
+# Список и группы проверяет медик команды [медик].
+
+symptoms:
+  - { code: drowsiness, name: Сонливость, term: Сонливость }
+  - { code: headache, name: Головная боль, term: Головная боль }
+  - { code: dizziness, name: Головокружение, term: Головокружение }
+  - { code: weakness, name: "Слабость, быстро устаю", term: Астения }
+  - { code: tingling, name: Покалывание или онемение в руках и ногах, term: Парестезии }
+  - { code: insomnia, name: "Плохо сплю, трудно уснуть", term: Бессонница }
+  - { code: anxiety_worse, name: Тревога стала сильнее, term: Усиление тревоги }
+  - { code: agitation, name: "Беспокойство, возбуждение", term: Ажитация }
+  - { code: attention, name: Трудно сосредоточиться, term: Нарушение внимания }
+  - { code: tremor, name: Дрожь в руках или теле, term: Тремор }
+  - { code: nausea, name: Тошнота, term: Тошнота }
+  - { code: vomiting, name: Рвота, term: Рвота }
+  - { code: diarrhea, name: Жидкий стул, term: Диарея }
+  - { code: constipation, name: Запор, term: Запор }
+  - { code: stomach_pain, name: Боль в животе, term: Боль в животе }
+  - { code: dry_mouth, name: Сухость во рту, term: Сухость во рту }
+  - { code: taste_change, name: Изменился вкус, term: Дисгевзия }
+  - { code: appetite, name: Аппетит стал меньше или больше, term: Изменение аппетита }
+  - { code: weight_gain, name: Прибавка веса, term: Увеличение массы тела }
+  - { code: sweating, name: Сильно потею, term: Гипергидроз }
+  - { code: sexual, name: Снизилось влечение или трудности в интимной жизни, term: Сексуальная дисфункция }
+  - { code: muscle_pain, name: Боль в мышцах или суставах, term: Миалгия или артралгия }
+  - { code: back_pain, name: Боль в спине, term: Боль в спине }
+  - { code: blurred_vision, name: Нечёткое зрение, term: Нарушение зрения }
+  - { code: palpitations, name: Сердцебиение, term: Сердцебиение }
+  - { code: rash_itch, name: Сыпь или зуд, term: Сыпь и зуд }
+  - { code: muscle_stiffness, name: Скованность мышц, term: Мышечная скованность }
+  - { code: trismus, name: "Сводит челюсти, трудно открыть рот", term: Тризм }
+  - { code: akathisia, name: Не могу усидеть на месте, term: Акатизия }
+  - { code: mania, name: "Слишком приподнятое настроение, почти не сплю и не устаю", term: Мания или гипомания }
+  - { code: jaundice, name: Пожелтела кожа или белки глаз, term: Желтуха }
+  - { code: urination, name: Трудно помочиться, term: Задержка мочеиспускания }
+  - {
+      code: face_swelling,
+      name: "Отекло лицо, губы или язык, трудно дышать или глотать",
+      term: Ангионевротический отёк или анафилаксия,
+    }
+  - { code: hives, name: Крупные зудящие волдыри на коже, term: Крапивница }
+  - { code: skin_blisters, name: Сыпь с пузырями или шелушение кожи, term: Тяжёлая кожная реакция }
+  - { code: seizures, name: Судороги, term: Судороги }
+  - { code: bleeding, name: Необычное кровотечение или синяки, term: Кровотечение }
+  - { code: serotonin, name: "Жар, дрожь, спутанность и сильное возбуждение", term: Серотониновый синдром }
+  - { code: fainting, name: Перебои в сердце или обморок, term: Нарушение ритма или обморок }
+
+drugs:
+  # Листок: «Немедленно сообщите лечащему врачу» — скованность мышц, тризм, потливость.
+  maritupirdine:
+    - level: urgent
+      symptoms: [muscle_stiffness, trismus, sweating]
+    - level: common
+      symptoms: [drowsiness, headache, dizziness, weakness, tingling]
+    - level: uncommon
+      symptoms: [insomnia, anxiety_worse, attention, taste_change, nausea, stomach_pain, constipation, back_pain]
+
+  # Листок: «Немедленно прекратите приём и обратитесь за помощью в ближайшее медицинское учреждение»
+  # при кровотечениях, аллергической реакции, серотониновом синдроме, трудностях при мочеиспускании,
+  # судорогах и желтухе.
+  escitalopram:
+    - level: emergency
+      instruction: Немедленно прекратите приём препарата и обратитесь за помощью в ближайшее медицинское учреждение.
+      symptoms: [face_swelling, seizures, bleeding, serotonin]
+    # Обморок и нарушение ритма в листке среди остальных реакций, но угрожают жизни.
+    - level: emergency
+      symptoms: [fainting]
+    - level: urgent
+      symptoms: [jaundice, urination]
+    - level: common
+      symptoms:
+        [
+          nausea,
+          headache,
+          appetite,
+          anxiety_worse,
+          agitation,
+          insomnia,
+          drowsiness,
+          dizziness,
+          tremor,
+          tingling,
+          diarrhea,
+          constipation,
+          vomiting,
+          dry_mouth,
+          sweating,
+          muscle_pain,
+          sexual,
+          weakness,
+          weight_gain,
+        ]
+    - level: uncommon
+      symptoms: [taste_change, blurred_vision, palpitations, rash_itch]
+
+  # Листок: «Немедленно сообщите лечащему врачу» при сыпи с волдырями, аллергии, серотониновом
+  # синдроме, желтухе, беспокойстве с неспособностью усидеть, судорогах и мании.
+  sertraline:
+    - level: emergency
+      instruction: Немедленно сообщите лечащему врачу.
+      symptoms: [face_swelling, skin_blisters, seizures, serotonin]
+    - level: emergency
+      symptoms: [fainting]
+    - level: urgent
+      symptoms: [akathisia, mania, jaundice]
+    - level: common
+      symptoms:
+        [
+          insomnia,
+          dizziness,
+          drowsiness,
+          headache,
+          diarrhea,
+          nausea,
+          dry_mouth,
+          sexual,
+          weakness,
+          appetite,
+          anxiety_worse,
+          agitation,
+          tremor,
+          muscle_stiffness,
+          tingling,
+          attention,
+          taste_change,
+          blurred_vision,
+          palpitations,
+          vomiting,
+          constipation,
+          stomach_pain,
+          sweating,
+          rash_itch,
+          back_pain,
+          muscle_pain,
+          weight_gain,
+        ]
+    - level: uncommon
+      symptoms: [bleeding]
+
+  # Листок: тяжёлая аллергия — «прекратите приём и немедленно свяжитесь с лечащим врачом»,
+  # серотониновый синдром — «немедленно свяжитесь с врачом», акатизия — «как можно скорее сообщите».
+  paroxetine:
+    - level: emergency
+      instruction: Прекратите приём препарата и немедленно свяжитесь с лечащим врачом.
+      symptoms: [face_swelling, hives, fainting]
+    - level: emergency
+      instruction: Немедленно свяжитесь с врачом.
+      symptoms: [serotonin]
+    # Судороги в листке среди редких реакций, но угрожают жизни.
+    - level: emergency
+      symptoms: [seizures]
+    - level: urgent
+      symptoms: [akathisia, mania, jaundice]
+    - level: common
+      symptoms:
+        [
+          nausea,
+          sexual,
+          appetite,
+          insomnia,
+          drowsiness,
+          agitation,
+          dizziness,
+          tremor,
+          headache,
+          attention,
+          blurred_vision,
+          dry_mouth,
+          constipation,
+          diarrhea,
+          vomiting,
+          sweating,
+          weakness,
+          weight_gain,
+        ]
+    - level: uncommon
+      symptoms: [bleeding, palpitations, rash_itch, urination]
+
+  # Листок: «Прекратите приём и немедленно обратитесь за медицинской помощью» при крапивнице,
+  # анафилаксии, отёке, тяжёлых кожных реакциях и нарушении ритма.
+  hydroxyzine:
+    - level: emergency
+      instruction: Прекратите приём препарата и немедленно обратитесь за медицинской помощью.
+      symptoms: [face_swelling, hives, skin_blisters, fainting]
+    # Судороги в листке среди редких реакций, но угрожают жизни.
+    - level: emergency
+      symptoms: [seizures]
+    - level: common
+      symptoms: [drowsiness, headache, weakness, dry_mouth]
+    - level: uncommon
+      symptoms:
+        [
+          agitation,
+          dizziness,
+          insomnia,
+          tremor,
+          nausea,
+          blurred_vision,
+          palpitations,
+          vomiting,
+          constipation,
+          urination,
+        ]

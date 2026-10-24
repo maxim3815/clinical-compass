@@ -39,6 +39,8 @@ export type AttentionPatient = {
     alerts: AttentionAlert[];
     // Препараты с красной находкой без решения.
     contraindications: string[];
+    // Побочные эффекты, которые врач ещё не просмотрел: «Сонливость, сильно».
+    adverse_events: string[];
     adherence: AdherenceSignal | null;
     // Пропуски, которых врач ещё не видел: пациент в счётчике у «Пациентов».
     new_misses: boolean;

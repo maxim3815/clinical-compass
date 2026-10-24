@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Patient;
 
 use App\Actions\RecordHelpEvent;
 use App\Actions\RequestHelp;
+use App\Enums\AlertTrigger;
 use App\Enums\HelpEventType;
 use App\Http\Controllers\Controller;
 use App\Models\Alert;
+use App\Models\AlertRule;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
@@ -84,7 +86,7 @@ class HelpController extends Controller
     {
         $last = Alert::query()
             ->where('patient_id', $patient->id)
-            ->whereNull('assessment_id')
+            ->whereIn('alert_rule_id', AlertRule::query()->triggeredBy(AlertTrigger::HelpRequest)->select('id'))
             ->get(['submitted_at', 'repeated_at'])
             ->map(fn (Alert $alert): CarbonImmutable => $alert->repeated_at ?? $alert->submitted_at)
             ->max();

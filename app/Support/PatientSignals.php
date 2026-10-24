@@ -4,13 +4,14 @@ namespace App\Support;
 
 use App\Models\User;
 use App\Support\Adherence\AdherenceSignals;
+use App\Support\AdverseEvents\AdverseEventPresenter;
 use App\Support\Alerts\AlertSignals;
 use App\Support\Safety\SafetySignals;
 
 /**
  * Счётчик у пункта меню «Пациенты»: пациенты, которые требуют внимания врача. Это открытый
- * алерт, сигнал о приверженности с новыми пропусками или красная находка проверки безопасности
- * без решения.
+ * алерт, сигнал о приверженности с новыми пропусками, красная находка проверки безопасности
+ * без решения или непросмотренный побочный эффект.
  */
 final class PatientSignals
 {
@@ -20,6 +21,7 @@ final class PatientSignals
             ...AlertSignals::patientIds($doctor),
             ...AdherenceSignals::unseenPatientIds($doctor),
             ...SafetySignals::patientIds($doctor),
+            ...AdverseEventPresenter::patientIds($doctor),
         ]));
     }
 }

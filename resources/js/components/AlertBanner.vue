@@ -50,9 +50,25 @@ function soundKey(alert: UrgentAlert): string {
     return `${alert.id}:${alert.repeats?.count ?? 0}`;
 }
 
-// Повтор «Сообщить врачу» виден с первых слов: «Срочно, повторно: <ФИО>».
+// Во второй строке плашки: заголовок уже говорит «новое сообщение», здесь только время последнего.
+function repeatsLine(alert: UrgentAlert): string {
+    if (alert.repeats === null) {
+        return '';
+    }
+
+    return alert.kind === 'adverse_event'
+        ? `, последнее ${alert.repeats.at}`
+        : `, ${alertRepeats(alert.repeats)}`;
+}
+
+// Повтор виден с первых слов: «Срочно, повторно: <ФИО>», у побочного эффекта — «Срочно, новое
+// сообщение: <ФИО>»: пациент мог сообщить о другом, более опасном симптоме.
 function bannerTitle(alert: UrgentAlert): string {
-    return `${alert.repeats ? 'Срочно, повторно' : 'Срочно'}: ${alert.patient}`;
+    if (!alert.repeats) {
+        return `Срочно: ${alert.patient}`;
+    }
+
+    return `${alert.kind === 'adverse_event' ? 'Срочно, новое сообщение' : 'Срочно, повторно'}: ${alert.patient}`;
 }
 const accepting = ref<number | null>(null);
 // Скринридер читает только новый алерт, а не всю плашку с кнопками.
@@ -80,7 +96,7 @@ useRealtime<{ alerts: UrgentAlert[]; count: number }>(
                 announcement.value = fresh
                     .map(
                         (alert) =>
-                            `${bannerTitle(alert)}. ${alertTitle(alert.rule, alert.trigger)}${alert.repeats ? `, ${alertRepeats(alert.repeats)}` : ''}.`,
+                            `${bannerTitle(alert)}. ${alertTitle(alert.rule, alert.trigger)}${alert.repeats ? `, ${alertRepeats(alert.repeats, alert.kind)}` : ''}.`,
                     )
                     .join(' ');
             });
@@ -237,7 +253,7 @@ function accept(alert: UrgentAlert): void {
                         </p>
                         <p class="text-sm">
                             {{
-                                `${alertTitle(alert.rule, alert.trigger)}. ${alertSubmitted(alert.kind, alert.at)}${alert.repeats ? `, ${alertRepeats(alert.repeats)}` : ''}.`
+                                `${alertTitle(alert.rule, alert.trigger)}. ${alertSubmitted(alert.kind, alert.at)}${repeatsLine(alert)}.`
                             }}
                         </p>
                     </div>

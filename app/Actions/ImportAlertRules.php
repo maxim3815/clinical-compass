@@ -22,10 +22,10 @@ use Symfony\Component\Yaml\Yaml;
  * повторная загрузка тех же файлов ничего не меняет. Правило, которого в файлах больше нет,
  * выключается, а не удаляется: на него ссылаются алерты.
  *
- * Правило срабатывает по ответам опросника (trigger: answers, по умолчанию) или по кнопке
- * «Сообщить врачу» на экране помощи (trigger: help_request). У правила по ответам обязательны
- * условие и источник. У правила по кнопке условия нет, источник необязателен, и такое правило
- * одно.
+ * Правило срабатывает по ответам опросника (trigger: answers, по умолчанию), по кнопке
+ * «Сообщить врачу» на экране помощи (trigger: help_request) или по срочному побочному эффекту
+ * от пациента (trigger: adverse_event). У правила по ответам обязательны условие и источник.
+ * У двух других условия нет, источник необязателен, и каждое такое правило одно.
  *
  * Опросники должны быть загружены раньше: условия ссылаются на них по коду.
  *
@@ -96,7 +96,8 @@ class ImportAlertRules
     {
         $scales = Scale::query()->active()->get()->keyBy('code');
         $errors = [];
-        $helpRequests = [];
+        // Правила без условия по виду срабатывания: каждое должно быть одно.
+        $byTrigger = [];
 
         foreach ($files as $name => $rule) {
             if (! is_array($rule) || array_is_list($rule)) {
@@ -116,7 +117,7 @@ class ImportAlertRules
                 'name' => ['required', 'string', 'max:255'],
                 'level' => ['required', Rule::enum(AlertLevel::class)],
                 'trigger' => ['sometimes', 'required', 'string', Rule::enum(AlertTrigger::class)],
-                // У правила по кнопке условия нет: его поднимает сам пациент.
+                // У правила по кнопке и по побочному эффекту условия нет: его поднимает сам пациент.
                 'condition' => $byAnswers ? ['required', 'string'] : ['prohibited'],
                 'text' => ['required', 'string'],
                 'source' => [$byAnswers ? 'required' : 'sometimes', 'array'],
@@ -142,13 +143,16 @@ class ImportAlertRules
                 }
             }
 
-            if (($rule['trigger'] ?? null) === AlertTrigger::HelpRequest->value) {
-                $helpRequests[] = $name;
+            if (! $byAnswers && is_string($rule['trigger'] ?? null)) {
+                $byTrigger[$rule['trigger']][] = $name;
             }
         }
 
-        if (count($helpRequests) > 1) {
-            $errors[] = 'Правило по кнопке «Сообщить врачу» должно быть одно, а их '.count($helpRequests).': '.implode(', ', $helpRequests).'.';
+        foreach ($byTrigger as $trigger => $names) {
+            if (count($names) > 1) {
+                $what = $trigger === AlertTrigger::HelpRequest->value ? 'по кнопке «Сообщить врачу»' : 'по срочному побочному эффекту';
+                $errors[] = "Правило {$what} должно быть одно, а их ".count($names).': '.implode(', ', $names).'.';
+            }
         }
 
         if ($errors !== []) {

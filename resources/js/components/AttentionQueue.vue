@@ -5,11 +5,17 @@ import {
     MessageCircle,
     OctagonAlert,
     Siren,
+    Thermometer,
     TriangleAlert,
 } from '@lucide/vue';
 import AdherenceSignal from '@/components/AdherenceSignal.vue';
 import { alertState, alertTitle } from '@/lib/alerts';
-import { CHIP_ICON, DANGER_CHIP, MESSAGE_CHIP } from '@/lib/chips';
+import {
+    CHIP_ICON,
+    DANGER_CHIP,
+    MESSAGE_CHIP,
+    WARNING_CHIP,
+} from '@/lib/chips';
 import { formatAge, plural } from '@/lib/plural';
 import { show } from '@/routes/doctor/patients';
 import { show as chat } from '@/routes/doctor/patients/chat';
@@ -19,12 +25,23 @@ defineProps<{
     patients: AttentionPatient[];
 }>();
 
+// Возраст и диагноз одной строкой: текст и <template v-if> подряд на сервере сливаются в один узел.
+function summary(patient: AttentionPatient): string {
+    const diagnosis = patient.diagnosis
+        ? `${patient.diagnosis.code} ${patient.diagnosis.name}`
+        : 'основной диагноз не указан';
+
+    return patient.age === null
+        ? diagnosis
+        : `${formatAge(patient.age)} · ${diagnosis}`;
+}
+
 // Алертов у пациента обычно один: виден новый, остальные — числом.
 function alertLabel(alerts: AttentionAlert[]): string {
     const [latest] = alerts;
     const more = alerts.length > 1 ? ` · ещё ${alerts.length - 1}` : '';
 
-    return `${alertTitle(latest.rule, latest.trigger)} · ${alertState(!latest.acknowledged, latest.repeated)}${more}`;
+    return `${alertTitle(latest.rule, latest.trigger)} · ${alertState(!latest.acknowledged, latest.repeated, latest.kind)}${more}`;
 }
 
 function messages(count: number): string {
@@ -52,7 +69,8 @@ function messages(count: number): string {
             class="-mt-2 text-sm text-muted-foreground"
         >
             Число у «Пациентов» в меню показывает пациентов с алертом,
-            противопоказанием без решения или новыми пропусками.
+            противопоказанием без решения, новыми пропусками или новым побочным
+            эффектом.
         </p>
 
         <p
@@ -62,7 +80,7 @@ function messages(count: number): string {
         >
             <CircleCheck class="size-5 shrink-0 text-success" />
             Сейчас никто не требует внимания: нет алертов, сигналов о приёме,
-            противопоказаний без решения и новых сообщений.
+            противопоказаний без решения, новых побочных эффектов и сообщений.
         </p>
 
         <ul v-else class="divide-y rounded-xl border bg-card shadow-xs">
@@ -81,14 +99,7 @@ function messages(count: number): string {
                         {{ patient.name }}
                     </Link>
                     <p class="text-sm text-muted-foreground">
-                        <template v-if="patient.age !== null"
-                            >{{ formatAge(patient.age) }} ·
-                        </template>
-                        <template v-if="patient.diagnosis"
-                            >{{ patient.diagnosis.code }}
-                            {{ patient.diagnosis.name }}</template
-                        >
-                        <template v-else>основной диагноз не указан</template>
+                        {{ summary(patient) }}
                     </p>
                 </div>
 
@@ -114,6 +125,16 @@ function messages(count: number): string {
                             >Противопоказание без решения:
                             {{ patient.contraindications.join(', ') }}</span
                         >
+                    </li>
+                    <li
+                        v-if="patient.adverse_events.length > 0"
+                        :class="WARNING_CHIP"
+                        data-test="attention-adverse-events"
+                    >
+                        <Thermometer :class="CHIP_ICON" />
+                        <span>{{
+                            `${patient.adverse_events.length > 1 ? 'Побочные эффекты' : 'Побочный эффект'}: ${patient.adverse_events.join('; ')}`
+                        }}</span>
                     </li>
                     <li
                         v-if="patient.adherence"

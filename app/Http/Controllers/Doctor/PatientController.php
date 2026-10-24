@@ -2,17 +2,21 @@
 
 namespace App\Http\Controllers\Doctor;
 
+use App\Enums\AdverseEventSeverity;
 use App\Enums\AlertDecision;
 use App\Enums\PrescriptionCancelReason;
 use App\Enums\PrescriptionSource;
 use App\Events\PatientSignalsChanged;
 use App\Http\Controllers\Controller;
+use App\Models\AdverseEvent;
 use App\Models\CareRelationship;
 use App\Models\Prescription;
 use App\Models\User;
 use App\Support\Adherence\AdherenceSignal;
 use App\Support\Adherence\AdherenceSignals;
 use App\Support\Adherence\PatientAdherence;
+use App\Support\AdverseEvents\AdverseEventPresenter;
+use App\Support\AdverseEvents\SideEffectCatalog;
 use App\Support\Alerts\AlertPresenter;
 use App\Support\Alerts\AlertSignals;
 use App\Support\Alerts\HelpEventPresenter;
@@ -154,6 +158,17 @@ class PatientController extends Controller
             // Тихие строки: когда пациент открывал экран помощи и нажимал на нём звонки.
             'helpEvents' => HelpEventPresenter::forPatient($patient),
             'alertDecisions' => AlertDecision::options(),
+            // Побочные эффекты: сообщения пациента и записи врача, сначала новые.
+            'adverseEvents' => AdverseEventPresenter::forDoctor($patient),
+            // Для записи со слов пациента: весь словарь симптомов и сила.
+            'sideEffects' => SideEffectCatalog::dictionary(),
+            'severities' => AdverseEventSeverity::options(),
+            'adverseEventLimits' => [
+                'name' => AdverseEvent::MAX_NAME_LENGTH,
+                'comment' => AdverseEvent::MAX_COMMENT_LENGTH,
+                'today' => $today->toDateString(),
+                'min_date' => $today->subDays(AdverseEventController::MAX_DAYS_AGO)->toDateString(),
+            ],
             'alertCommentLimit' => AlertController::MAX_COMMENT_LENGTH,
             // Опросники, которые заполняет пациент: суммы, степени, изменение и ответы.
             'wellbeing' => PatientAssessments::forDoctor($patient),

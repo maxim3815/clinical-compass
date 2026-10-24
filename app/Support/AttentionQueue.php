@@ -5,20 +5,21 @@ namespace App\Support;
 use App\Models\CareRelationship;
 use App\Models\User;
 use App\Support\Adherence\AdherenceSignals;
+use App\Support\AdverseEvents\AdverseEventPresenter;
 use App\Support\Alerts\AlertPresenter;
 use App\Support\Safety\ClinicalProfilePresenter;
 use App\Support\Safety\SafetySignals;
 
 /**
  * Очередь «Требуют внимания» над списком пациентов: открытый алерт, противопоказание без решения
- * врача, сигнал о приверженности и непрочитанные сообщения. Причины берутся из тех же расчётов,
+ * врача, непросмотренный побочный эффект, сигнал о приверженности и непрочитанные сообщения. Причины берутся из тех же расчётов,
  * что отметки в списке и счётчики в меню.
  */
 final class AttentionQueue
 {
     /**
-     * Сначала алерты, затем противопоказания, сигналы с новыми пропусками, остальные сигналы
-     * и только сообщения; внутри — по ФИО.
+     * Сначала алерты, затем противопоказания, побочные эффекты, сигналы с новыми пропусками,
+     * остальные сигналы и только сообщения; внутри — по ФИО.
      *
      * @return list<array<string, mixed>>
      */
@@ -33,11 +34,12 @@ final class AttentionQueue
 
         $alerts = AlertPresenter::openByPatient($doctor);
         $contraindications = SafetySignals::awaitingDrugs($patientIds);
+        $adverseEvents = AdverseEventPresenter::awaitingByPatient($patientIds);
         $adherence = AdherenceSignals::raised($doctor);
         $unseen = array_flip(AdherenceSignals::unseenPatientIds($doctor));
         $unread = UnreadMessages::byPatient($doctor);
 
-        $ids = array_values(array_unique([...array_keys($alerts), ...array_keys($contraindications), ...array_keys($adherence), ...array_keys($unread)]));
+        $ids = array_values(array_unique([...array_keys($alerts), ...array_keys($contraindications), ...array_keys($adverseEvents), ...array_keys($adherence), ...array_keys($unread)]));
 
         if ($ids === []) {
             return [];
@@ -55,6 +57,7 @@ final class AttentionQueue
             ->sortBy(fn (User $patient): array => [
                 isset($alerts[$patient->id]) ? 0 : 1,
                 isset($contraindications[$patient->id]) ? 0 : 1,
+                isset($adverseEvents[$patient->id]) ? 0 : 1,
                 isset($unseen[$patient->id]) ? 0 : 1,
                 isset($adherence[$patient->id]) ? 0 : 1,
             ])
@@ -67,6 +70,8 @@ final class AttentionQueue
                 'alerts' => $alerts[$patient->id] ?? [],
                 // Препараты с красной находкой без решения.
                 'contraindications' => $contraindications[$patient->id] ?? [],
+                // Побочные эффекты, которые врач ещё не просмотрел: «Сонливость, сильно».
+                'adverse_events' => $adverseEvents[$patient->id] ?? [],
                 'adherence' => ($adherence[$patient->id] ?? null)?->toArray(),
                 // Сигнал с пропусками, которых врач ещё не видел: он в счётчике у «Пациентов».
                 'new_misses' => isset($unseen[$patient->id]),

@@ -6,6 +6,7 @@ import {
     ChevronRight,
     MessageCircle,
     Stethoscope,
+    Thermometer,
     UserRoundX,
 } from '@lucide/vue';
 import {
@@ -24,10 +25,12 @@ import HelpCard from '@/components/HelpCard.vue';
 import InstallAppBanner from '@/components/InstallAppBanner.vue';
 import PushBanner from '@/components/PushBanner.vue';
 import QuestionnaireCard from '@/components/QuestionnaireCard.vue';
+import SideEffectAlertCard from '@/components/SideEffectAlertCard.vue';
 import TodaySummary from '@/components/TodaySummary.vue';
 import { Button } from '@/components/ui/button';
 import { calendar, home } from '@/routes/patient';
 import { show as chat } from '@/routes/patient/chat';
+import { create as reportSideEffect } from '@/routes/patient/side-effects';
 import type {
     AsNeeded,
     AssessmentStatus,
@@ -62,8 +65,18 @@ const props = defineProps<{
     skipReasons: SelectOption[];
     // Опросники по календарю; null — опросников нет или пациент не прикреплён к врачу.
     assessments: AssessmentStatus | null;
-    // Карточка с 112, пока врач не закрыл алерт по ответам.
+    // Карточка с 112 и кризисной линией, пока врач не закрыл алерт по ответам или по «Сообщить врачу».
     help: boolean;
+    // Пока открыт алерт по срочному побочному эффекту: о чём сообщил пациент.
+    sideEffectAlert: {
+        symptoms: string[];
+        at: string;
+        emergency: boolean;
+    } | null;
+    // Ссылка «Сообщить о побочном эффекте»: есть лечащий врач.
+    canReportSideEffects: boolean;
+    // Сегодня «не принял» из-за самочувствия и ещё ни о чём не сообщил.
+    unwellSuggestion: boolean;
     hasIntakeHistory: boolean;
 }>();
 
@@ -180,8 +193,9 @@ function keepInView(card: Element, container: HTMLElement): () => void {
     <Head title="Сегодня" />
 
     <!--
-        Сверху вниз: итог дня и ссылка на календарь приёма, куда звонить, если тяжело (после ответов, на которые сработал
-        алерт), приёмы на сегодня, что нужно настроить, опросники, если пора их
+        Сверху вниз: итог дня, ссылки на календарь приёма и на побочные эффекты, куда звонить, если тяжело
+        (после ответов, на которые сработал алерт), что пациент срочно сообщил врачу, предложение рассказать
+        о самочувствии после пропуска, приёмы на сегодня, что нужно настроить, опросники, если пора их
         заполнить, вчерашние приёмы без отметки и «по необходимости». Баннеры напоминаний
         и установки идут после приёмов, чтобы не сдвигать их с первого экрана.
     -->
@@ -196,19 +210,73 @@ function keepInView(card: Element, container: HTMLElement): () => void {
                 </h1>
             </div>
             <TodaySummary v-if="today.groups.length" :groups="today.groups" />
-            <Link
-                v-if="hasIntakeHistory"
-                :href="calendar()"
-                class="-mx-2 flex min-h-11 items-center gap-2 self-start rounded-lg px-2 font-medium text-primary outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring focus-visible:outline-solid"
-                data-test="calendar-link"
+            <div
+                v-if="
+                    hasIntakeHistory ||
+                    (canReportSideEffects && hasPrescriptions)
+                "
+                class="flex flex-col"
             >
-                <CalendarDays class="size-5 shrink-0" />
-                Календарь приёма
-                <ChevronRight class="size-5 shrink-0" />
-            </Link>
+                <Link
+                    v-if="hasIntakeHistory"
+                    :href="calendar()"
+                    class="-mx-2 flex min-h-11 items-center gap-2 self-start rounded-lg px-2 font-medium text-primary outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring focus-visible:outline-solid"
+                    data-test="calendar-link"
+                >
+                    <CalendarDays class="size-5 shrink-0" />
+                    Календарь приёма
+                    <ChevronRight class="size-5 shrink-0" />
+                </Link>
+                <Link
+                    v-if="canReportSideEffects && hasPrescriptions"
+                    :href="reportSideEffect()"
+                    class="-mx-2 flex min-h-11 items-center gap-2 self-start rounded-lg px-2 font-medium text-primary outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring focus-visible:outline-solid"
+                    data-test="report-side-effect-link"
+                >
+                    <Thermometer class="size-5 shrink-0" />
+                    Сообщить о побочном эффекте
+                    <ChevronRight class="size-5 shrink-0" />
+                </Link>
+            </div>
         </header>
 
         <HelpCard v-if="help" compact />
+
+        <SideEffectAlertCard
+            v-if="sideEffectAlert"
+            :symptoms="sideEffectAlert.symptoms"
+            :at="sideEffectAlert.at"
+            :emergency="sideEffectAlert.emergency"
+        />
+
+        <!-- Не принял из-за самочувствия: предложить рассказать врачу, но не открывать форму самим. -->
+        <section
+            v-if="unwellSuggestion && !sideEffectAlert"
+            class="flex flex-col gap-3 rounded-2xl border bg-card p-4 shadow-xs"
+            aria-labelledby="unwell-title"
+            data-test="unwell-suggestion"
+        >
+            <div class="flex items-start gap-3">
+                <Thermometer class="mt-0.5 size-6 shrink-0 text-primary" />
+                <div class="flex flex-col gap-1">
+                    <h2 id="unwell-title" class="text-xl font-semibold">
+                        Плохо себя чувствуете?
+                    </h2>
+                    <p>
+                        Расскажите врачу, что беспокоит: он увидит это в вашей
+                        карточке.
+                    </p>
+                </div>
+            </div>
+            <Button
+                variant="outline"
+                size="lg"
+                class="self-start rounded-full"
+                as-child
+            >
+                <Link :href="reportSideEffect()">Рассказать врачу</Link>
+            </Button>
+        </section>
 
         <template v-if="setupFirst">
             <TimeSetupCard

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Doctor\AdverseEventController;
 use App\Http\Controllers\Doctor\AlertController;
 use App\Http\Controllers\Doctor\AppointmentInvitationController;
 use App\Http\Controllers\Doctor\ChatController;
@@ -28,6 +29,7 @@ use App\Http\Controllers\Patient\IntakeCalendarController;
 use App\Http\Controllers\Patient\IntakeTimeController;
 use App\Http\Controllers\Patient\MedicationController;
 use App\Http\Controllers\Patient\OwnMedicationController;
+use App\Http\Controllers\Patient\SideEffectController;
 use App\Http\Controllers\PushDoseController;
 use App\Models\Drug;
 use Illuminate\Support\Facades\Route;
@@ -105,6 +107,15 @@ Route::middleware('auth')->group(function () {
         });
 
         // Клинический профиль: пол, диагнозы и факты. Диагноз ищется только среди диагнозов пациента.
+        Route::scopeBindings()->whereNumber(['patient', 'adverseEvent'])->group(function () {
+            Route::post('patients/{patient}/adverse-events', [AdverseEventController::class, 'store'])
+                ->name('patients.adverse-events.store');
+            Route::post('patients/{patient}/adverse-events/{adverseEvent}/review', [AdverseEventController::class, 'review'])
+                ->name('patients.adverse-events.review');
+            Route::put('patients/{patient}/adverse-events/{adverseEvent}/comment', [AdverseEventController::class, 'comment'])
+                ->name('patients.adverse-events.comment');
+        });
+
         Route::scopeBindings()->whereNumber(['patient', 'diagnosis'])->group(function () {
             Route::get('patients/{patient}/clinical-profile', [ClinicalProfileController::class, 'edit'])
                 ->name('patients.clinical-profile.edit');
@@ -178,6 +189,16 @@ Route::middleware('auth')->group(function () {
             ->name('questionnaires.sent');
 
         // Экран помощи: открытие и звонки — тихие строки для врача, «Сообщить врачу» — алерт.
+        Route::get('side-effects', [SideEffectController::class, 'index'])->name('side-effects.index');
+        Route::get('side-effects/create', [SideEffectController::class, 'create'])->name('side-effects.create');
+        Route::post('side-effects', [SideEffectController::class, 'store'])->middleware('throttle:30,1')->name('side-effects.store');
+        Route::post('side-effects/{adverseEvent}/resolve', [SideEffectController::class, 'resolve'])
+            ->whereNumber('adverseEvent')
+            ->name('side-effects.resolve');
+        Route::delete('side-effects/{adverseEvent}/resolve', [SideEffectController::class, 'unresolve'])
+            ->whereNumber('adverseEvent')
+            ->name('side-effects.unresolve');
+
         Route::get('help', [HelpController::class, 'show'])->name('help.show');
         Route::post('help/report', [HelpController::class, 'report'])->middleware('throttle:30,1')->name('help.report');
         Route::post('help/calls', [HelpController::class, 'call'])->middleware('throttle:60,1')->name('help.calls');

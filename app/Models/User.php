@@ -171,6 +171,16 @@ class User extends Authenticatable
     }
 
     /**
+     * Побочные эффекты: сообщения пациента и записи врача с его слов.
+     *
+     * @return HasMany<AdverseEvent, $this>
+     */
+    public function adverseEvents(): HasMany
+    {
+        return $this->hasMany(AdverseEvent::class, 'patient_id');
+    }
+
+    /**
      * Часовой пояс пациента, у врача — пояс интерфейса.
      */
     public function localTimezone(): string

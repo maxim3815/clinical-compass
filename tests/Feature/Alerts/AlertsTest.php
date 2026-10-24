@@ -194,7 +194,7 @@ test('doctor sees the banner, the queue and the counter, accepts and closes the 
             ]])
             ->where('patients.data.0.alert', true)
             ->where('attention.0.id', $this->patient->id)
-            ->where('attention.0.alerts', [['rule' => 'Суицидальный риск', 'trigger' => 'PHQ-9, вопрос 9: «почти каждый день»', 'acknowledged' => false, 'repeated' => false]]));
+            ->where('attention.0.alerts', [['rule' => 'Суицидальный риск', 'trigger' => 'PHQ-9, вопрос 9: «почти каждый день»', 'kind' => 'answers', 'acknowledged' => false, 'repeated' => false]]));
 
     // Браузер врача показал плашку: время доставки считается от ответа пациента.
     $this->travel(1500)->milliseconds();

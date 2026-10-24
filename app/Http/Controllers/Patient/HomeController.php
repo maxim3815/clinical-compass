@@ -2,10 +2,16 @@
 
 namespace App\Http\Controllers\Patient;
 
+use App\Enums\AlertTrigger;
+use App\Enums\DoseEventStatus;
 use App\Enums\DoseSkipReason;
 use App\Enums\PrescriptionKind;
 use App\Enums\PrescriptionSource;
+use App\Enums\SideEffectLevel;
 use App\Http\Controllers\Controller;
+use App\Models\AdverseEvent;
+use App\Models\Alert;
+use App\Models\AlertRule;
 use App\Models\AsNeededDose;
 use App\Models\DoseEvent;
 use App\Models\Prescription;
@@ -67,11 +73,76 @@ class HomeController extends Controller
             'skipReasons' => DoseSkipReason::options($female),
             // Опросники по календарю: карточка «Пора ответить», когда срок наступил.
             'assessments' => PatientAssessments::status($patient),
-            // Карточка с 112, пока врач не закрыл алерт по ответам. Сам алерт пациент не видит.
-            'help' => $patient->alerts()->open()->exists(),
+            // Карточка с 112 и кризисной линией, пока врач не закрыл алерт по ответам или по «Сообщить
+            // врачу». Сам алерт пациент не видит.
+            'help' => $patient->alerts()->open()
+                ->whereIn('alert_rule_id', AlertRule::query()->whereIn('trigger', [AlertTrigger::Answers, AlertTrigger::HelpRequest])->select('id'))
+                ->exists(),
+            // Пока открыт алерт по срочному побочному эффекту — своя карточка: о чём сообщил, 112 и чат.
+            'sideEffectAlert' => $this->sideEffectAlert($patient),
+            // Ссылка «Сообщить о побочном эффекте»: сообщать есть кому.
+            'canReportSideEffects' => $doctor !== null,
+            // Сегодня не принял из-за самочувствия и ещё не рассказал врачу, что беспокоит.
+            'unwellSuggestion' => $doctor !== null && $this->unwellWithoutReport($patient, $today, $timezone),
             // Ссылка на календарь приёма, когда в нём уже есть что показать.
             'hasIntakeHistory' => IntakeCalendar::hasHistory($patient),
         ]);
+    }
+
+    /**
+     * Открытый алерт по побочным эффектам: о чём пациент сообщил, когда и была ли среди этого
+     * «нужна помощь сейчас» в последние часы. Когда всё отмечено «Уже прошло», карточка не нужна.
+     *
+     * @return array{symptoms: list<string>, at: string, emergency: bool}|null
+     */
+    private function sideEffectAlert(User $patient): ?array
+    {
+        $alert = $patient->alerts()->open()
+            ->whereIn('alert_rule_id', AlertRule::query()->triggeredBy(AlertTrigger::AdverseEvent)->select('id'))
+            ->first();
+
+        if (! $alert instanceof Alert) {
+            return null;
+        }
+
+        // Только то, что ещё не прошло: прошедшее пациент уже отметил сам.
+        $events = AdverseEvent::query()->where('alert_id', $alert->id)->whereNull('resolved_on')->orderBy('id')->get(['name', 'level', 'created_at']);
+
+        if ($events->isEmpty()) {
+            return null;
+        }
+
+        $timezone = $patient->localTimezone();
+        $last = ($alert->repeated_at ?? $alert->submitted_at)->setTimezone($timezone);
+        $recent = CarbonImmutable::now()->subHours((int) config('help.reported_hours'));
+
+        return [
+            'symptoms' => array_values($events->pluck('name')->unique()->all()),
+            'at' => ($last->isSameDay(CarbonImmutable::now($timezone)) ? 'сегодня' : $last->isoFormat('D MMMM'))." в\u{00A0}".$last->format('H:i'),
+            // Звонок в 112 главной кнопкой — пока сообщение свежее, а не все дни, пока открыт алерт.
+            'emergency' => $events->contains(fn (AdverseEvent $event): bool => $event->level === SideEffectLevel::Emergency
+                && $event->created_at->greaterThan($recent)),
+        ];
+    }
+
+    /**
+     * Пациент сегодня отметил «Не принял: плохо себя чувствовал или были побочные эффекты» и сегодня
+     * ещё ни о чём не сообщил. Предложение висит до конца дня.
+     */
+    private function unwellWithoutReport(User $patient, CarbonImmutable $today, string $timezone): bool
+    {
+        $startOfToday = CarbonImmutable::parse($today->toDateString(), $timezone);
+
+        $skipped = $patient->doseEvents()
+            ->where('status', DoseEventStatus::Skipped)
+            ->where('skip_reason', DoseSkipReason::Unwell)
+            ->where('marked_at', '>=', $startOfToday)
+            ->exists();
+
+        return $skipped && ! $patient->adverseEvents()
+            ->where('reported_by_id', $patient->id)
+            ->where('created_at', '>=', $startOfToday)
+            ->exists();
     }
 
     /**

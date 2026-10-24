@@ -16,7 +16,8 @@ use Illuminate\Database\Eloquent\Builder;
  * при передаче пациента открытые алерты переходят к новому врачу.
  *
  * Вид алерта (`kind`): `answers` — сработало правило по ответам опросника, `help_request` —
- * пациент нажал «Сообщить врачу». У алерта по кнопке есть повторы (`repeats`).
+ * пациент нажал «Сообщить врачу», `adverse_event` — пациент сообщил о срочном побочном эффекте.
+ * У двух последних есть повторы (`repeats`).
  */
 final class AlertPresenter
 {
@@ -50,7 +51,7 @@ final class AlertPresenter
     /**
      * Открытые алерты пациентов врача: причина в очереди «Требуют внимания».
      *
-     * @return array<int, list<array{rule: string, trigger: string, acknowledged: bool, repeated: bool}>> id пациента => алерты, сначала новые
+     * @return array<int, list<array{rule: string, trigger: string, kind: string, acknowledged: bool, repeated: bool}>> id пациента => алерты, сначала новые
      */
     public static function openByPatient(User $doctor): array
     {
@@ -64,8 +65,10 @@ final class AlertPresenter
             ->map(fn ($alerts): array => array_values($alerts->map(fn (Alert $alert): array => [
                 'rule' => $alert->rule->name,
                 'trigger' => $alert->trigger(),
+                'kind' => self::kind($alert),
                 'acknowledged' => ! $alert->awaitsAcknowledgement(),
-                // Пациент снова нажимал «Сообщить врачу» после того, как врач уже принимал алерт.
+                // Пациент снова нажимал «Сообщить врачу» или сообщал о срочном побочном эффекте
+                // после того, как врач уже принимал алерт.
                 'repeated' => $alert->acknowledged_at !== null && $alert->repeat_count > 0,
             ])->all()))
             ->all();
@@ -132,6 +135,12 @@ final class AlertPresenter
                 fn (array $entry): string => "{$entry['item']}. {$entry['text']}: «".mb_lcfirst($entry['label']).'»',
                 array_filter($alert->evidence, fn (array $entry): bool => $entry['type'] === 'answer'),
             )),
+            // Срочные побочные эффекты: термин, слова пациента и что ему показано.
+            'symptoms' => array_map(
+                fn (array $entry): string => "{$entry['term']}: «{$entry['name']}»"
+                    .($entry['level'] === 'emergency' ? ', пациенту показано «Позвоните 112»' : ''),
+                $alert->adverseEvidence(),
+            ),
             'source' => $alert->rule->source(),
             'kind' => self::kind($alert),
             'submitted_at' => DisplayTime::format($alert->submitted_at),
@@ -157,16 +166,14 @@ final class AlertPresenter
         ];
     }
 
-    /**
-     * @return 'answers'|'help_request'
-     */
     private static function kind(Alert $alert): string
     {
-        return $alert->isHelpRequest() ? 'help_request' : 'answers';
+        return $alert->kind()->value;
     }
 
     /**
-     * Повторные «Сообщить врачу»: сколько раз и когда последний.
+     * Повторы: сколько раз пациент снова нажал «Сообщить врачу» или сообщил о срочном побочном
+     * эффекте и когда последний.
      *
      * @return array{count: int, at: string}|null
      */

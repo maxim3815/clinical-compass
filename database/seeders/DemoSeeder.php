@@ -5,7 +5,9 @@ namespace Database\Seeders;
 use App\Actions\CreateDoctor;
 use App\Actions\InvitePatient;
 use App\Enums\AccessLinkPurpose;
+use App\Enums\AdverseEventSeverity;
 use App\Enums\HelpEventType;
+use App\Enums\PrescriptionSource;
 use App\Events\AlertsChanged;
 use App\Events\MessageSent;
 use App\Events\MessagesRead;
@@ -13,7 +15,9 @@ use App\Events\PatientSignalsChanged;
 use App\Events\UnreadMessagesChanged;
 use App\Jobs\CheckAlertRules;
 use App\Models\AccessLink;
+use App\Models\AdverseEvent;
 use App\Models\HelpEvent;
+use App\Models\SideEffect;
 use App\Models\User;
 use App\Support\DisplayTime;
 use Carbon\CarbonImmutable;
@@ -83,6 +87,10 @@ class DemoSeeder extends Seeder
 
         $this->invitation($doctors['doctor'], 'Новиков Артём Сергеевич');
         $this->helpTrace('patient_3c');
+        // Лебедев бросил «Авиандр» из-за сонливости: сообщил о ней, врач ещё не смотрел.
+        $this->adverseEvent('patient_3c', 'drowsiness', AdverseEventSeverity::Severe, started: 3, reported: [9, '21:30']);
+        // У Иванова головная боль в первые дни прошла сама, как обещает листок.
+        $this->adverseEvent('patient', 'headache', AdverseEventSeverity::Mild, started: 2, reported: [2, '19:10'], resolved: 5, reviewed: [3, '10:05']);
     }
 
     /**
@@ -139,6 +147,54 @@ class DemoSeeder extends Seeder
                 'created_at' => $night->addSeconds($seconds)->utc(),
             ])->save();
         }
+    }
+
+    /**
+     * Побочный эффект для показа, если у пациента их ещё нет. Дни считаются от начала курса
+     * «Авиандра» в базе (день начала — первый), а не от сегодняшнего: сидер запускается и при
+     * выкладке без сброса, когда курс начался раньше.
+     *
+     * @param  array{int, string}  $reported  день курса и местное время отправки
+     * @param  array{int, string}|null  $reviewed  день курса и время, когда врач просмотрел
+     */
+    private function adverseEvent(string $login, string $symptom, AdverseEventSeverity $severity, int $started, array $reported, ?int $resolved = null, ?array $reviewed = null): void
+    {
+        $patient = User::query()->where('login', $login)->first();
+        $sideEffect = SideEffect::query()->where('code', $symptom)->first();
+
+        if ($patient === null || $sideEffect === null || $patient->adverseEvents()->exists()) {
+            return;
+        }
+
+        $course = $patient->prescriptions()
+            ->where('source', PrescriptionSource::Doctor)
+            ->whereHas('drug', fn ($query) => $query->where('code', 'maritupirdine'))
+            ->orderBy('starts_on')
+            ->first();
+        $doctor = $patient->activeCareRelationship?->doctor;
+
+        if ($course === null || $doctor === null) {
+            return;
+        }
+
+        $timezone = $patient->localTimezone();
+        $day = fn (int $number, string $time): CarbonImmutable => CarbonImmutable::parse($course->starts_on->addDays($number - 1)->toDateString().' '.$time, $timezone)->utc();
+
+        (new AdverseEvent)->forceFill([
+            'patient_id' => $patient->id,
+            'side_effect_id' => $sideEffect->id,
+            'name' => $sideEffect->name,
+            'term' => $sideEffect->term,
+            'level' => $sideEffect->drugs()->where('drug_id', $course->drug_id)->value('level'),
+            'severity' => $severity,
+            'started_on' => $course->starts_on->addDays($started - 1),
+            'reported_by_id' => $patient->id,
+            'resolved_on' => $resolved === null ? null : $course->starts_on->addDays($resolved - 1),
+            'reviewed_at' => $reviewed === null ? null : $day(...$reviewed),
+            'reviewed_by_id' => $reviewed === null ? null : $doctor->id,
+            'created_at' => $day(...$reported),
+            'updated_at' => $day(...($reviewed ?? $reported)),
+        ])->save();
     }
 
     private function invitation(User $doctor, string $patientName): void

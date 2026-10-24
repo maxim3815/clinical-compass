@@ -9,14 +9,18 @@ import {
     Pencil,
     Plus,
     Siren,
+    Thermometer,
     TriangleAlert,
 } from '@lucide/vue';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import ClinicalProfileController from '@/actions/App/Http/Controllers/Doctor/ClinicalProfileController';
 import PasswordResetLinkController from '@/actions/App/Http/Controllers/Doctor/PasswordResetLinkController';
 import PrescriptionController from '@/actions/App/Http/Controllers/Doctor/PrescriptionController';
+import AddAdverseEventDialog from '@/components/AddAdverseEventDialog.vue';
 import AdherenceCourse from '@/components/AdherenceCourse.vue';
 import AdherenceSignal from '@/components/AdherenceSignal.vue';
+import AdverseEventCommentDialog from '@/components/AdverseEventCommentDialog.vue';
+import AdverseEventsSection from '@/components/AdverseEventsSection.vue';
 import AlertSection from '@/components/AlertSection.vue';
 import CancelPrescriptionDialog from '@/components/CancelPrescriptionDialog.vue';
 import ClinicalProfileSummary from '@/components/ClinicalProfileSummary.vue';
@@ -32,13 +36,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useRealtime } from '@/composables/useRealtime';
 import { alertState, alertTitle } from '@/lib/alerts';
-import { CHIP_ICON, DANGER_CHIP } from '@/lib/chips';
+import { CHIP_ICON, DANGER_CHIP, WARNING_CHIP } from '@/lib/chips';
 import { formatAge, plural } from '@/lib/plural';
 import { index, show } from '@/routes/doctor/patients';
 import { show as chat } from '@/routes/doctor/patients/chat';
 import type {
     Adherence,
     AdherenceSignal as Signal,
+    AdverseEvent,
     AlertDecisionOption,
     ClinicalProfile,
     HelpEvent,
@@ -47,6 +52,7 @@ import type {
     SafetyCard,
     SafetyFinding,
     SelectOption,
+    SideEffectOption,
     Wellbeing,
 } from '@/types';
 
@@ -75,6 +81,17 @@ const props = defineProps<{
     helpEvents: HelpEvent[];
     alertDecisions: AlertDecisionOption[];
     alertCommentLimit: number;
+    // Побочные эффекты: сообщения пациента и записи врача, сначала новые.
+    adverseEvents: AdverseEvent[];
+    // Для записи со слов пациента.
+    sideEffects: SideEffectOption[];
+    severities: SelectOption[];
+    adverseEventLimits: {
+        name: number;
+        comment: number;
+        today: string;
+        min_date: string;
+    };
     // Опросники пациента: суммы, степени, изменение и ответы.
     wellbeing: Wellbeing;
     // Находки и «Не проверено» по id назначения.
@@ -102,6 +119,8 @@ defineOptions({
 const page = usePage();
 const cancelling = ref<Prescription | null>(null);
 const closingAlert = ref<PatientAlert | null>(null);
+const addingAdverseEvent = ref(false);
+const commentingAdverseEvent = ref<AdverseEvent | null>(null);
 
 // Новый, принятый или закрытый алерт — в том числе в другой вкладке: блок алертов обновляется.
 // Плашку и число в меню перезагрузка берёт тоже, иначе её ответ перетёр бы их старыми значениями.
@@ -110,7 +129,13 @@ useRealtime(
     'alerts.changed',
     () =>
         router.reload({
-            only: ['alerts', 'helpEvents', 'urgentAlerts', 'patientSignals'],
+            only: [
+                'alerts',
+                'helpEvents',
+                'adverseEvents',
+                'urgentAlerts',
+                'patientSignals',
+            ],
         }),
 );
 
@@ -134,6 +159,7 @@ const alertChip = computed(() => {
     const state = alertState(
         latest.awaits_acknowledgement,
         latest.acknowledged !== null && latest.repeats !== null,
+        latest.kind,
     );
     const more =
         openAlerts.value.length > 1
@@ -142,6 +168,51 @@ const alertChip = computed(() => {
 
     return `${alertTitle(latest.rule, latest.trigger)} · ${state}${more}`;
 });
+// Побочные эффекты, которые врач ещё не просмотрел: плашка в шапке и блок выше назначений.
+const newAdverseEvents = computed(() =>
+    props.adverseEvents.filter((event) => event.awaits_review),
+);
+
+// Блок наверху, пока есть новое или срочное с открытым алертом. Вниз он уезжает только при
+// следующем открытии карточки: после «Просмотрено» врач не теряет запись и её комментарий.
+const needsAttention = (): boolean =>
+    props.adverseEvents.some(
+        (event) => event.awaits_review || event.alert_open,
+    );
+const adverseFirst = ref(needsAttention());
+// Так же блок алертов: после «Закрыть с решением» он уезжает к истории только при следующем открытии.
+const alertsFirst = ref(props.alerts.some((alert) => !alert.closed));
+watch(
+    () => props.alerts,
+    () => {
+        if (props.alerts.some((alert) => !alert.closed)) {
+            alertsFirst.value = true;
+        }
+    },
+);
+watch(
+    () => props.adverseEvents,
+    () => {
+        if (needsAttention()) {
+            adverseFirst.value = true;
+        }
+    },
+);
+const adverseChip = computed(() => {
+    const names = [
+        ...new Set(
+            newAdverseEvents.value.map(
+                (event) =>
+                    `${event.term ?? event.name}, ${event.severity_short}`,
+            ),
+        ),
+    ];
+
+    return names.length === 0
+        ? null
+        : `${names.length > 1 ? 'Побочные эффекты' : 'Побочный эффект'}: ${names.join('; ')}`;
+});
+
 const continuing = ref<{ finding: SafetyFinding; drug: string } | null>(null);
 
 function continueDespite(
@@ -356,6 +427,7 @@ const unreadLabel = computed(
             <ul
                 v-if="
                     alertChip !== null ||
+                    adverseChip !== null ||
                     helpEvents.length > 0 ||
                     awaiting.length > 0 ||
                     adherenceSignal.raised ||
@@ -391,6 +463,18 @@ const unreadLabel = computed(
                                 .map((prescription) => prescription.drug.name)
                                 .join(', ')
                         }}
+                        <ArrowDown class="mt-0.5 size-4 shrink-0" />
+                    </a>
+                </li>
+                <li v-if="adverseChip">
+                    <a
+                        href="#adverse-events"
+                        class="hover:underline pointer-coarse:min-h-11 pointer-coarse:items-center"
+                        :class="WARNING_CHIP"
+                        data-test="card-adverse-events"
+                    >
+                        <Thermometer :class="CHIP_ICON" />
+                        {{ adverseChip }}
                         <ArrowDown class="mt-0.5 size-4 shrink-0" />
                     </a>
                 </li>
@@ -473,7 +557,7 @@ const unreadLabel = computed(
                     :patient-id="patient.id"
                     :alerts="alerts"
                     :chat-href="chat(patient.id)"
-                    :class="openAlerts.length > 0 ? 'order-0' : 'order-5'"
+                    :class="alertsFirst ? 'order-0' : 'order-5'"
                     @close="(alert) => (closingAlert = alert)"
                 />
 
@@ -483,6 +567,15 @@ const unreadLabel = computed(
                     :events="helpEvents"
                     near-alert
                     class="order-0"
+                />
+
+                <!-- Новое — выше назначений, просмотренное — рядом с приёмом и опросниками. -->
+                <AdverseEventsSection
+                    :patient-id="patient.id"
+                    :events="adverseEvents"
+                    :class="adverseFirst ? 'order-0' : 'order-3'"
+                    @add="addingAdverseEvent = true"
+                    @comment="(event) => (commentingAdverseEvent = event)"
                 />
 
                 <section
@@ -831,6 +924,20 @@ const unreadLabel = computed(
             :patient-id="patient.id"
             :decisions="alertDecisions"
             :max-length="alertCommentLimit"
+        />
+
+        <AddAdverseEventDialog
+            v-model:open="addingAdverseEvent"
+            :patient-id="patient.id"
+            :symptoms="sideEffects"
+            :severities="severities"
+            :limits="adverseEventLimits"
+        />
+
+        <AdverseEventCommentDialog
+            v-model:event="commentingAdverseEvent"
+            :patient-id="patient.id"
+            :max-length="adverseEventLimits.comment"
         />
 
         <ContinueFindingDialog

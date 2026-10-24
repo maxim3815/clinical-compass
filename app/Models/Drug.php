@@ -37,6 +37,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $updated_at
  * @property-read Collection<int, DrugStrength> $strengths
  * @property-read Collection<int, SafetyRule> $safetyRules
+ * @property-read Collection<int, DrugSideEffect> $sideEffects
  */
 #[Fillable([
     'code',
@@ -84,6 +85,16 @@ class Drug extends Model
     public function safetyRules(): HasMany
     {
         return $this->hasMany(SafetyRule::class);
+    }
+
+    /**
+     * Побочные эффекты по разделу 4 листка-вкладыша с группой срочности.
+     *
+     * @return HasMany<DrugSideEffect, $this>
+     */
+    public function sideEffects(): HasMany
+    {
+        return $this->hasMany(DrugSideEffect::class);
     }
 
     /**

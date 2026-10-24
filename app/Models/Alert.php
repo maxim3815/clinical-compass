@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\AlertDecision;
 use App\Enums\AlertLevel;
 use App\Enums\AlertShownVia;
+use App\Enums\AlertTrigger;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -13,16 +14,18 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Алерт: правило сработало на ответах пациента или пациент сам нажал «Сообщить врачу» на экране
- * помощи. Открыт, пока врач не закрыл его решением; «Принял» только убирает красную плашку.
- * Каждое срабатывание по ответам — новый алерт. Повторное «Сообщить врачу», пока алерт по кнопке
- * открыт, пишется в тот же алерт и снова поднимает плашку, даже принятую.
+ * Алерт: правило сработало на ответах пациента, пациент сам нажал «Сообщить врачу» на экране
+ * помощи или сообщил о срочном побочном эффекте. Открыт, пока врач не закрыл его решением;
+ * «Принял» только убирает красную плашку. Каждое срабатывание по ответам — новый алерт. Повторное
+ * «Сообщить врачу» или новый срочный побочный эффект, пока такой алерт открыт, пишется в тот же
+ * алерт и снова поднимает плашку, даже принятую.
  *
  * Метки времени шагов хранятся с миллисекундами: пациент отправил ответы или нажал кнопку, алерт
  * создан, событие ушло в Reverb, пуш отправлен, алерт показан на экране врача, принят, закрыт.
  *
  * @phpstan-type AnswerEvidence array{type: 'answer', scale: string, name: string, item: int, text: string, score: int, label: string}|array{type: 'total', scale: string, name: string, total: int, max: int}
- * @phpstan-type Evidence AnswerEvidence|array{type: 'help_request'}
+ * @phpstan-type AdverseEventEvidence array{type: 'adverse_event', name: string, term: string, level: 'urgent'|'emergency'}
+ * @phpstan-type Evidence AnswerEvidence|array{type: 'help_request'}|AdverseEventEvidence
  *
  * @property int $id
  * @property int $patient_id
@@ -30,11 +33,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $alert_rule_id
  * @property string $rule_version
  * @property AlertLevel $level
- * @property int|null $assessment_id У алерта по кнопке опросника нет.
+ * @property int|null $assessment_id Есть только у алерта по ответам опросника.
  * @property list<Evidence> $evidence
- * @property CarbonImmutable $submitted_at Пациент отправил ответы или нажал «Сообщить врачу».
- * @property int $repeat_count Повторные «Сообщить врачу», пока алерт открыт.
- * @property CarbonImmutable|null $repeated_at Последнее повторное нажатие.
+ * @property CarbonImmutable $submitted_at Пациент отправил ответы, нажал «Сообщить врачу» или отправил побочный эффект.
+ * @property int $repeat_count Повторы, пока алерт открыт: «Сообщить врачу» или новый срочный побочный эффект.
+ * @property CarbonImmutable|null $repeated_at Последний повтор.
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable|null $broadcast_at
  * @property CarbonImmutable|null $pushed_at
@@ -133,15 +136,54 @@ class Alert extends Model
 
     /**
      * Что сработало, одной строкой: «PHQ-9, вопрос 9: «почти каждый день»». Так же ответ на этот
-     * вопрос назван в строке заполнения у врача.
+     * вопрос назван в строке заполнения у врача. У побочных эффектов — термины без повторов,
+     * «нужна помощь сейчас» первыми: «ангионевротический отёк или анафилаксия, тризм».
      */
     public function trigger(): string
     {
-        return implode('; ', array_map(fn (array $entry): string => match ($entry['type']) {
+        if ($this->kind() === AlertTrigger::AdverseEvent) {
+            return implode(', ', array_map(fn (array $entry): string => mb_lcfirst($entry['term']), $this->adverseEvidence()));
+        }
+
+        return implode('; ', array_values(array_unique(array_map(fn (array $entry): string => match ($entry['type']) {
             'answer' => "{$entry['name']}, вопрос {$entry['item']}: «".mb_lcfirst($entry['label']).'»',
             'total' => "{$entry['name']}: сумма {$entry['total']} из {$entry['max']}",
             'help_request' => 'кнопка «Сообщить врачу»',
-        }, $this->evidence));
+            'adverse_event' => mb_lcfirst($entry['term']),
+        }, $this->evidence))));
+    }
+
+    /**
+     * Срочные побочные эффекты без повторов одного симптома: «нужна помощь сейчас» первыми,
+     * дальше в порядке сообщения.
+     *
+     * @return list<AdverseEventEvidence>
+     */
+    public function adverseEvidence(): array
+    {
+        $entries = [];
+
+        foreach ($this->evidence as $entry) {
+            if ($entry['type'] === 'adverse_event') {
+                $entries[$entry['term']] ??= $entry;
+            }
+        }
+
+        usort($entries, fn (array $a, array $b): int => ($b['level'] === 'emergency') <=> ($a['level'] === 'emergency'));
+
+        return $entries;
+    }
+
+    /**
+     * Что подняло алерт: ответы опросника, «Сообщить врачу» или срочный побочный эффект.
+     */
+    public function kind(): AlertTrigger
+    {
+        return match ($this->evidence[0]['type'] ?? null) {
+            'help_request' => AlertTrigger::HelpRequest,
+            'adverse_event' => AlertTrigger::AdverseEvent,
+            default => AlertTrigger::Answers,
+        };
     }
 
     /**
@@ -149,7 +191,7 @@ class Alert extends Model
      */
     public function isHelpRequest(): bool
     {
-        return $this->assessment_id === null;
+        return $this->kind() === AlertTrigger::HelpRequest;
     }
 
     /**

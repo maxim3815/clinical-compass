@@ -1,4 +1,5 @@
 import type { Directive } from 'vue';
+import type { SideEffectReport } from '@/types/adverse-events';
 import type { CrisisLine, UrgentAlert } from '@/types/alerts';
 import type { Auth } from '@/types/auth';
 import type { FlashToast } from '@/types/ui';
@@ -44,6 +45,8 @@ declare module '@inertiajs/core' {
             helpReportedAt?: string;
             // «Сообщить врачу» не принято: врача нет или правило по кнопке выключено.
             helpReportRefused?: boolean;
+            // Пациент отправил побочные эффекты: что показать после отправки.
+            sideEffectReport?: SideEffectReport;
         };
     }
 }

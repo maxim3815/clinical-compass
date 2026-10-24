@@ -5,6 +5,7 @@ namespace App\Actions;
 use App\Enums\AlertDecision;
 use App\Enums\UserRole;
 use App\Events\AlertsChanged;
+use App\Models\AdverseEvent;
 use App\Models\Alert;
 use App\Models\AuditLog;
 use App\Models\User;
@@ -14,7 +15,8 @@ use InvalidArgumentException;
 
 /**
  * Врач закрывает алерт решением, у «Угрозы нет» — с комментарием. Решение пишется в алерт
- * и в журнал аудита со снимком правила. Непринятый алерт сначала принимается.
+ * и в журнал аудита со снимком правила. Непринятый алерт сначала принимается. Побочные эффекты
+ * этого алерта становятся просмотренными.
  */
 class CloseAlert
 {
@@ -49,6 +51,12 @@ class CloseAlert
                 'decision' => $decision,
                 'decision_comment' => $comment,
             ])->save();
+
+            // Срочные побочные эффекты врач разобрал вместе с алертом.
+            AdverseEvent::query()
+                ->where('alert_id', $alert->id)
+                ->awaitingReview()
+                ->update(['reviewed_at' => $alert->closed_at, 'reviewed_by_id' => $doctor->id]);
 
             $alert->loadMissing(['rule', 'patient']);
 

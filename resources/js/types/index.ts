@@ -1,4 +1,5 @@
 export * from './adherence';
+export * from './adverse-events';
 export * from './alerts';
 export * from './assessments';
 export * from './auth';

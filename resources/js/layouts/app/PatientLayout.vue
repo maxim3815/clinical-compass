@@ -27,6 +27,7 @@ const isForm = computed(() =>
         'patient/MedicationForm',
         'patient/IntakeTimes',
         'patient/Questionnaire',
+        'patient/SideEffectForm',
     ].includes(page.component),
 );
 

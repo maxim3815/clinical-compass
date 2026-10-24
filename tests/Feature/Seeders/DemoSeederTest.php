@@ -6,6 +6,7 @@ use App\Enums\PrescriptionCancelReason;
 use App\Enums\PrescriptionSource;
 use App\Enums\UserRole;
 use App\Models\AccessLink;
+use App\Models\AdverseEvent;
 use App\Models\Alert;
 use App\Models\AlertRule;
 use App\Models\Assessment;
@@ -181,12 +182,23 @@ test('demo seeder builds the planned doctors, patients and courses and can be ru
         ->and($status('patient4'))->toMatchArray(['due' => true, 'last' => null])
         // Правила алертинга загружены, алерт появляется на показе, когда Морозова отвечает сама
         // или нажимает «Сообщить врачу».
-        ->and(AlertRule::query()->active()->orderBy('code')->pluck('code')->all())->toBe(['help_request', 'suicide_risk'])
+        ->and(AlertRule::query()->active()->orderBy('code')->pluck('code')->all())->toBe(['adverse_event', 'help_request', 'suicide_risk'])
         ->and(Alert::query()->count())->toBe(0)
         // Тихий след на экране помощи у Лебедева: врач видит его в карточке без алерта.
         ->and(HelpEvent::query()->whereRelation('patient', 'login', 'patient_3c')->orderBy('created_at')->pluck('type')->all())
         ->toBe([HelpEventType::Opened, HelpEventType::CallCrisisLine])
-        ->and(HelpEvent::query()->count())->toBe(2);
+        ->and(HelpEvent::query()->count())->toBe(2)
+        // Побочные эффекты для показа: сонливость Лебедева ждёт врача, головная боль Иванова прошла.
+        ->and(AdverseEvent::query()->with('patient')->orderBy('id')->get()->map(fn (AdverseEvent $event): array => [
+            $event->patient->login,
+            $event->term,
+            $event->severity->value,
+            $event->resolved_on === null ? null : (int) $event->started_on->diffInDays($event->resolved_on) + 1,
+            $event->reviewed_at !== null,
+        ])->all())->toBe([
+            ['patient_3c', 'Сонливость', 'severe', null, false],
+            ['patient', 'Головная боль', 'mild', 4, true],
+        ]);
 
     $this->get(route('invitation.show', DemoSeeder::INVITATION_TOKEN))
         ->assertOk()
