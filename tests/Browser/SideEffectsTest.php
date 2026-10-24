@@ -4,6 +4,7 @@ use App\Models\AdverseEvent;
 use App\Models\Alert;
 use App\Models\CareRelationship;
 use App\Models\User;
+use App\Support\DisplayTime;
 
 beforeEach(function () {
     $this->reverb = startReverb();
@@ -12,7 +13,7 @@ beforeEach(function () {
     $this->doctor = User::factory()->doctor()->create(['login' => 'doctor', 'name' => 'Смирнова Анна Сергеевна']);
     $this->patient = User::factory()->patientOf($this->doctor)->create(['login' => 'kuznetsova', 'name' => 'Кузнецова Елена Викторовна']);
     CareRelationship::query()->where('patient_id', $this->patient->id)->update(['started_at' => now()->subMonth()]);
-    takes($this->patient, 'maritupirdine')->update(['starts_on' => now()->subDays(14)->toDateString(), 'prescriber_id' => $this->doctor->id]);
+    takes($this->patient, 'maritupirdine')->update(['starts_on' => DisplayTime::today()->subDays(14)->toDateString(), 'prescriber_id' => $this->doctor->id]);
 });
 
 afterEach(fn () => $this->reverb->stop());
@@ -104,7 +105,7 @@ test('the doctor reviews a side effect from the queue and records one from the p
         'side_effect_id' => null,
         'name' => 'Сонливость днём',
         'severity' => 'severe',
-        'started_on' => now()->subDays(11)->toDateString(),
+        'started_on' => DisplayTime::today()->subDays(11)->toDateString(),
         'reported_by_id' => $this->patient->id,
     ]);
 
@@ -127,7 +128,7 @@ test('the doctor reviews a side effect from the queue and records one from the p
         ->select('#adverse_symptom', 'other')
         ->fill('#adverse_other', 'Шум в ушах')
         ->click('[data-test="adverse-severity-mild"]')
-        ->fill('#adverse_started_on', now()->toDateString())
+        ->fill('#adverse_started_on', DisplayTime::today()->toDateString())
         ->click('[data-test="confirm-add-adverse-event"]')
         ->assertSee('Запись добавлена.')
         ->assertSeeIn('[data-test="adverse-event-list"]', 'Шум в ушах')

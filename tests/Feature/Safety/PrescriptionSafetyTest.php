@@ -45,7 +45,7 @@ test('contraindication needs a justification and is saved with the decision and 
     expect($check['requires_justification'])->toBeTrue()
         ->and($check['findings'][0]['rule'])->toBe('maritupirdine.gfr')
         ->and($check['findings'][0]['level'])->toBe('contraindicated')
-        ->and($check['findings'][0]['evidence'])->toBe(['СКФ 52 мл/мин/1,73 м² на '.now()->format('d.m.Y')])
+        ->and($check['findings'][0]['evidence'])->toBe(['СКФ 52 мл/мин/1,73 м² на '.DisplayTime::today()->format('d.m.Y')])
         ->and($check['findings'][0]['source']['section'])->toBe('4.3. Противопоказания');
 
     $seen = [$check['findings'][0]['key']];
@@ -118,7 +118,7 @@ test('pregnancy contraindication quotes the exception from the summary of produc
     $finding = safetyCheckFor($this->patient, 'maritupirdine')['findings'][0];
 
     expect($finding['rule'])->toBe('maritupirdine.pregnancy')
-        ->and($finding['evidence'])->toBe(['Беременность: да (7 недель) на '.now()->format('d.m.Y')])
+        ->and($finding['evidence'])->toBe(['Беременность: да (7 недель) на '.DisplayTime::today()->format('d.m.Y')])
         ->and($finding['advice'])->toContain('польза для матери превышает возможный риск для плода')
         ->and($finding['source']['section'])->toBe('4.6. Фертильность, беременность и лактация');
 });
@@ -226,7 +226,7 @@ test('new prescription form shows the check result of every drug before the choi
     $this->actingAs($this->doctor)
         ->get(route('doctor.patients.prescriptions.create', $this->patient))
         ->assertInertia(fn (Assert $page) => $page
-            ->where('drugSafety.'.$id('maritupirdine'), ['level' => 'contraindicated', 'label' => 'Противопоказано', 'reason' => 'СКФ 52 мл/мин/1,73 м² на '.now()->format('d.m.Y')])
+            ->where('drugSafety.'.$id('maritupirdine'), ['level' => 'contraindicated', 'label' => 'Противопоказано', 'reason' => 'СКФ 52 мл/мин/1,73 м² на '.DisplayTime::today()->format('d.m.Y')])
             ->where('drugSafety.'.$id('paroxetine'), ['level' => 'caution', 'label' => 'С осторожностью', 'reason' => 'Принимает Эсциталопрам (добавил пациент)'])
             ->has('drugSafety', Drug::query()->where('is_active', true)->count())
             // Что уже было с препаратом у пациента.
@@ -243,14 +243,14 @@ test('drug choice shows what happened to the drug before and why it is outside t
     diagnose($this->patient, 'Z73.0');
     $escitalopram = takes($this->patient, 'escitalopram');
     app(CancelPrescription::class)->handle($this->doctor, $escitalopram, PrescriptionCancelReason::AdverseEvents, null);
-    takes($this->patient, 'maritupirdine');
+    $maritupirdine = takes($this->patient, 'maritupirdine');
     $id = fn (string $code): int => Drug::query()->where('code', $code)->value('id');
 
     $this->actingAs($this->doctor)
         ->get(route('doctor.patients.prescriptions.create', $this->patient))
         ->assertInertia(fn (Assert $page) => $page
             ->where('drugHistory.'.$id('escitalopram'), 'Отменён '.DisplayTime::today()->format('d.m.Y').': нежелательные явления')
-            ->where('drugHistory.'.$id('maritupirdine'), 'Уже назначен с '.DisplayTime::today()->format('d.m.Y'))
+            ->where('drugHistory.'.$id('maritupirdine'), 'Уже назначен с '.$maritupirdine->starts_on->format('d.m.Y'))
             ->where('drugSafety.'.$id('sertraline').'.reason', 'Вне зарегистрированных показаний'),
         );
 });

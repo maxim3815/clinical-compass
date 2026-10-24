@@ -7,6 +7,7 @@ use App\Models\ObservationType;
 use App\Models\SafetyFinding;
 use App\Models\SafetyRule;
 use App\Models\User;
+use App\Support\DisplayTime;
 use Illuminate\Support\Facades\Artisan;
 use Symfony\Component\Yaml\Yaml;
 
@@ -141,7 +142,7 @@ test('rules import resyncs findings of current prescriptions', function () {
 
     importRules([ruleRecord(['text' => 'СКФ ниже 60.'])]);
 
-    expect(SafetyFinding::query()->sole()->evidence)->toBe(['СКФ 50 мл/мин/1,73 м² на '.now()->format('d.m.Y')]);
+    expect(SafetyFinding::query()->sole()->evidence)->toBe(['СКФ 50 мл/мин/1,73 м² на '.DisplayTime::today()->format('d.m.Y')]);
 });
 
 test('drug groups are checked against the groups file', function () {

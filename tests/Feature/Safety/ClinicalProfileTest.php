@@ -60,7 +60,7 @@ test('doctor sets sex, diagnoses and facts and the card shows the current values
             ->where('profile.types.2.history.1.value', '58 мл/мин/1,73 м²'),
         );
 
-    expect(AuditLog::query()->where('patient_id', $this->patient->id)->pluck('action')->all())
+    expect(AuditLog::query()->where('patient_id', $this->patient->id)->orderBy('id')->pluck('action')->all())
         ->toBe(['patient.sex_changed', 'diagnosis.added', 'diagnosis.added', 'observation.recorded', 'observation.recorded']);
 });
 
