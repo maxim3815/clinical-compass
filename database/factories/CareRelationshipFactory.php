@@ -21,7 +21,9 @@ class CareRelationshipFactory extends Factory
         return [
             'doctor_id' => User::factory()->doctor(),
             'patient_id' => User::factory()->patient(),
-            'started_at' => fake()->dateTimeBetween('-1 year', '-1 day'),
+            // От часов приложения, а не Faker: тест с travelTo в прошлое иначе получает связь,
+            // которая начинается позже, чем её завершают в тесте.
+            'started_at' => now()->subDays(fake()->numberBetween(1, 365))->subMinutes(fake()->numberBetween(0, 1439)),
         ];
     }
 
