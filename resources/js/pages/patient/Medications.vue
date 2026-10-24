@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
-import { Clock, Plus, TriangleAlert } from '@lucide/vue';
+import { CalendarDays, Clock, Plus, TriangleAlert } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import IntakeTimeController from '@/actions/App/Http/Controllers/Patient/IntakeTimeController';
 import OwnMedicationController from '@/actions/App/Http/Controllers/Patient/OwnMedicationController';
 import PrescriptionDetails from '@/components/PrescriptionDetails.vue';
 import StopMedicationDialog from '@/components/StopMedicationDialog.vue';
 import { Button } from '@/components/ui/button';
-import { medications } from '@/routes/patient';
+import { calendar, medications } from '@/routes/patient';
 import type { Prescription } from '@/types';
 
 const props = defineProps<{
@@ -47,7 +47,20 @@ function titleId(prescription: Prescription): string {
     <Head title="Мои препараты" />
 
     <div class="flex flex-col gap-8 p-4">
-        <h1 class="text-2xl font-semibold tracking-tight">Мои препараты</h1>
+        <div class="flex flex-col items-start gap-3">
+            <h1 class="text-2xl font-semibold tracking-tight">Мои препараты</h1>
+            <Button
+                v-if="prescriptions.length > 0 || ownMedications.length > 0"
+                variant="outline"
+                size="lg"
+                as-child
+            >
+                <Link :href="calendar()" data-test="calendar-link">
+                    <CalendarDays />
+                    Календарь приёма
+                </Link>
+            </Button>
+        </div>
 
         <section class="flex flex-col gap-3" data-test="doctor-prescriptions">
             <h2 class="text-xl font-semibold">Назначил врач</h2>

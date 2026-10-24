@@ -10,7 +10,7 @@ import type { NavItem } from '@/types';
 const page = usePage();
 
 // Раздел определяем по странице, а не по адресу: так вложенные страницы
-// («Самочувствие», «Время приёма», «Свой препарат», все настройки) подсвечивают свою вкладку.
+// («Самочувствие», «Календарь приёма», «Время приёма», «Свой препарат», все настройки) подсвечивают свою вкладку.
 const tabs = computed<(NavItem & { name: string })[]>(() => [
     {
         name: 'today',
@@ -19,6 +19,7 @@ const tabs = computed<(NavItem & { name: string })[]>(() => [
         icon: CalendarCheck,
         isActive: [
             'patient/Home',
+            'patient/IntakeCalendar',
             'patient/Wellbeing',
             'patient/Questionnaire',
             'patient/QuestionnaireSent',

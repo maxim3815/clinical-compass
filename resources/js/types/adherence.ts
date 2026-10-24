@@ -146,3 +146,73 @@ export type AdherenceSignal = {
     // Сработало хотя бы одно условие.
     raised: boolean;
 };
+
+/**
+ * Итог дня в календаре пациента: «вовремя» и «поздно» — одно «всё принято».
+ */
+export type CalendarDayResult =
+    | 'taken'
+    | 'partial'
+    | 'none'
+    | 'pending'
+    | 'no_data';
+
+export type CalendarDose = {
+    id: number;
+    // Плановое время по поясу пациента: «8:00».
+    time: string;
+    drug: string;
+    dose: string;
+    status: 'scheduled' | 'taken' | 'skipped' | 'missed';
+    // «Принят в 8:05», «Не принят: забыл», «Нет отметки», «Ещё не отмечен».
+    status_text: string;
+    skip_comment: string | null;
+};
+
+export type CalendarAsNeeded = {
+    drug: string;
+    count: number;
+    times: string[];
+    // Сколько можно в сутки, если приёмов было больше; иначе null.
+    over_limit: number | null;
+};
+
+export type CalendarDay = {
+    date: string;
+    day: number;
+    // «Пятница, 23 октября».
+    label: string;
+    today: boolean;
+    yesterday: boolean;
+    future: boolean;
+    // У будущего дня итога нет.
+    result: CalendarDayResult | null;
+    doses: CalendarDose[];
+    as_needed: CalendarAsNeeded[];
+    // Не принял из-за самочувствия или побочных эффектов.
+    unwell: boolean;
+    // Сегодня или вчера с неотмеченными приёмами: отметить можно на «Сегодня».
+    can_mark: boolean;
+};
+
+/**
+ * Месяц календаря приёма, как его отдаёт `App\Support\Adherence\IntakeCalendar`.
+ */
+export type IntakeCalendarMonth = {
+    // «2026-10».
+    month: string;
+    // «Октябрь 2026».
+    title: string;
+    // «октябре», в другом году — «октябре 2025».
+    in_month: string;
+    previous: string | null;
+    // Подпись стрелки: «Сентябрь», в другом году — «Декабрь 2025».
+    previous_title: string | null;
+    next: string | null;
+    next_title: string | null;
+    // Пустых клеток перед первым числом: неделя с понедельника.
+    offset: number;
+    taken: number;
+    counted: number;
+    days: CalendarDay[];
+};

@@ -2,6 +2,8 @@
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import {
     CalendarClock,
+    CalendarDays,
+    ChevronRight,
     MessageCircle,
     Stethoscope,
     UserRoundX,
@@ -24,7 +26,7 @@ import PushBanner from '@/components/PushBanner.vue';
 import QuestionnaireCard from '@/components/QuestionnaireCard.vue';
 import TodaySummary from '@/components/TodaySummary.vue';
 import { Button } from '@/components/ui/button';
-import { home } from '@/routes/patient';
+import { calendar, home } from '@/routes/patient';
 import { show as chat } from '@/routes/patient/chat';
 import type {
     AsNeeded,
@@ -62,6 +64,7 @@ const props = defineProps<{
     assessments: AssessmentStatus | null;
     // Карточка с 112, пока врач не закрыл алерт по ответам.
     help: boolean;
+    hasIntakeHistory: boolean;
 }>();
 
 defineOptions({
@@ -177,7 +180,7 @@ function keepInView(card: Element, container: HTMLElement): () => void {
     <Head title="Сегодня" />
 
     <!--
-        Сверху вниз: итог дня, куда звонить, если тяжело (после ответов, на которые сработал
+        Сверху вниз: итог дня и ссылка на календарь приёма, куда звонить, если тяжело (после ответов, на которые сработал
         алерт), приёмы на сегодня, что нужно настроить, опросники, если пора их
         заполнить, вчерашние приёмы без отметки и «по необходимости». Баннеры напоминаний
         и установки идут после приёмов, чтобы не сдвигать их с первого экрана.
@@ -193,6 +196,16 @@ function keepInView(card: Element, container: HTMLElement): () => void {
                 </h1>
             </div>
             <TodaySummary v-if="today.groups.length" :groups="today.groups" />
+            <Link
+                v-if="hasIntakeHistory"
+                :href="calendar()"
+                class="-mx-2 flex min-h-11 items-center gap-2 self-start rounded-lg px-2 font-medium text-primary outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring focus-visible:outline-solid"
+                data-test="calendar-link"
+            >
+                <CalendarDays class="size-5 shrink-0" />
+                Календарь приёма
+                <ChevronRight class="size-5 shrink-0" />
+            </Link>
         </header>
 
         <HelpCard v-if="help" compact />

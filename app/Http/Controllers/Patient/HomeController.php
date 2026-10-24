@@ -10,6 +10,7 @@ use App\Models\AsNeededDose;
 use App\Models\DoseEvent;
 use App\Models\Prescription;
 use App\Models\User;
+use App\Support\Adherence\IntakeCalendar;
 use App\Support\Assessments\PatientAssessments;
 use App\Support\DoseEventPresenter;
 use Carbon\CarbonImmutable;
@@ -68,6 +69,8 @@ class HomeController extends Controller
             'assessments' => PatientAssessments::status($patient),
             // Карточка с 112, пока врач не закрыл алерт по ответам. Сам алерт пациент не видит.
             'help' => $patient->alerts()->open()->exists(),
+            // Ссылка на календарь приёма, когда в нём уже есть что показать.
+            'hasIntakeHistory' => IntakeCalendar::hasHistory($patient),
         ]);
     }
 

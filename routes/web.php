@@ -23,6 +23,7 @@ use App\Http\Controllers\Patient\AssessmentController;
 use App\Http\Controllers\Patient\ChatController as PatientChatController;
 use App\Http\Controllers\Patient\DoseController;
 use App\Http\Controllers\Patient\HomeController as PatientHomeController;
+use App\Http\Controllers\Patient\IntakeCalendarController;
 use App\Http\Controllers\Patient\IntakeTimeController;
 use App\Http\Controllers\Patient\MedicationController;
 use App\Http\Controllers\Patient\OwnMedicationController;
@@ -149,6 +150,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:patient')->prefix('patient')->name('patient.')->group(function () {
         Route::get('/', PatientHomeController::class)->name('home');
         Route::get('medications', MedicationController::class)->name('medications');
+        Route::get('calendar', IntakeCalendarController::class)->name('calendar');
 
         // Препараты, которые пациент добавил сам.
         Route::get('medications/create', [OwnMedicationController::class, 'create'])->name('own-medications.create');
