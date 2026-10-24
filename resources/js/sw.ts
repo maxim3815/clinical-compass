@@ -147,8 +147,13 @@ async function runAction(
 
         if (response.ok && result.message) {
             message = result.message;
-        } else {
+        } else if (response.status === 409) {
+            // Свой ответ сервера: почему приём нельзя отметить.
             reason = result.message ?? null;
+        } else if (response.status === 403) {
+            // Подпись ссылки истекла: окно приёма уже закрылось. Без этого пациент увидел бы
+            // английское «Invalid signature.».
+            reason = 'Напоминание устарело.';
         }
     } catch {
         // Нет сети или ссылка устарела: пациенту предлагаем открыть приложение.
@@ -176,7 +181,7 @@ async function runAction(
             tag,
             icon: ICON,
             badge: BADGE,
-            body: `${reason ?? 'Нет связи с сервером.'} Откройте приложение, чтобы отметить приём.`,
+            body: `${reason ?? 'Нет интернета или приложение не отвечает.'} Откройте приложение, чтобы отметить приём.`,
             data: { url: data.url },
         },
     );
