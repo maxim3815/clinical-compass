@@ -53,6 +53,10 @@ class HandleInertiaRequests extends Middleware
             'patientSignals' => fn (): int => $request->user()?->role === UserRole::Doctor ? PatientSignals::count($request->user()) : 0,
             // Непринятые алерты врача: красная плашка на всех страницах кабинета. Дальше — событиями.
             'urgentAlerts' => fn (): array => $request->user()?->role === UserRole::Doctor ? AlertPresenter::banner($request->user()) : [],
+            // Вид врача: у терапевта своё меню и свой кабинет. У пациента null.
+            'doctorKind' => fn (): ?string => $request->user()?->doctorKind()?->value,
+            // Пациента ведёт терапевт: чата и окна побочных эффектов нет, ссылки на них не показываются.
+            'withTherapist' => fn (): bool => (bool) $request->user()?->isWithTherapist(),
             // Кризисная линия на экране помощи пациента и в карточке «Если вам сейчас тяжело».
             'crisisLine' => fn (): ?array => $request->user()?->role === UserRole::Patient ? [
                 'label' => (string) config('help.crisis_line'),

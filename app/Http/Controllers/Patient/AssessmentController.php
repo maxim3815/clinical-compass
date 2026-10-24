@@ -44,6 +44,7 @@ class AssessmentController extends Controller
         return Inertia::render('patient/Questionnaire', [
             'scales' => Scale::query()
                 ->active()
+                ->forPatients()
                 ->orderBy('position')
                 ->get()
                 ->map(fn (Scale $scale): array => [

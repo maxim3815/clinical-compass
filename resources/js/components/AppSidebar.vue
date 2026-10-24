@@ -47,49 +47,65 @@ const isDoctorChat = computed(() =>
     /^\/doctor\/patients\/\d+\/chat$/.test(currentUrl.value),
 );
 
-const mainNavItems = computed<NavItem[]>(() => [
-    {
-        title: 'Пациенты',
-        href: patients(),
-        icon: Users,
-        // Карточка пациента тоже относится к разделу.
-        isActive: isCurrentOrParentUrl(patients()) && !isDoctorChat.value,
-        badge: page.props.patientSignals,
-        badgeLabel: 'требуют внимания',
-        // Пока есть непринятый алерт, число красное, как плашка алерта.
-        badgeTone: page.props.urgentAlerts.length > 0 ? 'danger' : 'attention',
-    },
-    {
-        title: 'Сообщения',
-        href: conversations(),
-        icon: MessagesSquare,
-        isActive: isCurrentUrl(conversations()) || isDoctorChat.value,
-        badge: page.props.unreadMessages,
-    },
-    {
-        title: 'Приглашения',
-        href: invitations(),
-        icon: UserPlus,
-    },
-    {
-        title: 'Препараты',
-        href: drugs(),
-        icon: Pill,
-        // Карточка препарата тоже относится к разделу.
-        isActive: isCurrentOrParentUrl(drugs()),
-    },
-    {
-        title: 'Правила',
-        href: rules(),
-        icon: ShieldCheck,
-    },
-    {
-        title: 'Настройки',
-        href: editProfile(),
-        icon: Settings,
-        isActive: page.component.startsWith('settings/'),
-    },
-]);
+// У терапевта небольшой кабинет: отбор и направление, без сообщений, справочника и правил.
+const isTherapist = computed(() => page.props.doctorKind === 'therapist');
+
+const mainNavItems = computed<NavItem[]>(() => {
+    const items: (NavItem & { psychiatristOnly?: boolean })[] = [
+        {
+            title: 'Пациенты',
+            href: patients(),
+            icon: Users,
+            // Карточка пациента и направление тоже относятся к разделу.
+            isActive:
+                (isCurrentOrParentUrl(patients()) ||
+                    currentUrl.value.startsWith('/doctor/referrals/')) &&
+                !isDoctorChat.value,
+            badge: page.props.patientSignals,
+            badgeLabel: 'требуют внимания',
+            // Пока есть непринятый алерт, число красное, как плашка алерта.
+            badgeTone:
+                page.props.urgentAlerts.length > 0 ? 'danger' : 'attention',
+        },
+        {
+            title: 'Сообщения',
+            href: conversations(),
+            icon: MessagesSquare,
+            isActive: isCurrentUrl(conversations()) || isDoctorChat.value,
+            badge: page.props.unreadMessages,
+            psychiatristOnly: true,
+        },
+        {
+            title: 'Приглашения',
+            href: invitations(),
+            icon: UserPlus,
+        },
+        {
+            title: 'Препараты',
+            href: drugs(),
+            icon: Pill,
+            // Карточка препарата тоже относится к разделу.
+            isActive: isCurrentOrParentUrl(drugs()),
+            psychiatristOnly: true,
+        },
+        {
+            title: 'Правила',
+            href: rules(),
+            icon: ShieldCheck,
+            psychiatristOnly: true,
+        },
+        {
+            title: 'Настройки',
+            href: editProfile(),
+            icon: Settings,
+            isActive: page.component.startsWith('settings/'),
+        },
+    ];
+
+    return items.filter(
+        (item) => !(isTherapist.value && item.psychiatristOnly),
+    );
+});
 </script>
 
 <template>

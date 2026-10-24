@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import {
     CalendarCheck,
     ChevronLeft,
@@ -30,6 +30,8 @@ const props = defineProps<{
     hasHistory: boolean;
     hasDoctor: boolean;
 }>();
+
+const page = usePage();
 
 defineOptions({
     layout: {
@@ -622,7 +624,11 @@ function doseIcon(dose: CalendarDose) {
                 </div>
 
                 <div
-                    v-if="selected.unwell && hasDoctor"
+                    v-if="
+                        selected.unwell &&
+                        hasDoctor &&
+                        !page.props.withTherapist
+                    "
                     class="flex flex-col items-start gap-2 rounded-xl bg-secondary p-3 text-secondary-foreground"
                     data-test="calendar-unwell"
                 >

@@ -1,6 +1,7 @@
 import type { AdherenceSignal } from './adherence';
 import type { AttentionAlert } from './alerts';
 import type { Prescription } from './prescriptions';
+import type { IncomingReferral } from './referrals';
 
 /**
  * Основной диагноз пациента в списке: по нему врач узнаёт пациента.
@@ -45,6 +46,8 @@ export type AttentionPatient = {
     // Пропуски, которых врач ещё не видел: пациент в счётчике у «Пациентов».
     new_misses: boolean;
     unread: number;
+    // Направление терапевта, которое ждёт врача: строка ведёт на страницу направления.
+    referral: IncomingReferral | null;
 };
 
 /**

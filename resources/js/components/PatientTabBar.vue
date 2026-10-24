@@ -12,49 +12,54 @@ const page = usePage();
 // Раздел определяем по странице, а не по адресу: так вложенные страницы
 // («Самочувствие», «Календарь приёма», «Время приёма», «Свой препарат», «Побочные эффекты», все настройки)
 // подсвечивают свою вкладку.
-const tabs = computed<(NavItem & { name: string })[]>(() => [
-    {
-        name: 'today',
-        title: 'Сегодня',
-        href: home(),
-        icon: CalendarCheck,
-        isActive: [
-            'patient/Home',
-            'patient/IntakeCalendar',
-            'patient/Wellbeing',
-            'patient/Questionnaire',
-            'patient/QuestionnaireSent',
-        ].includes(page.component),
-    },
-    {
-        name: 'medications',
-        title: 'Препараты',
-        href: medications(),
-        icon: Pill,
-        isActive: [
-            'patient/Medications',
-            'patient/MedicationForm',
-            'patient/IntakeTimes',
-            'patient/SideEffects',
-            'patient/SideEffectForm',
-        ].includes(page.component),
-    },
-    {
-        name: 'chat',
-        title: 'Чат',
-        href: chat(),
-        icon: MessageCircle,
-        isActive: page.component === 'patient/Chat',
-        badge: page.props.unreadMessages,
-    },
-    {
-        name: 'settings',
-        title: 'Настройки',
-        href: settings(),
-        icon: Settings,
-        isActive: page.component.startsWith('settings/'),
-    },
-]);
+const tabs = computed<(NavItem & { name: string })[]>(() =>
+    [
+        {
+            name: 'today',
+            title: 'Сегодня',
+            href: home(),
+            icon: CalendarCheck,
+            isActive: [
+                'patient/Home',
+                'patient/IntakeCalendar',
+                'patient/Wellbeing',
+                'patient/Questionnaire',
+                'patient/QuestionnaireSent',
+            ].includes(page.component),
+        },
+        {
+            name: 'medications',
+            title: 'Препараты',
+            href: medications(),
+            icon: Pill,
+            isActive: [
+                'patient/Medications',
+                'patient/MedicationForm',
+                'patient/IntakeTimes',
+                'patient/SideEffects',
+                'patient/SideEffectForm',
+            ].includes(page.component),
+        },
+        {
+            name: 'chat',
+            title: 'Чат',
+            href: chat(),
+            icon: MessageCircle,
+            isActive: page.component === 'patient/Chat',
+            badge: page.props.unreadMessages,
+        },
+        {
+            name: 'settings',
+            title: 'Настройки',
+            href: settings(),
+            icon: Settings,
+            isActive: page.component.startsWith('settings/'),
+        },
+    ].filter(
+        // Пока пациента ведёт терапевт, чата нет: он появится у психиатра.
+        (tab) => !(tab.name === 'chat' && page.props.withTherapist),
+    ),
+);
 </script>
 
 <template>
@@ -63,7 +68,10 @@ const tabs = computed<(NavItem & { name: string })[]>(() => [
         class="fixed inset-x-0 bottom-0 z-40 border-t bg-card pb-[env(safe-area-inset-bottom)]"
         data-test="tab-bar"
     >
-        <ul class="mx-auto grid h-(--tab-bar-height) max-w-xl grid-cols-4">
+        <ul
+            class="mx-auto grid h-(--tab-bar-height) max-w-xl"
+            :class="tabs.length === 4 ? 'grid-cols-4' : 'grid-cols-3'"
+        >
             <li v-for="tab in tabs" :key="tab.name">
                 <Link
                     :href="tab.href"

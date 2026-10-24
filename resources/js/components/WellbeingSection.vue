@@ -1,26 +1,41 @@
 <script setup lang="ts">
+import { Link } from '@inertiajs/vue3';
 import {
     ArrowDownRight,
     ArrowUpRight,
     CalendarClock,
+    ClipboardPen,
     ExternalLink,
     Minus,
     Siren,
 } from '@lucide/vue';
+import DoctorScaleController from '@/actions/App/Http/Controllers/Doctor/DoctorScaleController';
 import { computed, nextTick, ref, useTemplateRef } from 'vue';
 import ScoreChart from '@/components/ScoreChart.vue';
 import { Button } from '@/components/ui/button';
 import { CHIP_ICON, DANGER_CHIP } from '@/lib/chips';
-import type { AssessmentFilling, DoctorScale, Wellbeing } from '@/types';
+import type {
+    AssessmentFilling,
+    DoctorScale,
+    RatableScale,
+    Wellbeing,
+} from '@/types';
 
 /**
  * Блок «Самочувствие» в карточке пациента: последние суммы опросников со степенью и изменением,
  * график по датам и заполнения с ответами на каждый вопрос. Ответ на отмеченный вопрос
- * (9-й PHQ-9, мысли о смерти) виден в строке каждого заполнения.
+ * (9-й PHQ-9, мысли о смерти) виден в строке каждого заполнения. Шкалу врача (HARS) врач
+ * заполняет на приёме кнопкой в шапке блока.
  */
-const props = defineProps<{
-    wellbeing: Wellbeing;
-}>();
+const props = withDefaults(
+    defineProps<{
+        wellbeing: Wellbeing;
+        patientId?: number | null;
+        // Шкалы, которые врач может заполнить; пусто — только просмотр.
+        rateScales?: RatableScale[];
+    }>(),
+    { patientId: null, rateScales: () => [] },
+);
 
 // Сначала видны последние заполнения, остальные — по кнопке.
 const VISIBLE_FILLINGS = 5;
@@ -90,15 +105,38 @@ function highlighted(filling: AssessmentFilling) {
         aria-labelledby="wellbeing-title"
         data-test="wellbeing"
     >
-        <div>
-            <h2 id="wellbeing-title" class="text-lg font-semibold">
-                Самочувствие
-            </h2>
-            <p class="text-sm text-muted-foreground">
-                Пациент заполняет GAD-7 (тревога) и PHQ-9 (депрессия) за
-                последние 2 недели. Сроки от начала наблюдения: день 0, 7, 14,
-                28, дальше каждые 4 недели.
-            </p>
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0 flex-1">
+                <h2 id="wellbeing-title" class="text-lg font-semibold">
+                    Самочувствие
+                </h2>
+                <p class="text-sm text-muted-foreground">
+                    Пациент заполняет GAD-7 (тревога) и PHQ-9 (депрессия) за
+                    последние 2 недели. Сроки от начала наблюдения: день 0, 7,
+                    14, 28, дальше каждые 4 недели. HARS заполняет врач на
+                    приёме.
+                </p>
+            </div>
+            <Button
+                v-for="scale in patientId === null ? [] : rateScales"
+                :key="scale.code"
+                variant="outline"
+                class="max-sm:w-full"
+                as-child
+            >
+                <Link
+                    :href="
+                        DoctorScaleController.create({
+                            patient: patientId!,
+                            scale: scale.code,
+                        })
+                    "
+                    :data-test="`rate-${scale.code}`"
+                >
+                    <ClipboardPen />
+                    {{ `Заполнить ${scale.name}` }}
+                </Link>
+            </Button>
         </div>
 
         <p
@@ -199,7 +237,11 @@ function highlighted(filling: AssessmentFilling) {
                         </p>
                     </template>
                     <p v-else class="text-sm text-muted-foreground">
-                        Не заполнялся.
+                        {{
+                            scale.rater === 'doctor'
+                                ? 'Не заполнялась.'
+                                : 'Не заполнялся.'
+                        }}
                     </p>
                 </div>
 
@@ -242,6 +284,13 @@ function highlighted(filling: AssessmentFilling) {
                                 }}</span>
                                 <span class="text-muted-foreground">
                                     · {{ assessment.band }}</span
+                                >
+                                <span
+                                    v-if="assessment.rated_by"
+                                    class="text-muted-foreground"
+                                    data-test="wellbeing-rated-by"
+                                >
+                                    · {{ `врач ${assessment.rated_by}` }}</span
                                 >
                             </span>
                             <span
@@ -307,6 +356,11 @@ function highlighted(filling: AssessmentFilling) {
                                                 >{{ answer.item }}.</span
                                             >
                                             {{ answer.text }}
+                                            <span
+                                                v-if="answer.hint"
+                                                class="block text-muted-foreground"
+                                                >{{ answer.hint }}</span
+                                            >
                                         </td>
                                         <td
                                             class="w-2/5 py-1.5 align-top"

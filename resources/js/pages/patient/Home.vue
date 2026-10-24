@@ -25,6 +25,7 @@ import HelpCard from '@/components/HelpCard.vue';
 import InstallAppBanner from '@/components/InstallAppBanner.vue';
 import PushBanner from '@/components/PushBanner.vue';
 import QuestionnaireCard from '@/components/QuestionnaireCard.vue';
+import ReferralCard from '@/components/ReferralCard.vue';
 import SideEffectAlertCard from '@/components/SideEffectAlertCard.vue';
 import TodaySummary from '@/components/TodaySummary.vue';
 import { Button } from '@/components/ui/button';
@@ -36,6 +37,7 @@ import type {
     AssessmentStatus,
     Dose,
     DoseGroup,
+    PatientReferral,
     SelectOption,
 } from '@/types';
 
@@ -78,6 +80,8 @@ const props = defineProps<{
     // Сегодня «не принял» из-за самочувствия и ещё ни о чём не сообщил.
     unwellSuggestion: boolean;
     hasIntakeHistory: boolean;
+    // Направление терапевта к психиатру: ждёт психиатра или принято на этой неделе.
+    referral: PatientReferral | null;
 }>();
 
 defineOptions({
@@ -242,6 +246,8 @@ function keepInView(card: Element, container: HTMLElement): () => void {
 
         <HelpCard v-if="help" compact />
 
+        <ReferralCard v-if="referral" :referral="referral" />
+
         <SideEffectAlertCard
             v-if="sideEffectAlert"
             :symptoms="sideEffectAlert.symptoms"
@@ -296,10 +302,20 @@ function keepInView(card: Element, container: HTMLElement): () => void {
                 data-test="no-prescriptions"
             >
                 <CalendarClock class="size-8 text-muted-foreground" />
-                <p class="font-medium">Врач пока не назначил препараты.</p>
-                <p class="text-muted-foreground">
-                    Как только он это сделает, здесь появятся приёмы на день.
-                </p>
+                <!-- Терапевт препараты не назначает: их назначит психиатр. -->
+                <template v-if="page.props.withTherapist">
+                    <p class="font-medium">Препаратов пока нет.</p>
+                    <p class="text-muted-foreground">
+                        Препараты назначит психиатр, когда станет вашим врачом.
+                        Тогда здесь появятся приёмы на день.
+                    </p>
+                </template>
+                <template v-else>
+                    <p class="font-medium">Врач пока не назначил препараты.</p>
+                    <p class="text-muted-foreground">
+                        Когда врач их назначит, здесь появятся приёмы на день.
+                    </p>
+                </template>
             </div>
             <p
                 v-else-if="today.groups.length === 0"
@@ -399,7 +415,9 @@ function keepInView(card: Element, container: HTMLElement): () => void {
                 <p v-if="doctor.specialty" class="text-muted-foreground">
                     {{ doctor.specialty }}
                 </p>
+                <!-- Терапевт только отбирает и направляет: чата с ним нет. -->
                 <Button
+                    v-if="!page.props.withTherapist"
                     size="lg"
                     variant="ghost"
                     class="-ml-3 px-3 text-primary"

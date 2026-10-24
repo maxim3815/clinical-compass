@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import { LifeBuoy, MessageCircle } from '@lucide/vue';
 import HelpCallButtons from '@/components/HelpCallButtons.vue';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,8 @@ defineProps<{
     // На «Сегодня» короче: карточка не должна сдвигать приёмы с первого экрана.
     compact?: boolean;
 }>();
+
+const page = usePage();
 </script>
 
 <template>
@@ -31,6 +33,9 @@ defineProps<{
                 <p v-if="compact">
                     Позвоните 112 или на кризисную линию. Звонок бесплатный.
                 </p>
+                <p v-else-if="page.props.withTherapist">
+                    Позвоните 112 или на кризисную линию. Звонок бесплатный.
+                </p>
                 <p v-else>
                     Позвоните 112 или на кризисную линию. Звонок бесплатный.
                     Можно написать врачу, но он не всегда отвечает сразу.
@@ -38,7 +43,9 @@ defineProps<{
             </div>
         </div>
         <HelpCallButtons />
+        <!-- Пока пациента ведёт терапевт, чата нет. -->
         <Button
+            v-if="!page.props.withTherapist"
             :variant="compact ? 'ghost' : 'outline'"
             size="lg"
             :class="

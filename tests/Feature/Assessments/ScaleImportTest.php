@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ScaleRater;
 use App\Models\Scale;
 use Illuminate\Support\Facades\Artisan;
 use Symfony\Component\Yaml\Yaml;
@@ -26,15 +27,25 @@ function scalesDirectory(array $change = []): string
     return $directory;
 }
 
-test('scale files load both questionnaires once', function () {
+test('scale files load the patient questionnaires and the doctor scale once', function () {
     $this->artisan('app:scales:import')
         ->assertSuccessful()
-        ->expectsOutputToContain('Шкалы обновлены. Шкал в файлах: 2.');
+        ->expectsOutputToContain('Шкалы обновлены. Шкал в файлах: 3.');
 
     $gad7 = Scale::query()->where('code', 'gad7')->sole();
     $version = $gad7->version;
 
-    expect(Scale::query()->active()->orderBy('position')->pluck('code')->all())->toBe(['gad7', 'phq9'])
+    $hars = Scale::query()->where('code', 'hars')->sole();
+
+    expect(Scale::query()->active()->forPatients()->orderBy('position')->pluck('code')->all())->toBe(['gad7', 'phq9'])
+        ->and($gad7->rater)->toBe(ScaleRater::Patient)
+        ->and($hars->rater)->toBe(ScaleRater::Doctor)
+        ->and($hars->patient_title)->toBeNull()
+        ->and($hars->schedule_days)->toBeNull()
+        ->and($hars->items)->toHaveCount(14)
+        ->and($hars->items[0])->toBe(['text' => 'Тревожное настроение', 'hint' => 'озабоченность, ожидание наихудшего, тревожные опасения, раздражительность', 'highlight' => false])
+        ->and($hars->maxTotal())->toBe(56)
+        ->and($hars->band(25))->toBe('тяжелая степень выраженности тревожного расстройства')
         ->and($gad7->items)->toHaveCount(7)
         ->and($gad7->items[0])->toBe(['text' => 'Чувство тревоги или раздражения', 'highlight' => false])
         ->and($gad7->options[3])->toBe(['score' => 3, 'label' => 'Почти каждый день'])
@@ -45,9 +56,9 @@ test('scale files load both questionnaires once', function () {
 
     $this->artisan('app:scales:import')
         ->assertSuccessful()
-        ->expectsOutputToContain('Шкалы не изменились. Шкал в файлах: 2.');
+        ->expectsOutputToContain('Шкалы не изменились. Шкал в файлах: 3.');
 
-    expect(Scale::query()->count())->toBe(2)
+    expect(Scale::query()->count())->toBe(3)
         ->and($gad7->refresh()->version)->toBe($version);
 });
 

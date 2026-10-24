@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Support\Adherence\IntakeCalendar;
 use App\Support\Assessments\PatientAssessments;
 use App\Support\DoseEventPresenter;
+use App\Support\Referrals\ReferralPresenter;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -38,6 +39,8 @@ class HomeController extends Controller
         $patient->load('patientProfile');
 
         $doctor = $patient->currentDoctor()->with('doctorProfile')->first();
+        // Терапевт только отбирает и направляет: побочные эффекты разбирает психиатр.
+        $withPsychiatrist = $doctor !== null && ! $doctor->isTherapist();
         $today = $patient->localToday();
         $timezone = $patient->localTimezone();
         $now = CarbonImmutable::now();
@@ -81,9 +84,11 @@ class HomeController extends Controller
             // Пока открыт алерт по срочному побочному эффекту — своя карточка: о чём сообщил, 112 и чат.
             'sideEffectAlert' => $this->sideEffectAlert($patient),
             // Ссылка «Сообщить о побочном эффекте»: сообщать есть кому.
-            'canReportSideEffects' => $doctor !== null,
+            'canReportSideEffects' => $withPsychiatrist,
             // Сегодня не принял из-за самочувствия и ещё не рассказал врачу, что беспокоит.
-            'unwellSuggestion' => $doctor !== null && $this->unwellWithoutReport($patient, $today, $timezone),
+            'unwellSuggestion' => $withPsychiatrist && $this->unwellWithoutReport($patient, $today, $timezone),
+            // Направление терапевта к психиатру: к кому, мягкая категория и ждёт ли психиатра.
+            'referral' => ReferralPresenter::forPatient($patient),
             // Ссылка на календарь приёма, когда в нём уже есть что показать.
             'hasIntakeHistory' => IntakeCalendar::hasHistory($patient),
         ]);

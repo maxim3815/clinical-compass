@@ -30,8 +30,8 @@ class SideEffectController extends Controller
         $patient = $request->user();
 
         return Inertia::render('patient/SideEffects', [
-            // Без лечащего врача сообщать некому: формы нет, только 112.
-            'canReport' => $patient->activeCareRelationship()->exists(),
+            // Без лечащего врача сообщать некому: формы нет, только 112. Терапевт побочные эффекты не разбирает.
+            'canReport' => $patient->activeCareRelationship()->exists() && ! $patient->isWithTherapist(),
             'reports' => AdverseEventPresenter::forPatient($patient),
         ]);
     }
@@ -41,7 +41,7 @@ class SideEffectController extends Controller
         /** @var User $patient */
         $patient = $request->user();
 
-        if (! $patient->activeCareRelationship()->exists()) {
+        if (! $patient->activeCareRelationship()->exists() || $patient->isWithTherapist()) {
             return to_route('patient.side-effects.index');
         }
 
@@ -63,6 +63,11 @@ class SideEffectController extends Controller
     {
         /** @var User $patient */
         $patient = $request->user();
+
+        if ($patient->isWithTherapist()) {
+            return to_route('patient.side-effects.index');
+        }
+
         $today = $patient->localToday();
         $catalog = SideEffectCatalog::forPatient($patient);
         // Если отмечено только опасное («нужна помощь сейчас»), пациенту не до вопросов: сила и начало

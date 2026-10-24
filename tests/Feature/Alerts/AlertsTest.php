@@ -147,7 +147,8 @@ test('the rule check is queued in the same transaction as the answers', function
 
     ($this->answer)(3)->assertRedirect();
 
-    $job = DB::table('jobs')->sole();
+    // Рядом в очереди default — трансляция события врачу о новых ответах.
+    $job = DB::table('jobs')->where('queue', 'alerts')->sole();
 
     expect($job->queue)->toBe('alerts')
         ->and(json_decode($job->payload, true)['displayName'])->toBe(CheckAlertRules::class)
@@ -156,7 +157,7 @@ test('the rule check is queued in the same transaction as the answers', function
     Artisan::call('queue:work', ['--queue' => 'alerts', '--stop-when-empty' => true]);
 
     expect(Alert::query()->count())->toBe(1)
-        ->and(DB::table('jobs')->count())->toBe(0);
+        ->and(DB::table('jobs')->where('queue', 'alerts')->count())->toBe(0);
 });
 
 test('a repeated check does not raise a second alert for the same answers', function () {

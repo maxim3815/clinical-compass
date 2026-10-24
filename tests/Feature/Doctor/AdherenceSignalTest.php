@@ -267,7 +267,8 @@ test('the number of list queries does not grow with patients', function () {
     $queries = function (): int {
         DB::flushQueryLog();
         DB::enableQueryLog();
-        $this->actingAs($this->doctor)->get(route('doctor.patients.index', ['sort' => 'adherence']))->assertOk();
+        // Свежая модель врача, как в настоящем запросе: профиль, загруженный в прошлый раз, не в счёт.
+        $this->actingAs($this->doctor->fresh())->get(route('doctor.patients.index', ['sort' => 'adherence']))->assertOk();
         DB::disableQueryLog();
 
         return count(DB::getQueryLog());

@@ -10,8 +10,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * Заполненный пациентом опросник: сумма и степень на момент заполнения, ответы на каждый
- * вопрос. Запись не меняется и не удаляется: так требует триггер в БД.
+ * Заполненный опросник пациента или шкала врача: сумма и степень на момент заполнения, ответы
+ * на каждый вопрос. Запись не меняется и не удаляется: так требует триггер в БД.
  *
  * @property int $id
  * @property int $patient_id
@@ -21,11 +21,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $band
  * @property CarbonImmutable $local_date
  * @property CarbonImmutable $submitted_at Когда пациент отправил ответы. У опросников, отправленных вместе, одно время.
+ * @property int|null $rated_by_id Врач, который заполнил шкалу врача на приёме. У шкал пациента пусто.
  * @property-read Scale $scale
+ * @property-read User|null $ratedBy
  * @property-read User $patient
  * @property-read Collection<int, AssessmentAnswer> $answers
  */
-#[Fillable(['patient_id', 'scale_id', 'scale_version', 'total', 'band', 'local_date', 'submitted_at'])]
+#[Fillable(['patient_id', 'scale_id', 'scale_version', 'total', 'band', 'local_date', 'submitted_at', 'rated_by_id'])]
 class Assessment extends Model
 {
     public const ?string CREATED_AT = 'submitted_at';
@@ -51,6 +53,14 @@ class Assessment extends Model
     public function patient(): BelongsTo
     {
         return $this->belongsTo(User::class, 'patient_id');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function ratedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'rated_by_id');
     }
 
     /**

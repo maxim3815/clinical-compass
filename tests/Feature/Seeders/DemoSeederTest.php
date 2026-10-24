@@ -4,6 +4,7 @@ use App\Enums\DoseEventStatus;
 use App\Enums\HelpEventType;
 use App\Enums\PrescriptionCancelReason;
 use App\Enums\PrescriptionSource;
+use App\Enums\ReferralCategory;
 use App\Enums\UserRole;
 use App\Models\AccessLink;
 use App\Models\AdverseEvent;
@@ -15,6 +16,7 @@ use App\Models\Drug;
 use App\Models\HelpEvent;
 use App\Models\Message;
 use App\Models\Prescription;
+use App\Models\Referral;
 use App\Models\SafetyFinding;
 use App\Models\User;
 use App\Notifications\DoseReminder;
@@ -40,23 +42,38 @@ test('demo seeder builds the planned doctors, patients and courses and can be ru
 
     $doctor = User::query()->where('login', 'doctor')->sole();
     $doctor2 = User::query()->where('login', 'doctor2')->sole();
+    $therapist = User::query()->where('login', 'therapist')->sole();
     $patient = fn (string $login): User => User::query()->where('login', $login)->sole();
     $today = DisplayTime::today();
 
     expect($doctor->role)->toBe(UserRole::Doctor)
         ->and($doctor->doctorProfile?->specialty)->toBe('Психиатр')
-        ->and($doctor->patients()->count())->toBe(14)
+        ->and($doctor->patients()->count())->toBe(13)
         ->and($doctor2->patients()->pluck('login')->all())->toBe(['patient_4b'])
-        ->and(User::query()->count())->toBe(17)
+        ->and($therapist->isTherapist())->toBeTrue()
+        ->and($therapist->doctorProfile?->join_code)->toBe(DemoSeeder::THERAPIST_JOIN_CODE)
+        ->and($therapist->patients()->pluck('login')->all())->toBe(['patient_4c'])
+        ->and(User::query()->count())->toBe(18)
         ->and(User::query()->where('role', UserRole::Patient)->whereDoesntHave('patientProfile')->exists())->toBeFalse()
         ->and(User::query()->get()->every(fn (User $user) => Hash::check('password', $user->password)))->toBeTrue()
         ->and($doctor2->can('view', $patient('patient')))->toBeFalse()
         ->and(Drug::query()->active()->count())->toBe(5)
         ->and(AccessLink::query()->count())->toBe(1)
         ->and(AdherenceSignals::count($doctor))->toBe(3)
-        // Плюс Кузнецова с противопоказанием без решения; у второго врача — Николаев.
-        ->and(PatientSignals::count($doctor))->toBe(4)
+        // Плюс Кузнецова с противопоказанием без решения и направление Зайцевой; у второго врача — Николаев.
+        ->and(PatientSignals::count($doctor))->toBe(5)
         ->and(PatientSignals::count($doctor2))->toBe(1);
+
+    // Зайцеву терапевт направил к Смирновой «желательно» по HARS и опросникам, направление ждёт.
+    $referral = Referral::query()->sole();
+
+    expect($referral->patient_id)->toBe($patient('patient_4c')->id)
+        ->and($referral->from_doctor_id)->toBe($therapist->id)
+        ->and($referral->to_doctor_id)->toBe($doctor->id)
+        ->and($referral->category)->toBe(ReferralCategory::Desirable)
+        ->and(array_column($referral->basis, 'code'))->toBe(['hars_moderate', 'gad7_severe', 'phq9_moderate'])
+        ->and($referral->isOpen())->toBeTrue()
+        ->and(Assessment::query()->whereNotNull('rated_by_id')->sole()->total)->toBe(22);
 
     // Клинический профиль у всех: пол и действующий диагноз.
     $patients = User::query()->where('role', UserRole::Patient)->with('patientProfile')->get();
@@ -230,7 +247,7 @@ test('only the planned patients have an adherence signal and the counters are th
         ->and($signals['patient_3c']->hasConsecutiveMisses())->toBeTrue()
         ->and(AdherenceSignals::count($doctor))->toBe(3)
         ->and(AdherenceSignals::count($doctor2))->toBe(0)
-        ->and(PatientSignals::count($doctor))->toBe(4)
+        ->and(PatientSignals::count($doctor))->toBe(5)
         ->and(PatientSignals::count($doctor2))->toBe(1);
 })->with([
     'утром до приёмов' => '07:00',

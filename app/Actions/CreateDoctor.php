@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Enums\DoctorKind;
 use App\Enums\UserRole;
 use App\Models\DoctorProfile;
 use App\Models\User;
@@ -12,9 +13,12 @@ use Illuminate\Support\Facades\DB;
  */
 class CreateDoctor
 {
-    public function handle(string $name, string $login, string $password, string $specialty = 'Психиатр'): User
+    /**
+     * @param  string|null  $specialty  подпись для пациента, по умолчанию — по виду врача
+     */
+    public function handle(string $name, string $login, string $password, ?string $specialty = null, DoctorKind $kind = DoctorKind::Psychiatrist): User
     {
-        return DB::transaction(function () use ($name, $login, $password, $specialty): User {
+        return DB::transaction(function () use ($name, $login, $password, $specialty, $kind): User {
             $doctor = User::query()->create([
                 'name' => $name,
                 'login' => $login,
@@ -23,8 +27,9 @@ class CreateDoctor
             ]);
 
             $doctor->doctorProfile()->create([
-                'specialty' => $specialty,
+                'specialty' => $specialty ?? $kind->specialty(),
                 'join_code' => DoctorProfile::newJoinCode(),
+                'kind' => $kind,
             ]);
 
             return $doctor;

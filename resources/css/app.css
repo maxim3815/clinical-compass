@@ -191,11 +191,12 @@
         padding-right: env(safe-area-inset-right);
     }
     /*
-     * Закреплённые строки внизу формы назначения и профиля не закрывают поле, к которому
+     * Закреплённые строки внизу формы назначения, профиля и шкалы врача не закрывают поле, к которому
      * браузер прокручивает при переходе по Tab.
      */
     html:has([data-test='prescription-summary']),
-    html:has([data-test='facts-save-bar']) {
+    html:has([data-test='facts-save-bar']),
+    html:has([data-test='scale-save-bar']) {
         scroll-padding-bottom: 8rem;
     }
     /*

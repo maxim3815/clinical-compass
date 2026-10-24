@@ -149,10 +149,13 @@ function report(): void {
                             Ответ может прийти не сразу. Если есть угроза жизни,
                             звоните 112.
                         </p>
-                        <p>Если нажали случайно, напишите врачу:</p>
+                        <p v-if="!page.props.withTherapist">
+                            Если нажали случайно, напишите врачу:
+                        </p>
                     </div>
                 </div>
                 <Button
+                    v-if="!page.props.withTherapist"
                     variant="outline"
                     size="lg"
                     class="rounded-full bg-card"
@@ -234,7 +237,7 @@ function report(): void {
             </template>
 
             <Button
-                v-if="!reportedAt || failed"
+                v-if="(!reportedAt || failed) && !page.props.withTherapist"
                 variant="outline"
                 size="lg"
                 class="rounded-full"

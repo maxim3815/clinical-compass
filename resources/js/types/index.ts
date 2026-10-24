@@ -9,5 +9,6 @@ export * from './invitations';
 export * from './navigation';
 export * from './patients';
 export * from './prescriptions';
+export * from './referrals';
 export * from './safety';
 export * from './ui';

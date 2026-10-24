@@ -277,10 +277,12 @@ final class DemoPatients
 
     /**
      * 4.3. Паническое расстройство с агорафобией. В НСИ нет кода F40.01 из профиля, взяли F40.0 [медик].
+     * Пациентка терапевта: вчера на приёме ответила на опросники, терапевт заполнил HARS и направил
+     * её к Смирновой «желательно» (DemoSeeder).
      */
     private static function zaytseva(): DemoPatient
     {
-        return new DemoPatient('patient_4c', 'Зайцева Светлана Юрьевна', '1981-02-22', 'female', [DemoDiagnosis::main('F40.0')], scales: [
+        return new DemoPatient('patient_4c', 'Зайцева Светлана Юрьевна', '1981-02-22', 'female', [DemoDiagnosis::main('F40.0')], doctor: 'therapist', scales: [
             'gad7' => [0 => 19],
             'phq9' => [0 => 10],
         ]);

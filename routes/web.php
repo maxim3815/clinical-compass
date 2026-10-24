@@ -6,12 +6,14 @@ use App\Http\Controllers\Doctor\AppointmentInvitationController;
 use App\Http\Controllers\Doctor\ChatController;
 use App\Http\Controllers\Doctor\ClinicalProfileController;
 use App\Http\Controllers\Doctor\ConversationController;
+use App\Http\Controllers\Doctor\DoctorScaleController;
 use App\Http\Controllers\Doctor\DrugController;
 use App\Http\Controllers\Doctor\Icd10Controller;
 use App\Http\Controllers\Doctor\InvitationController;
 use App\Http\Controllers\Doctor\PasswordResetLinkController;
 use App\Http\Controllers\Doctor\PatientController;
 use App\Http\Controllers\Doctor\PrescriptionController;
+use App\Http\Controllers\Doctor\ReferralController;
 use App\Http\Controllers\Doctor\SafetyCheckController;
 use App\Http\Controllers\Doctor\SafetyFindingController;
 use App\Http\Controllers\Doctor\SafetyRuleController;
@@ -32,6 +34,7 @@ use App\Http\Controllers\Patient\OwnMedicationController;
 use App\Http\Controllers\Patient\SideEffectController;
 use App\Http\Controllers\PushDoseController;
 use App\Models\Drug;
+use App\Models\Scale;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->name('home');
@@ -67,33 +70,20 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:doctor')->prefix('doctor')->name('doctor.')->group(function () {
         Route::redirect('/', '/doctor/patients')->name('home');
 
+        // Список и карточка — у психиатра и у терапевта свои (кабинет по виду врача).
         Route::get('patients', [PatientController::class, 'index'])->name('patients.index');
         Route::get('patients/{patient}', [PatientController::class, 'show'])->whereNumber('patient')->name('patients.show');
         Route::post('patients/{patient}/password-reset-link', [PasswordResetLinkController::class, 'store'])
             ->whereNumber('patient')
             ->name('patients.password-reset-link.store');
 
-        // Назначение ищется только среди назначений этого пациента.
-        Route::scopeBindings()->whereNumber(['patient', 'prescription'])->group(function () {
-            Route::get('patients/{patient}/prescriptions/create', [PrescriptionController::class, 'create'])
-                ->name('patients.prescriptions.create');
-            Route::post('patients/{patient}/prescriptions', [PrescriptionController::class, 'store'])
-                ->name('patients.prescriptions.store');
-            Route::get('patients/{patient}/prescriptions/{prescription}/edit', [PrescriptionController::class, 'edit'])
-                ->name('patients.prescriptions.edit');
-            Route::put('patients/{patient}/prescriptions/{prescription}', [PrescriptionController::class, 'update'])
-                ->name('patients.prescriptions.update');
-            Route::post('patients/{patient}/prescriptions/{prescription}/cancel', [PrescriptionController::class, 'cancel'])
-                ->name('patients.prescriptions.cancel');
-        });
-
-        // Проверка безопасности назначения: блок в форме (JSON) и решение по находке.
-        Route::get('patients/{patient}/safety-check', [SafetyCheckController::class, 'show'])
-            ->whereNumber('patient')
-            ->name('patients.safety-check.show');
-        Route::scopeBindings()->whereNumber(['patient', 'safetyFinding'])->group(function () {
-            Route::post('patients/{patient}/safety-findings/{safetyFinding}/continue', [SafetyFindingController::class, 'continue'])
-                ->name('patients.safety-findings.continue');
+        // Шкала врача (HARS): заполняют на приёме и психиатр, и терапевт. Шкала общая, а не шкала
+        // пациента: без withoutScopedBindings ключ {scale:code} искался бы через пациента.
+        Route::withoutScopedBindings()->whereNumber('patient')->where(['scale' => Scale::CODE_PATTERN])->group(function () {
+            Route::get('patients/{patient}/scales/{scale:code}/create', [DoctorScaleController::class, 'create'])
+                ->name('patients.scales.create');
+            Route::post('patients/{patient}/scales/{scale:code}', [DoctorScaleController::class, 'store'])
+                ->name('patients.scales.store');
         });
 
         // Алерт: отметка «показан» из браузера (JSON), «Принял» и закрытие решением.
@@ -106,47 +96,6 @@ Route::middleware('auth')->group(function () {
                 ->name('patients.alerts.close');
         });
 
-        // Клинический профиль: пол, диагнозы и факты. Диагноз ищется только среди диагнозов пациента.
-        Route::scopeBindings()->whereNumber(['patient', 'adverseEvent'])->group(function () {
-            Route::post('patients/{patient}/adverse-events', [AdverseEventController::class, 'store'])
-                ->name('patients.adverse-events.store');
-            Route::post('patients/{patient}/adverse-events/{adverseEvent}/review', [AdverseEventController::class, 'review'])
-                ->name('patients.adverse-events.review');
-            Route::put('patients/{patient}/adverse-events/{adverseEvent}/comment', [AdverseEventController::class, 'comment'])
-                ->name('patients.adverse-events.comment');
-        });
-
-        Route::scopeBindings()->whereNumber(['patient', 'diagnosis'])->group(function () {
-            Route::get('patients/{patient}/clinical-profile', [ClinicalProfileController::class, 'edit'])
-                ->name('patients.clinical-profile.edit');
-            Route::put('patients/{patient}/clinical-profile/sex', [ClinicalProfileController::class, 'updateSex'])
-                ->name('patients.clinical-profile.sex');
-            Route::post('patients/{patient}/diagnoses', [ClinicalProfileController::class, 'storeDiagnosis'])
-                ->name('patients.diagnoses.store');
-            Route::post('patients/{patient}/diagnoses/{diagnosis}/resolve', [ClinicalProfileController::class, 'resolveDiagnosis'])
-                ->name('patients.diagnoses.resolve');
-            Route::post('patients/{patient}/observations', [ClinicalProfileController::class, 'storeObservations'])
-                ->name('patients.observations.store');
-        });
-        Route::get('icd10', [Icd10Controller::class, 'index'])->name('icd10.index');
-
-        // Чат: страница диалога, а более ранние сообщения, отправка и прочтение — JSON.
-        Route::get('messages', [ConversationController::class, 'index'])->name('conversations.index');
-        Route::whereNumber('patient')->group(function () {
-            Route::get('patients/{patient}/chat', [ChatController::class, 'show'])->name('patients.chat.show');
-            Route::get('patients/{patient}/chat/messages', [ChatController::class, 'messages'])->name('patients.chat.messages');
-            Route::post('patients/{patient}/chat/messages', [ChatController::class, 'store'])
-                ->middleware('throttle:chat')
-                ->name('patients.chat.store');
-            Route::post('patients/{patient}/chat/read', [ChatController::class, 'read'])->name('patients.chat.read');
-        });
-
-        Route::get('drugs', [DrugController::class, 'index'])->name('drugs.index');
-        Route::get('drugs/{drug:code}', [DrugController::class, 'show'])
-            ->where('drug', Drug::CODE_PATTERN)
-            ->name('drugs.show');
-        Route::get('rules', [SafetyRuleController::class, 'index'])->name('rules.index');
-
         Route::get('invitations', [InvitationController::class, 'index'])->name('invitations.index');
         Route::post('invitations', [InvitationController::class, 'store'])->name('invitations.store');
         Route::post('invitations/appointment', [AppointmentInvitationController::class, 'store'])->name('invitations.appointment.store');
@@ -157,6 +106,95 @@ Route::middleware('auth')->group(function () {
         Route::post('invitations/{invitation}/revoke', [InvitationController::class, 'revoke'])
             ->whereNumber('invitation')
             ->name('invitations.revoke');
+
+        // Терапевт: решение о направлении к психиатру.
+        Route::middleware('doctor.kind:therapist')->group(function () {
+            Route::post('patients/{patient}/referrals', [ReferralController::class, 'store'])
+                ->whereNumber('patient')
+                ->name('patients.referrals.store');
+            Route::post('patients/{patient}/referrals/decline', [ReferralController::class, 'decline'])
+                ->whereNumber('patient')
+                ->name('patients.referrals.decline');
+            Route::post('referrals/{referral}/withdraw', [ReferralController::class, 'withdraw'])
+                ->whereNumber('referral')
+                ->name('referrals.withdraw');
+        });
+
+        // Психиатр: ведение лечения. Терапевту эти адреса отвечают 404.
+        Route::middleware('doctor.kind:psychiatrist')->group(function () {
+            // Направление от терапевта: страница до принятия и «Принять пациента».
+            Route::get('referrals/{referral}', [ReferralController::class, 'show'])
+                ->whereNumber('referral')
+                ->name('referrals.show');
+            Route::post('referrals/{referral}/accept', [ReferralController::class, 'accept'])
+                ->whereNumber('referral')
+                ->name('referrals.accept');
+
+            // Назначение ищется только среди назначений этого пациента.
+            Route::scopeBindings()->whereNumber(['patient', 'prescription'])->group(function () {
+                Route::get('patients/{patient}/prescriptions/create', [PrescriptionController::class, 'create'])
+                    ->name('patients.prescriptions.create');
+                Route::post('patients/{patient}/prescriptions', [PrescriptionController::class, 'store'])
+                    ->name('patients.prescriptions.store');
+                Route::get('patients/{patient}/prescriptions/{prescription}/edit', [PrescriptionController::class, 'edit'])
+                    ->name('patients.prescriptions.edit');
+                Route::put('patients/{patient}/prescriptions/{prescription}', [PrescriptionController::class, 'update'])
+                    ->name('patients.prescriptions.update');
+                Route::post('patients/{patient}/prescriptions/{prescription}/cancel', [PrescriptionController::class, 'cancel'])
+                    ->name('patients.prescriptions.cancel');
+            });
+
+            // Проверка безопасности назначения: блок в форме (JSON) и решение по находке.
+            Route::get('patients/{patient}/safety-check', [SafetyCheckController::class, 'show'])
+                ->whereNumber('patient')
+                ->name('patients.safety-check.show');
+            Route::scopeBindings()->whereNumber(['patient', 'safetyFinding'])->group(function () {
+                Route::post('patients/{patient}/safety-findings/{safetyFinding}/continue', [SafetyFindingController::class, 'continue'])
+                    ->name('patients.safety-findings.continue');
+            });
+
+            // Побочные эффекты: запись со слов пациента, «Просмотрено» и комментарий.
+            Route::scopeBindings()->whereNumber(['patient', 'adverseEvent'])->group(function () {
+                Route::post('patients/{patient}/adverse-events', [AdverseEventController::class, 'store'])
+                    ->name('patients.adverse-events.store');
+                Route::post('patients/{patient}/adverse-events/{adverseEvent}/review', [AdverseEventController::class, 'review'])
+                    ->name('patients.adverse-events.review');
+                Route::put('patients/{patient}/adverse-events/{adverseEvent}/comment', [AdverseEventController::class, 'comment'])
+                    ->name('patients.adverse-events.comment');
+            });
+
+            // Клинический профиль: пол, диагнозы и факты. Диагноз ищется только среди диагнозов пациента.
+            Route::scopeBindings()->whereNumber(['patient', 'diagnosis'])->group(function () {
+                Route::get('patients/{patient}/clinical-profile', [ClinicalProfileController::class, 'edit'])
+                    ->name('patients.clinical-profile.edit');
+                Route::put('patients/{patient}/clinical-profile/sex', [ClinicalProfileController::class, 'updateSex'])
+                    ->name('patients.clinical-profile.sex');
+                Route::post('patients/{patient}/diagnoses', [ClinicalProfileController::class, 'storeDiagnosis'])
+                    ->name('patients.diagnoses.store');
+                Route::post('patients/{patient}/diagnoses/{diagnosis}/resolve', [ClinicalProfileController::class, 'resolveDiagnosis'])
+                    ->name('patients.diagnoses.resolve');
+                Route::post('patients/{patient}/observations', [ClinicalProfileController::class, 'storeObservations'])
+                    ->name('patients.observations.store');
+            });
+            Route::get('icd10', [Icd10Controller::class, 'index'])->name('icd10.index');
+
+            // Чат: страница диалога, а более ранние сообщения, отправка и прочтение — JSON.
+            Route::get('messages', [ConversationController::class, 'index'])->name('conversations.index');
+            Route::whereNumber('patient')->group(function () {
+                Route::get('patients/{patient}/chat', [ChatController::class, 'show'])->name('patients.chat.show');
+                Route::get('patients/{patient}/chat/messages', [ChatController::class, 'messages'])->name('patients.chat.messages');
+                Route::post('patients/{patient}/chat/messages', [ChatController::class, 'store'])
+                    ->middleware('throttle:chat')
+                    ->name('patients.chat.store');
+                Route::post('patients/{patient}/chat/read', [ChatController::class, 'read'])->name('patients.chat.read');
+            });
+
+            Route::get('drugs', [DrugController::class, 'index'])->name('drugs.index');
+            Route::get('drugs/{drug:code}', [DrugController::class, 'show'])
+                ->where('drug', Drug::CODE_PATTERN)
+                ->name('drugs.show');
+            Route::get('rules', [SafetyRuleController::class, 'index'])->name('rules.index');
+        });
     });
 
     Route::middleware('role:patient')->prefix('patient')->name('patient.')->group(function () {

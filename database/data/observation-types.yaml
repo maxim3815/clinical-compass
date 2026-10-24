@@ -65,3 +65,13 @@
 - code: substance_dependence
   name: Алкогольная или наркотическая зависимость
   value: boolean
+
+# Признаки, которых нет ни в одной шкале: по ним подсказка направления к психиатру ставит
+# «обязательно» (referral-rules.yaml). Терапевт отмечает их вместе с HARS [медик].
+- code: mania_signs
+  name: Признаки мании или гипомании
+  value: boolean
+
+- code: psychotic_symptoms
+  name: Бред или галлюцинации
+  value: boolean

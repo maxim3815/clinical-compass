@@ -16,6 +16,7 @@ import { computed, ref, watch } from 'vue';
 import ClinicalProfileController from '@/actions/App/Http/Controllers/Doctor/ClinicalProfileController';
 import PasswordResetLinkController from '@/actions/App/Http/Controllers/Doctor/PasswordResetLinkController';
 import PrescriptionController from '@/actions/App/Http/Controllers/Doctor/PrescriptionController';
+import AcceptedReferralSection from '@/components/AcceptedReferralSection.vue';
 import AddAdverseEventDialog from '@/components/AddAdverseEventDialog.vue';
 import AdherenceCourse from '@/components/AdherenceCourse.vue';
 import AdherenceSignal from '@/components/AdherenceSignal.vue';
@@ -53,6 +54,8 @@ import type {
     SafetyFinding,
     SelectOption,
     SideEffectOption,
+    RatableScale,
+    Referral,
     Wellbeing,
 } from '@/types';
 
@@ -92,8 +95,12 @@ const props = defineProps<{
         today: string;
         min_date: string;
     };
-    // Опросники пациента: суммы, степени, изменение и ответы.
+    // Опросники пациента и шкалы врача (HARS): суммы, степени, изменение и ответы.
     wellbeing: Wellbeing;
+    // Шкалы, которые врач заполняет на приёме.
+    doctorScales: RatableScale[];
+    // По какому направлению терапевта пациент пришёл.
+    referral: Referral | null;
     // Находки и «Не проверено» по id назначения.
     safety: Record<number, SafetyCard>;
     justificationLimit: number;
@@ -342,8 +349,9 @@ function closing(prescription: Prescription): string {
 
 // Опросники в шапке: дата и суммы со степенью последнего заполнения и незаполненный срок.
 const questionnaires = computed(() => {
+    // В плашке — опросники пациента, HARS видна в блоке «Самочувствие».
     const filled = props.wellbeing.scales.filter(
-        (scale) => scale.latest !== null,
+        (scale) => scale.rater === 'patient' && scale.latest !== null,
     );
     const status = props.wellbeing.status;
     const due = status?.due
@@ -797,7 +805,12 @@ const unreadLabel = computed(
                     </template>
                 </section>
 
-                <WellbeingSection :wellbeing="wellbeing" class="order-3" />
+                <WellbeingSection
+                    :wellbeing="wellbeing"
+                    :patient-id="patient.id"
+                    :rate-scales="doctorScales"
+                    class="order-3"
+                />
 
                 <section
                     v-if="prescriptionHistory.length > 0"
@@ -820,6 +833,12 @@ const unreadLabel = computed(
             </div>
 
             <div class="flex flex-col gap-6 @max-4xl:contents">
+                <AcceptedReferralSection
+                    v-if="referral"
+                    :referral="referral"
+                    class="order-4"
+                />
+
                 <section
                     class="order-4 flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-xs"
                     aria-labelledby="clinical-profile-title"

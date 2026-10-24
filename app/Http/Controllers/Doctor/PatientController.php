@@ -11,6 +11,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AdverseEvent;
 use App\Models\CareRelationship;
 use App\Models\Prescription;
+use App\Models\Scale;
 use App\Models\User;
 use App\Support\Adherence\AdherenceSignal;
 use App\Support\Adherence\AdherenceSignals;
@@ -24,6 +25,7 @@ use App\Support\Assessments\PatientAssessments;
 use App\Support\AttentionQueue;
 use App\Support\DisplayTime;
 use App\Support\PrescriptionPresenter;
+use App\Support\Referrals\ReferralPresenter;
 use App\Support\Safety\ClinicalProfilePresenter;
 use App\Support\Safety\SafetyAcknowledgement;
 use App\Support\Safety\SafetyPresenter;
@@ -42,6 +44,11 @@ class PatientController extends Controller
 
     public function index(Request $request): Response
     {
+        // У терапевта свой кабинет на тех же адресах.
+        if ($request->user()?->isTherapist()) {
+            return app(TherapistPatientController::class)->index($request);
+        }
+
         $search = trim($request->string('search')->toString());
         // По доле принятых за 7 дней: adherence — сначала самые низкие, -adherence — самые высокие.
         $sort = $request->string('sort')->toString();
@@ -96,6 +103,10 @@ class PatientController extends Controller
 
     public function show(Request $request, User $patient, SafetyPresenter $safetyPresenter): Response
     {
+        if ($request->user()?->isTherapist()) {
+            return app(TherapistPatientController::class)->show($request, $patient);
+        }
+
         Gate::authorize('view', $patient);
 
         /** @var User $doctor */
@@ -170,8 +181,14 @@ class PatientController extends Controller
                 'min_date' => $today->subDays(AdverseEventController::MAX_DAYS_AGO)->toDateString(),
             ],
             'alertCommentLimit' => AlertController::MAX_COMMENT_LENGTH,
-            // Опросники, которые заполняет пациент: суммы, степени, изменение и ответы.
+            // Опросники пациента и шкалы врача (HARS): суммы, степени, изменение и ответы.
             'wellbeing' => PatientAssessments::forDoctor($patient),
+            // Шкалы, которые врач заполняет на приёме: кнопка «Заполнить HARS».
+            'doctorScales' => Scale::query()->active()->forDoctors()->orderBy('position')->get(['code', 'name'])
+                ->map(fn (Scale $scale): array => ['code' => $scale->code, 'name' => $scale->name])
+                ->values(),
+            // По какому направлению терапевта пациент пришёл к врачу.
+            'referral' => ReferralPresenter::forPsychiatristCard($doctor, $patient),
             // Находки и «Не проверено» по id назначения, у назначений врача и своих препаратов пациента.
             'safety' => (object) $safetyPresenter->card($patient),
             'justificationLimit' => SafetyAcknowledgement::MAX_JUSTIFICATION_LENGTH,

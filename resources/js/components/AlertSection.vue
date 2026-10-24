@@ -25,7 +25,8 @@ import type { PatientAlert } from '@/types';
 const props = defineProps<{
     patientId: number;
     alerts: PatientAlert[];
-    chatHref: InertiaLinkProps['href'];
+    // Без чата (кабинет терапевта) кнопки «Написать» нет.
+    chatHref?: InertiaLinkProps['href'];
 }>();
 
 const emit = defineEmits<{
@@ -234,7 +235,7 @@ function history(alert: PatientAlert): string {
                 >
                     Закрыть с решением
                 </Button>
-                <Button variant="outline" as-child>
+                <Button v-if="chatHref" variant="outline" as-child>
                     <Link :href="chatHref" data-test="alert-chat">
                         <MessageCircle />
                         Написать

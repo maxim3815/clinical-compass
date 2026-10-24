@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\DoctorKind;
 use App\Enums\Sex;
 use App\Enums\UserRole;
 use App\Support\DisplayTime;
@@ -195,6 +196,29 @@ class User extends Authenticatable
     public function isFemalePatient(): bool
     {
         return $this->role === UserRole::Patient && $this->patientProfile?->sex === Sex::Female;
+    }
+
+    /**
+     * Вид врача: кабинет психиатра или терапевта. У пациента null.
+     */
+    public function doctorKind(): ?DoctorKind
+    {
+        return $this->role === UserRole::Doctor ? ($this->doctorProfile->kind ?? DoctorKind::Psychiatrist) : null;
+    }
+
+    public function isTherapist(): bool
+    {
+        return $this->doctorKind() === DoctorKind::Therapist;
+    }
+
+    /**
+     * Пациента сейчас ведёт терапевт: до принятия психиатром у него нет чата и окна побочных
+     * эффектов, терапевт только отбирает и направляет.
+     */
+    public function isWithTherapist(): bool
+    {
+        return $this->role === UserRole::Patient
+            && $this->currentDoctor()->with('doctorProfile')->first()?->isTherapist() === true;
     }
 
     /**

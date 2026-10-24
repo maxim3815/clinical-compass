@@ -2,6 +2,7 @@
 
 namespace App\Support\Assessments;
 
+use App\Enums\ScaleRater;
 use App\Models\Assessment;
 use App\Models\AssessmentAnswer;
 use App\Models\Scale;
@@ -84,14 +85,14 @@ final class PatientAssessments
 
     /**
      * Блок «Самочувствие» в карточке у врача: последние суммы со степенью и изменением, график,
-     * заполнения с ответами на каждый вопрос.
+     * заполнения с ответами на каждый вопрос. Шкалы врача (HARS) идут после шкал пациента.
      *
      * @return array<string, mixed>
      */
     public static function forDoctor(User $patient): array
     {
         $assessments = self::assessments($patient, withAnswers: true);
-        $scales = self::scales();
+        $scales = Scale::query()->active()->orderByRaw('rater = ?', [ScaleRater::Doctor->value])->orderBy('position')->orderBy('id')->get();
 
         return [
             'status' => self::status($patient, 'DD.MM.YYYY'),
@@ -107,6 +108,7 @@ final class PatientAssessments
                         'code' => $scale->code,
                         'name' => $scale->name,
                         'title' => $scale->title,
+                        'rater' => $scale->rater->value,
                         'max' => $scale->maxTotal(),
                         // Границы степеней — линии на графике врача.
                         'thresholds' => array_map(fn (array $band): int => $band['min'], array_slice($scale->bands, 1)),
@@ -141,6 +143,8 @@ final class PatientAssessments
                             'id' => $assessment->id,
                             'scale' => $assessment->scale->code,
                             'name' => $assessment->scale->name,
+                            // Шкалу врача заполнил врач на приёме: кто именно.
+                            'rated_by' => $assessment->ratedBy?->name,
                             'total' => $assessment->total,
                             'max' => $assessment->scale->maxTotal(),
                             'band' => $assessment->band,
@@ -148,6 +152,7 @@ final class PatientAssessments
                                 ->map(fn (AssessmentAnswer $answer): array => [
                                     'item' => $answer->item,
                                     'text' => $assessment->scale->items[$answer->item - 1]['text'] ?? "Вопрос {$answer->item}",
+                                    'hint' => $assessment->scale->items[$answer->item - 1]['hint'] ?? null,
                                     'score' => $answer->score,
                                     'label' => $assessment->scale->optionLabel($answer->score),
                                     'highlight' => $assessment->scale->items[$answer->item - 1]['highlight'] ?? false,
@@ -180,7 +185,7 @@ final class PatientAssessments
      */
     private static function scales(): Collection
     {
-        return Scale::query()->active()->orderBy('position')->orderBy('id')->get();
+        return Scale::query()->active()->forPatients()->orderBy('position')->orderBy('id')->get();
     }
 
     /**
@@ -206,7 +211,7 @@ final class PatientAssessments
     {
         return Assessment::query()
             ->where('patient_id', $patient->id)
-            ->with($withAnswers ? ['scale', 'answers'] : ['scale'])
+            ->with($withAnswers ? ['scale', 'answers', 'ratedBy'] : ['scale'])
             ->orderBy('submitted_at')
             ->orderBy('id')
             ->get();

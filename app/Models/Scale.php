@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ScaleRater;
 use App\Support\Assessments\AssessmentCalendar;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -11,20 +12,22 @@ use Illuminate\Database\Eloquent\Model;
 use InvalidArgumentException;
 
 /**
- * Опросник, который заполняет пациент, из database/data/scales/<код>.yaml: вопросы, варианты
- * ответа с баллами, степени по сумме, источник и календарь заполнения.
+ * Шкала из database/data/scales/<код>.yaml: вопросы, варианты ответа с баллами, степени по сумме,
+ * источник. Шкалу пациента (GAD-7, PHQ-9) он заполняет сам по календарю, шкалу врача (HARS)
+ * врач заполняет на приёме: у неё нет нейтрального названия для пациента и календаря.
  *
  * @property int $id
  * @property string $code
  * @property string $name «GAD-7»
  * @property string $title Полное название для врача.
- * @property string $patient_title Нейтральное название для пациента: «Беспокойство».
+ * @property ScaleRater $rater
+ * @property string|null $patient_title Нейтральное название для пациента: «Беспокойство». У шкалы врача пусто.
  * @property string $instruction
  * @property list<array{score: int, label: string}> $options
- * @property list<array{text: string, highlight?: bool}> $items
+ * @property list<array{text: string, hint?: string|null, highlight?: bool}> $items
  * @property list<array{min: int, max: int, label: string}> $bands
- * @property list<int> $schedule_days
- * @property int $schedule_then_every
+ * @property list<int>|null $schedule_days
+ * @property int|null $schedule_then_every
  * @property string $source_original
  * @property string $source_validation
  * @property string $source_url
@@ -40,6 +43,7 @@ use InvalidArgumentException;
     'code',
     'name',
     'title',
+    'rater',
     'patient_title',
     'instruction',
     'options',
@@ -120,6 +124,10 @@ class Scale extends Model
 
     public function calendar(): AssessmentCalendar
     {
+        if ($this->schedule_days === null || $this->schedule_then_every === null) {
+            throw new InvalidArgumentException("{$this->name}: у шкалы врача нет календаря.");
+        }
+
         return new AssessmentCalendar($this->schedule_days, $this->schedule_then_every);
     }
 
@@ -130,6 +138,28 @@ class Scale extends Model
     protected function active(Builder $query): void
     {
         $query->where('is_active', true);
+    }
+
+    /**
+     * Шкалы, которые заполняет пациент.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function forPatients(Builder $query): void
+    {
+        $query->where('rater', ScaleRater::Patient);
+    }
+
+    /**
+     * Шкалы, которые врач заполняет на приёме.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function forDoctors(Builder $query): void
+    {
+        $query->where('rater', ScaleRater::Doctor);
     }
 
     /**
@@ -144,6 +174,7 @@ class Scale extends Model
             'items' => 'array',
             'bands' => 'array',
             'schedule_days' => 'array',
+            'rater' => ScaleRater::class,
             'is_active' => 'boolean',
         ];
     }

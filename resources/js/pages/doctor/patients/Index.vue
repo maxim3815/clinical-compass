@@ -156,8 +156,9 @@ useRealtime<InvitationChanged>(channel, 'invitation.changed', (event) => {
 
         <PushBanner />
 
+        <!-- Направление терапевта ждёт и тогда, когда своих пациентов ещё нет. -->
         <div
-            v-if="patients.total === 0 && !search"
+            v-if="patients.total === 0 && !search && attention.length === 0"
             class="rounded-xl border border-dashed bg-card p-6"
             data-test="patients-empty"
         >
@@ -202,7 +203,17 @@ useRealtime<InvitationChanged>(channel, 'invitation.changed', (event) => {
                     </form>
                 </div>
 
-                <p v-if="patients.total === 0" class="text-muted-foreground">
+                <p
+                    v-if="patients.total === 0 && !search"
+                    class="text-muted-foreground"
+                >
+                    Своих пациентов пока нет. Пригласите пациента кнопками выше
+                    или примите пациента по направлению.
+                </p>
+                <p
+                    v-else-if="patients.total === 0"
+                    class="text-muted-foreground"
+                >
                     По запросу «{{ search }}» никого не нашли.
                     <Link
                         :href="index()"

@@ -6,6 +6,7 @@ use App\Actions\CreateDoctor;
 use App\Concerns\LoginValidationRules;
 use App\Concerns\PasswordValidationRules;
 use App\Concerns\ProfileValidationRules;
+use App\Enums\DoctorKind;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -24,7 +25,8 @@ class CreateDoctorCommand extends Command
         {--name= : ФИО врача}
         {--login= : Логин}
         {--password= : Пароль. Без опции спрашивается скрытым вводом}
-        {--specialty=Психиатр : Специальность}';
+        {--therapist : Терапевт: кабинет для отбора и направления к психиатру}
+        {--specialty= : Специальность для пациента. По умолчанию «Психиатр» или «Терапевт»}';
 
     /**
      * @var string
@@ -53,7 +55,7 @@ class CreateDoctorCommand extends Command
             'name' => $this->nameRules(),
             'login' => $this->loginRules(),
             'password' => $this->passwordRules(),
-            'specialty' => ['required', 'string', 'max:255'],
+            'specialty' => ['nullable', 'string', 'max:255'],
         ]);
 
         if ($validator->fails()) {
@@ -64,12 +66,13 @@ class CreateDoctorCommand extends Command
             return self::FAILURE;
         }
 
-        /** @var array{name: string, login: string, password: string, specialty: string} $data */
+        /** @var array{name: string, login: string, password: string, specialty: string|null} $data */
         $data = $validator->validated();
+        $kind = $this->option('therapist') === true ? DoctorKind::Therapist : DoctorKind::Psychiatrist;
 
-        $doctor = $createDoctor->handle($data['name'], $data['login'], $data['password'], $data['specialty']);
+        $doctor = $createDoctor->handle($data['name'], $data['login'], $data['password'], $data['specialty'], $kind);
 
-        $this->components->info("Врач создан: {$doctor->name}, логин {$doctor->login}.");
+        $this->components->info("Врач создан: {$doctor->name}, {$doctor->doctorProfile?->specialty}, логин {$doctor->login}.");
 
         return self::SUCCESS;
     }

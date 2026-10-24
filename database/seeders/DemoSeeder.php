@@ -4,10 +4,14 @@ namespace Database\Seeders;
 
 use App\Actions\CreateDoctor;
 use App\Actions\InvitePatient;
+use App\Actions\RateScale;
+use App\Actions\ReferPatient;
 use App\Enums\AccessLinkPurpose;
 use App\Enums\AdverseEventSeverity;
+use App\Enums\DoctorKind;
 use App\Enums\HelpEventType;
 use App\Enums\PrescriptionSource;
+use App\Enums\ReferralCategory;
 use App\Events\AlertsChanged;
 use App\Events\MessageSent;
 use App\Events\MessagesRead;
@@ -17,10 +21,14 @@ use App\Jobs\CheckAlertRules;
 use App\Models\AccessLink;
 use App\Models\AdverseEvent;
 use App\Models\HelpEvent;
+use App\Models\Referral;
+use App\Models\Scale;
 use App\Models\SideEffect;
 use App\Models\User;
 use App\Support\DisplayTime;
+use App\Support\Referrals\ReferralEngine;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Closure;
 use Database\Seeders\Demo\DemoHistory;
 use Database\Seeders\Demo\DemoPatients;
@@ -28,6 +36,7 @@ use DateInterval;
 use Illuminate\Console\Command;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
@@ -35,10 +44,11 @@ use RuntimeException;
 
 /**
  * Демо-данные для локальной разработки и показа: справочники, правила проверки, опросники,
- * два врача и 15 пациентов с клиническим профилем, назначениями, историей приёмов, опросников
- * и перепиской (план — в DemoPatients). История строится
+ * два психиатра, терапевт и 15 пациентов с клиническим профилем, назначениями, историей приёмов,
+ * опросников и перепиской (план — в DemoPatients). История строится
  * до текущего момента. У всех пользователей пароль `password`.
- * Второй врач со своими пациентами нужен, чтобы показать изоляцию данных.
+ * Второй психиатр со своими пациентами нужен, чтобы показать изоляцию данных, терапевт —
+ * отбор и направление к психиатру.
  * Повторный запуск не создаёт дубликатов: пациент, который уже есть, не меняется.
  */
 class DemoSeeder extends Seeder
@@ -57,10 +67,21 @@ class DemoSeeder extends Seeder
      */
     public const string JOIN_CODE = 'smirnova';
 
+    /**
+     * Постоянный адрес терапевта `therapist` для подключения на приёме: /join/kravtsova.
+     */
+    public const string THERAPIST_JOIN_CODE = 'kravtsova';
+
+    /**
+     * HARS Зайцевой на приёме у терапевта: 22 из 56, средняя выраженность. Выше всего страхи
+     * (агорафобия) и тревожное настроение [медик].
+     */
+    private const array ZAYTSEVA_HARS = [3, 2, 4, 2, 1, 2, 1, 1, 2, 2, 1, 0, 1, 0];
+
     public function run(CreateDoctor $createDoctor, DemoHistory $history): void
     {
         // Справочники и правила загружаются теми же командами, что и вне локального окружения.
-        foreach (['app:drugs:import' => 'Справочник препаратов', 'app:icd10:import' => 'Справочник МКБ-10', 'app:rules:import' => 'Правила проверки', 'app:scales:import' => 'Опросники', 'app:alerts:import' => 'Правила алертинга'] as $command => $title) {
+        foreach (['app:drugs:import' => 'Справочник препаратов', 'app:icd10:import' => 'Справочник МКБ-10', 'app:rules:import' => 'Правила проверки', 'app:scales:import' => 'Опросники', 'app:referral-rules:import' => 'Правила подсказки направления', 'app:alerts:import' => 'Правила алертинга'] as $command => $title) {
             if ($this->command->call($command) !== Command::SUCCESS) {
                 throw new RuntimeException("Не загружено: {$title}, ошибки выше.");
             }
@@ -69,10 +90,12 @@ class DemoSeeder extends Seeder
         $doctors = [
             'doctor' => $this->doctor($createDoctor, 'doctor', 'Смирнова Анна Сергеевна'),
             'doctor2' => $this->doctor($createDoctor, 'doctor2', 'Волков Дмитрий Андреевич'),
+            'therapist' => $this->doctor($createDoctor, 'therapist', 'Кравцова Ирина Олеговна', DoctorKind::Therapist),
         ];
 
         // Карточку с QR для показа печатают заранее, поэтому адрес не меняется от сброса к сбросу.
         $doctors['doctor']->doctorProfile?->update(['join_code' => self::JOIN_CODE]);
+        $doctors['therapist']->doctorProfile?->update(['join_code' => self::THERAPIST_JOIN_CODE]);
 
         $this->quietly(function () use ($doctors, $history): void {
             foreach (DemoPatients::all() as $plan) {
@@ -91,6 +114,8 @@ class DemoSeeder extends Seeder
         $this->adverseEvent('patient_3c', 'drowsiness', AdverseEventSeverity::Severe, started: 3, reported: [9, '21:30']);
         // У Иванова головная боль в первые дни прошла сама, как обещает листок.
         $this->adverseEvent('patient', 'headache', AdverseEventSeverity::Mild, started: 2, reported: [2, '19:10'], resolved: 5, reviewed: [3, '10:05']);
+        // Зайцеву терапевт направил к Смирновой «желательно»: направление ждёт психиатра.
+        $this->quietly(fn () => $this->referral('patient_4c', $doctors['therapist'], $doctors['doctor']));
     }
 
     /**
@@ -119,10 +144,52 @@ class DemoSeeder extends Seeder
         }
     }
 
-    private function doctor(CreateDoctor $createDoctor, string $login, string $name): User
+    private function doctor(CreateDoctor $createDoctor, string $login, string $name, DoctorKind $kind = DoctorKind::Psychiatrist): User
     {
         return User::query()->where('login', $login)->first()
-            ?? $createDoctor->handle($name, $login, self::PASSWORD);
+            ?? $createDoctor->handle($name, $login, self::PASSWORD, kind: $kind);
+    }
+
+    /**
+     * Приём у терапевта в вечер, когда пациент подключился и ответил на опросники: через 40 минут
+     * терапевт заполняет HARS, ещё через 10 направляет к психиатру. Только если пациента ведёт
+     * этот терапевт и направлений у него ещё не было: при выкладке без сброса пациент не меняется.
+     */
+    private function referral(string $login, User $therapist, User $psychiatrist): void
+    {
+        $patient = User::query()->where('login', $login)->first();
+        $care = $patient?->activeCareRelationship()->first();
+        $scale = Scale::query()->active()->forDoctors()->where('code', 'hars')->first();
+
+        if ($patient === null || $care === null || $scale === null || $care->doctor_id !== $therapist->id
+            || Referral::query()->where('patient_id', $patient->id)->exists()) {
+            return;
+        }
+
+        $frozen = CarbonImmutable::getTestNow();
+
+        try {
+            $this->travelTo($care->started_at->addMinutes(40));
+            app(RateScale::class)->handle($therapist, $patient, $scale, self::ZAYTSEVA_HARS, ['mania_signs' => false, 'psychotic_symptoms' => false]);
+
+            $this->travelTo($care->started_at->addMinutes(50));
+            app(ReferPatient::class)->handle(
+                $therapist,
+                $patient,
+                $psychiatrist,
+                ReferralCategory::Desirable,
+                'Три месяца не выходит из дома из-за панических атак, лечение у терапевта на дому не помогло.',
+                app(ReferralEngine::class)->suggest($patient)->category,
+            );
+        } finally {
+            $this->travelTo($frozen);
+        }
+    }
+
+    private function travelTo(?CarbonInterface $moment): void
+    {
+        Carbon::setTestNow($moment);
+        CarbonImmutable::setTestNow($moment);
     }
 
     /**

@@ -42,6 +42,7 @@ test('doctor sees the last sums with band and change, the chart and every answer
             ->where('wellbeing.fillings.0.assessments.1.answers.8', [
                 'item' => 9,
                 'text' => 'Мысли о том, что мне бы хотелось умереть или причинить себе боль',
+                'hint' => null,
                 'score' => 2,
                 'label' => 'Более, чем половину этого времени',
                 'highlight' => true,

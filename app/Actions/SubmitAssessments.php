@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Events\PatientSignalsChanged;
 use App\Jobs\CheckAlertRules;
 use App\Models\Assessment;
 use App\Models\Scale;
@@ -26,7 +27,7 @@ class SubmitAssessments
      */
     public function handle(User $patient, array $answers): Collection
     {
-        $scales = Scale::query()->active()->orderBy('position')->get();
+        $scales = Scale::query()->active()->forPatients()->orderBy('position')->get();
         $answers = array_map(array_values(...), $answers);
 
         if ($scales->isEmpty()) {
@@ -66,6 +67,8 @@ class SubmitAssessments
             }
 
             CheckAlertRules::dispatch($assessments);
+            // Терапевт видит ответивших сегодня, психиатр — опросники в карточке: оба без перезагрузки.
+            PatientSignalsChanged::dispatchForDoctorOf($patient);
 
             return $assessments;
         });

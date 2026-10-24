@@ -1,8 +1,10 @@
 <?php
 
+use App\Actions\RateScale;
 use App\Enums\DoseSkipReason;
 use App\Enums\PrescriptionCloseReason;
 use App\Models\AsNeededDose;
+use App\Models\Assessment;
 use App\Models\CareRelationship;
 use App\Models\Diagnosis;
 use App\Models\DoseEvent;
@@ -519,6 +521,31 @@ function diagnose(User $patient, string $code, bool $main = true): Diagnosis
         'established_on' => DisplayTime::today()->toDateString(),
         'created_by_id' => clinician($patient)->id,
     ]);
+}
+
+/**
+ * Правила подсказки направления к психиатру из файла приложения, как на стенде. Шкалы и виды
+ * фактов загружаются раньше: условия ссылаются на них.
+ */
+function loadReferralRules(): void
+{
+    loadSafetyRules();
+    loadScales();
+    expect(Artisan::call('app:referral-rules:import'))->toBe(0);
+}
+
+/**
+ * Врач заполняет HARS с заданной суммой сегодняшним числом: баллы по пунктам по порядку, не больше
+ * 4 на пункт. Терапевт передаёт признаки (mania_signs, psychotic_symptoms).
+ *
+ * @param  array<string, bool>  $facts
+ */
+function rateHars(User $doctor, User $patient, int $total, array $facts = []): Assessment
+{
+    $scale = Scale::query()->where('code', 'hars')->sole();
+    $scores = array_map(fn (int $item): int => max(0, min(4, $total - 4 * $item)), range(0, count($scale->items) - 1));
+
+    return app(RateScale::class)->handle($doctor, $patient, $scale, $scores, $facts);
 }
 
 /**

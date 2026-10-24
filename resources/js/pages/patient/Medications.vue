@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import {
     CalendarDays,
     Clock,
@@ -21,6 +21,8 @@ const props = defineProps<{
     prescriptions: Prescription[];
     ownMedications: Prescription[];
 }>();
+
+const page = usePage();
 
 defineOptions({
     layout: {
@@ -67,7 +69,13 @@ function titleId(prescription: Prescription): string {
                     Календарь приёма
                 </Link>
             </Button>
-            <Button variant="outline" size="lg" as-child>
+            <!-- Побочные эффекты разбирает психиатр: пока пациента ведёт терапевт, окна нет. -->
+            <Button
+                v-if="!page.props.withTherapist"
+                variant="outline"
+                size="lg"
+                as-child
+            >
                 <Link :href="sideEffects()" data-test="side-effects-link">
                     <Thermometer />
                     Побочные эффекты
@@ -83,7 +91,11 @@ function titleId(prescription: Prescription): string {
                 class="rounded-2xl border border-dashed p-4 text-muted-foreground"
                 data-test="no-prescriptions"
             >
-                Врач пока не назначил препараты.
+                {{
+                    page.props.withTherapist
+                        ? 'Препараты назначит психиатр, когда станет вашим врачом.'
+                        : 'Врач пока не назначил препараты.'
+                }}
             </p>
 
             <PrescriptionDetails

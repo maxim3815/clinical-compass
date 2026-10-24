@@ -74,6 +74,6 @@ class AssessmentRequest extends FormRequest
      */
     private function scales(): Collection
     {
-        return $this->scales ??= Scale::query()->active()->orderBy('position')->get();
+        return $this->scales ??= Scale::query()->active()->forPatients()->orderBy('position')->get();
     }
 }

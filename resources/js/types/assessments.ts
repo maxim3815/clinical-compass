@@ -1,5 +1,6 @@
 /**
- * Опросники пациента (GAD-7, PHQ-9): календарь, суммы для графика, заполнения у врача.
+ * Опросники пациента (GAD-7, PHQ-9) и шкала врача (HARS): календарь, суммы для графика,
+ * заполнения у врача.
  */
 
 // Пора ли заполнить опросники по календарю.
@@ -53,6 +54,8 @@ export type DoctorScale = {
     code: string;
     name: string;
     title: string;
+    // Кто заполняет: пациент сам или врач на приёме (HARS).
+    rater: 'patient' | 'doctor';
     max: number;
     // Границы степеней: линии на графике.
     thresholds: number[];
@@ -67,6 +70,8 @@ export type DoctorScale = {
 export type AssessmentAnswer = {
     item: number;
     text: string;
+    // Пояснение к пункту шкалы врача: что в него входит.
+    hint?: string | null;
     score: number;
     label: string;
     // Вопрос, ответ на который врач видит отдельно (9-й PHQ-9).
@@ -80,11 +85,39 @@ export type AssessmentFilling = {
         id: number;
         scale: string;
         name: string;
+        // Шкалу врача заполнил врач на приёме.
+        rated_by: string | null;
         total: number;
         max: number;
         band: string;
         answers: AssessmentAnswer[];
     }[];
+};
+
+// Шкала врача, которую можно заполнить на приёме.
+export type RatableScale = {
+    code: string;
+    name: string;
+};
+
+// Форма шкалы врача.
+export type DoctorScaleForm = {
+    code: string;
+    name: string;
+    title: string;
+    instruction: string;
+    options: { score: number; label: string }[];
+    items: { text: string; hint: string | null }[];
+    max: number;
+    bands: { min: number; max: number; label: string }[];
+    source: { validation: string; url: string; note: string | null };
+};
+
+// Признак, который терапевт отмечает вместе с HARS.
+export type ScreeningFact = {
+    code: string;
+    name: string;
+    value: boolean | null;
 };
 
 export type Wellbeing = {

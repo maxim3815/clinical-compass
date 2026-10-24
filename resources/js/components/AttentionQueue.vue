@@ -8,7 +8,9 @@ import {
     Thermometer,
     TriangleAlert,
 } from '@lucide/vue';
+import ReferralController from '@/actions/App/Http/Controllers/Doctor/ReferralController';
 import AdherenceSignal from '@/components/AdherenceSignal.vue';
+import ReferralCategoryBadge from '@/components/ReferralCategoryBadge.vue';
 import { alertState, alertTitle } from '@/lib/alerts';
 import {
     CHIP_ICON,
@@ -44,6 +46,13 @@ function alertLabel(alerts: AttentionAlert[]): string {
     return `${alertTitle(latest.rule, latest.trigger)} · ${alertState(!latest.acknowledged, latest.repeated, latest.kind)}${more}`;
 }
 
+// Направленный пациент ещё не пациент врача: строка ведёт на страницу направления.
+function href(patient: AttentionPatient) {
+    return patient.referral
+        ? ReferralController.show(patient.referral.id)
+        : show(patient.id);
+}
+
 function messages(count: number): string {
     return `${count} ${plural(count, ['новое сообщение', 'новых сообщения', 'новых сообщений'])}`;
 }
@@ -69,8 +78,8 @@ function messages(count: number): string {
             class="-mt-2 text-sm text-muted-foreground"
         >
             Число у «Пациентов» в меню показывает пациентов с алертом,
-            противопоказанием без решения, новыми пропусками или новым побочным
-            эффектом.
+            направлением терапевта, противопоказанием без решения, новыми
+            пропусками или новым побочным эффектом.
         </p>
 
         <p
@@ -79,8 +88,9 @@ function messages(count: number): string {
             data-test="attention-empty"
         >
             <CircleCheck class="size-5 shrink-0 text-success" />
-            Сейчас никто не требует внимания: нет алертов, сигналов о приёме,
-            противопоказаний без решения, новых побочных эффектов и сообщений.
+            Сейчас никто не требует внимания: нет алертов, направлений, сигналов
+            о приёме, противопоказаний без решения, новых побочных эффектов и
+            сообщений.
         </p>
 
         <ul v-else class="divide-y rounded-xl border bg-card shadow-xs">
@@ -93,7 +103,7 @@ function messages(count: number): string {
                 <div class="flex min-w-0 flex-col gap-0.5">
                     <!-- Ссылка растянута на всю строку: карточка открывается щелчком в любом месте. -->
                     <Link
-                        :href="show(patient.id)"
+                        :href="href(patient)"
                         class="font-semibold underline-offset-4 after:absolute after:inset-0 hover:underline"
                     >
                         {{ patient.name }}
@@ -114,6 +124,26 @@ function messages(count: number): string {
                     >
                         <Siren :class="CHIP_ICON" />
                         <span>{{ alertLabel(patient.alerts) }}</span>
+                    </li>
+                    <li
+                        v-if="patient.referral"
+                        class="flex flex-wrap items-center gap-x-2 gap-y-1"
+                        data-test="attention-referral"
+                    >
+                        <ReferralCategoryBadge
+                            :category="patient.referral.category"
+                            prefix="Направление терапевта"
+                        />
+                        <span
+                            class="flex w-full flex-col text-muted-foreground @2xl:items-end"
+                        >
+                            <span v-if="patient.referral.summary">{{
+                                patient.referral.summary
+                            }}</span>
+                            <span>{{
+                                `${(patient.referral.from.specialty ?? 'терапевт').toLowerCase()} ${patient.referral.from.name}, ${patient.referral.created_at}`
+                            }}</span>
+                        </span>
                     </li>
                     <li
                         v-if="patient.contraindications.length > 0"

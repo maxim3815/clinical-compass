@@ -300,7 +300,7 @@ final class DemoHistory
             return;
         }
 
-        $scales = Scale::query()->active()->orderBy('position')->get();
+        $scales = Scale::query()->active()->forPatients()->orderBy('position')->get();
         $start = CarbonImmutable::parse($createdAt->setTimezone(DisplayTime::TIMEZONE)->toDateString(), 'UTC');
 
         // У опросников один календарь: они заполняются вместе.

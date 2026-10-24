@@ -35,6 +35,10 @@ declare module '@inertiajs/core' {
             femalePatient: boolean;
             // Кризисная линия на экране помощи пациента, у врача null.
             crisisLine: CrisisLine | null;
+            // Вид врача: у терапевта своё меню и кабинет. У пациента null.
+            doctorKind: 'psychiatrist' | 'therapist' | null;
+            // Пациента ведёт терапевт: чата и окна побочных эффектов нет.
+            withTherapist: boolean;
             [key: string]: unknown;
         };
         flashDataType: {

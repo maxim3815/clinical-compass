@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\DoctorKind;
 use App\Enums\UserRole;
 use App\Models\CareRelationship;
 use App\Models\DoctorProfile;
@@ -60,6 +61,16 @@ class UserFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'role' => UserRole::Doctor,
         ]);
+    }
+
+    /**
+     * Терапевт: кабинет для отбора и направления к психиатру.
+     */
+    public function therapist(): static
+    {
+        return $this->doctor()->afterCreating(function (User $user): void {
+            $user->doctorProfile?->update(['kind' => DoctorKind::Therapist, 'specialty' => DoctorKind::Therapist->specialty()]);
+        });
     }
 
     public function patient(): static

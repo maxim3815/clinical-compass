@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureDoctorKind;
 use App\Http\Middleware\EnsureUserHasRole;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Application;
@@ -28,6 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'role' => EnsureUserHasRole::class,
+            'doctor.kind' => EnsureDoctorKind::class,
         ]);
 
         $middleware->web(append: [

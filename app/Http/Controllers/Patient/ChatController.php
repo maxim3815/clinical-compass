@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CareRelationship;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
 use Inertia\Inertia;
@@ -21,10 +22,15 @@ class ChatController extends Controller
 {
     use ServesChat;
 
-    public function show(Request $request, MarkMessagesRead $markMessagesRead): Response
+    public function show(Request $request, MarkMessagesRead $markMessagesRead): Response|RedirectResponse
     {
         /** @var User $patient */
         $patient = $request->user();
+
+        // Терапевт только отбирает и направляет: чат появится у психиатра.
+        if ($patient->isWithTherapist()) {
+            return to_route('patient.home');
+        }
 
         $careRelationship = $patient->activeCareRelationship()->with('doctor.doctorProfile')->first();
 
@@ -67,6 +73,8 @@ class ChatController extends Controller
     {
         /** @var User $patient */
         $patient = $request->user();
+
+        abort_if($patient->isWithTherapist(), 404);
 
         return $patient->activeCareRelationship()->firstOrFail();
     }

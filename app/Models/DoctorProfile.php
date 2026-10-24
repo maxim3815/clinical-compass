@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\DoctorKind;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Table;
@@ -12,11 +13,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $user_id
  * @property string $specialty
  * @property string $join_code
+ * @property DoctorKind $kind
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
 #[Table(key: 'user_id', incrementing: false)]
-#[Fillable(['specialty', 'join_code'])]
+#[Fillable(['specialty', 'join_code', 'kind'])]
 class DoctorProfile extends Model
 {
     /**
@@ -48,5 +50,17 @@ class DoctorProfile extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'kind' => DoctorKind::class,
+        ];
     }
 }

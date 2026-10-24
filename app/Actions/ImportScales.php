@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Enums\ScaleRater;
 use App\Exceptions\InvalidScales;
 use App\Models\Scale;
 use App\Support\Assessments\ScaleImportResult;
@@ -11,7 +12,8 @@ use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * Загрузка опросников из YAML-файлов, по файлу на шкалу. Всё проверяется до записи в БД:
+ * Загрузка шкал из YAML-файлов, по файлу на шкалу. Шкалу пациента он заполняет сам по календарю,
+ * у шкалы врача (`rater: doctor`) нет нейтрального названия для пациента и календаря. Всё проверяется до записи в БД:
  * при ошибке в любом файле не загружается ничего. Шкалы сопоставляются по коду, повторная
  * загрузка тех же файлов ничего не меняет. Шкала, которой в файлах больше нет, выключается,
  * а не удаляется: на неё ссылаются заполнения.
@@ -20,13 +22,14 @@ use Symfony\Component\Yaml\Yaml;
  *     code: string,
  *     name: string,
  *     title: string,
- *     patient_title: string,
+ *     rater?: 'patient'|'doctor',
+ *     patient_title?: string,
  *     position: int,
  *     instruction: string,
  *     options: list<array{score: int, label: string}>,
- *     items: list<array{text: string, highlight?: bool}>,
+ *     items: list<array{text: string, hint?: string, highlight?: bool}>,
  *     bands: list<array{min: int, max: int, label: string}>,
- *     schedule: array{days: list<int>, then_every: int},
+ *     schedule?: array{days: list<int>, then_every: int},
  *     source: array{original: string, validation: string, url: string, license: string, note?: string|null},
  * }
  */
@@ -34,11 +37,11 @@ class ImportScales
 {
     public const string DEFAULT_PATH = 'database/data/scales';
 
-    private const array FIELDS = ['code', 'name', 'title', 'patient_title', 'position', 'instruction', 'options', 'items', 'bands', 'schedule', 'source'];
+    private const array FIELDS = ['code', 'name', 'title', 'rater', 'patient_title', 'position', 'instruction', 'options', 'items', 'bands', 'schedule', 'source'];
 
     private const array OPTION_FIELDS = ['score', 'label'];
 
-    private const array ITEM_FIELDS = ['text', 'highlight'];
+    private const array ITEM_FIELDS = ['text', 'hint', 'highlight'];
 
     private const array BAND_FIELDS = ['min', 'max', 'label'];
 
@@ -157,11 +160,16 @@ class ImportScales
             }
         }
 
+        // Шкалу врача пациент не видит и по календарю не заполняет.
+        $byDoctor = ($scale['rater'] ?? null) === ScaleRater::Doctor->value;
+        $patientOnly = $byDoctor ? 'prohibited' : 'required';
+
         $validator = Validator::make($scale, [
             'code' => ['required', 'string', 'max:64', 'regex:/^'.Scale::CODE_PATTERN.'$/'],
             'name' => ['required', 'string', 'max:255'],
             'title' => ['required', 'string', 'max:255'],
-            'patient_title' => ['required', 'string', 'max:255'],
+            'rater' => ['sometimes', 'string', 'in:'.ScaleRater::Patient->value.','.ScaleRater::Doctor->value],
+            'patient_title' => [$patientOnly, 'string', 'max:255'],
             'position' => ['required', 'integer', 'min:1'],
             'instruction' => ['required', 'string'],
             'options' => ['required', 'list', 'min:2'],
@@ -171,16 +179,17 @@ class ImportScales
             'items' => ['required', 'list', 'min:1'],
             'items.*' => ['array'],
             'items.*.text' => ['required', 'string'],
+            'items.*.hint' => ['sometimes', 'string'],
             'items.*.highlight' => ['sometimes', 'boolean:strict'],
             'bands' => ['required', 'list', 'min:1'],
             'bands.*' => ['array'],
             'bands.*.min' => ['required', 'integer', 'min:0'],
             'bands.*.max' => ['required', 'integer', 'min:0'],
             'bands.*.label' => ['required', 'string', 'max:255'],
-            'schedule' => ['required', 'array'],
-            'schedule.days' => ['required', 'list', 'min:1'],
+            'schedule' => [$patientOnly, 'array'],
+            'schedule.days' => [$byDoctor ? 'exclude' : 'required', 'list', 'min:1'],
             'schedule.days.*' => ['integer', 'min:0', 'distinct'],
-            'schedule.then_every' => ['required', 'integer', 'min:1'],
+            'schedule.then_every' => [$byDoctor ? 'exclude' : 'required', 'integer', 'min:1'],
             'source' => ['required', 'array'],
             'source.original' => ['required', 'string'],
             'source.validation' => ['required', 'string'],
@@ -235,12 +244,14 @@ class ImportScales
             $errors[] = "последняя степень должна заканчиваться наибольшей суммой {$maxTotal}.";
         }
 
-        $days = $scale['schedule']['days'];
-        $sorted = $days;
-        sort($sorted);
+        if (isset($scale['schedule'])) {
+            $days = $scale['schedule']['days'];
+            $sorted = $days;
+            sort($sorted);
 
-        if ($days !== $sorted || $days[0] !== 0) {
-            $errors[] = 'schedule.days: сроки должны идти по возрастанию и начинаться с дня 0.';
+            if ($days !== $sorted || $days[0] !== 0) {
+                $errors[] = 'schedule.days: сроки должны идти по возрастанию и начинаться с дня 0.';
+            }
         }
 
         return $errors;
@@ -259,14 +270,19 @@ class ImportScales
             $attributes = [
                 'name' => $data['name'],
                 'title' => $data['title'],
-                'patient_title' => $data['patient_title'],
+                'rater' => $data['rater'] ?? ScaleRater::Patient->value,
+                'patient_title' => $data['patient_title'] ?? null,
                 'position' => $data['position'],
                 'instruction' => $data['instruction'],
                 'options' => $data['options'],
-                'items' => array_map(fn (array $item): array => ['text' => $item['text'], 'highlight' => $item['highlight'] ?? false], $data['items']),
+                'items' => array_map(fn (array $item): array => array_filter([
+                    'text' => $item['text'],
+                    'hint' => $item['hint'] ?? null,
+                    'highlight' => $item['highlight'] ?? false,
+                ], fn (mixed $value): bool => $value !== null), $data['items']),
                 'bands' => $data['bands'],
-                'schedule_days' => $data['schedule']['days'],
-                'schedule_then_every' => $data['schedule']['then_every'],
+                'schedule_days' => $data['schedule']['days'] ?? null,
+                'schedule_then_every' => $data['schedule']['then_every'] ?? null,
                 'source_original' => $data['source']['original'],
                 'source_validation' => $data['source']['validation'],
                 'source_url' => $data['source']['url'],
@@ -276,7 +292,9 @@ class ImportScales
 
             $scale = $existing->get($data['code']) ?? new Scale(['code' => $data['code']]);
             $isNew = ! $scale->exists;
-            $version = hash('sha256', $data['code'].'|'.json_encode($attributes, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+            // Шкалы пациента появились раньше поля rater: без него их версия не меняется.
+            $hashed = $attributes['rater'] === ScaleRater::Patient->value ? array_diff_key($attributes, ['rater' => true]) : $attributes;
+            $version = hash('sha256', $data['code'].'|'.json_encode($hashed, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
             $changed = $isNew || $scale->version !== $version || ! $scale->is_active;
 
             if (! $changed) {
