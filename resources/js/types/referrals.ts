@@ -89,10 +89,8 @@ export type SentReferral = {
 };
 
 // Строка «Ответили сегодня» у терапевта.
-export type AnsweredToday = {
+type AnsweredCommon = {
     id: number;
-    name: string;
-    age: number | null;
     at: string;
     scales: { name: string; total: number; max: number; band: string }[];
     // Ответ на 9-й вопрос PHQ-9 не «совсем нет».
@@ -107,6 +105,24 @@ export type AnsweredToday = {
         category: ReferralCategory | null;
     } | null;
 };
+
+/**
+ * Строка «Ответили сегодня»: пациент терапевта или ответы из очереди у двери с кодом.
+ */
+export type AnsweredToday =
+    | (AnsweredCommon & {
+          kind: 'patient';
+          name: string;
+          age: number | null;
+      })
+    | (AnsweredCommon & {
+          kind: 'queue';
+          code: string;
+          // Сигнал по 9-му вопросу, а терапевт ответы ещё не открывал.
+          unopened: boolean;
+          // Когда терапевт открыл ответы, ЧЧ:ММ; null — ещё не открывал.
+          opened_at: string | null;
+      });
 
 // Строка всех пациентов терапевта.
 export type TherapistPatientRow = {

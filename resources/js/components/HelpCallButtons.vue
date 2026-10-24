@@ -4,23 +4,31 @@ import { Phone } from '@lucide/vue';
 import { computed } from 'vue';
 import { Button } from '@/components/ui/button';
 import { recordHelpCall } from '@/lib/helpCalls';
+import type { HelpLine } from '@/lib/helpCalls';
 
 /**
  * Звонки на экране помощи и в карточке «Если вам сейчас тяжело»: 112 и кризисная линия [медик].
- * Нажатие врач видит тихой строкой в карточке пациента.
+ * Нажатие врач видит тихой строкой в карточке пациента. В очереди у двери терапевта пациент
+ * без входа: нажатия не записываются.
  */
+const { record = true } = defineProps<{
+    record?: boolean;
+}>();
+
 const page = usePage();
+
+function call(line: HelpLine): void {
+    if (record) {
+        recordHelpCall(line);
+    }
+}
 const crisisLine = computed(() => page.props.crisisLine);
 </script>
 
 <template>
     <div class="flex flex-col gap-3">
         <Button size="xl" as-child>
-            <a
-                href="tel:112"
-                data-test="call-112"
-                @click="recordHelpCall('112')"
-            >
+            <a href="tel:112" data-test="call-112" @click="call('112')">
                 <Phone />
                 Позвонить 112
             </a>
@@ -35,7 +43,7 @@ const crisisLine = computed(() => page.props.crisisLine);
             <a
                 :href="crisisLine.href"
                 data-test="call-crisis-line"
-                @click="recordHelpCall('crisis_line')"
+                @click="call('crisis_line')"
             >
                 <span class="flex items-center gap-2">
                     <Phone />

@@ -11,6 +11,7 @@ import {
 } from '@lucide/vue';
 import DoctorScaleController from '@/actions/App/Http/Controllers/Doctor/DoctorScaleController';
 import { computed, nextTick, ref, useTemplateRef } from 'vue';
+import AssessmentAnswers from '@/components/AssessmentAnswers.vue';
 import ScoreChart from '@/components/ScoreChart.vue';
 import { Button } from '@/components/ui/button';
 import { CHIP_ICON, DANGER_CHIP } from '@/lib/chips';
@@ -323,62 +324,11 @@ function highlighted(filling: AssessmentFilling) {
                         </summary>
 
                         <div class="flex flex-col gap-4 border-t px-4 py-3">
-                            <table
+                            <AssessmentAnswers
                                 v-for="assessment in filling.assessments"
                                 :key="`answers-${assessment.id}`"
-                                class="w-full text-left text-sm"
-                            >
-                                <caption class="pb-1 text-left font-semibold">
-                                    {{
-                                        `${assessment.name}: ${assessment.total} из ${assessment.max}, ${assessment.band}`
-                                    }}
-                                </caption>
-                                <thead class="sr-only">
-                                    <tr>
-                                        <th scope="col">Вопрос</th>
-                                        <th scope="col">Ответ</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr
-                                        v-for="answer in assessment.answers"
-                                        :key="answer.item"
-                                        class="border-b last:border-b-0"
-                                        :class="
-                                            answer.highlight && answer.score > 0
-                                                ? 'bg-danger-subtle'
-                                                : ''
-                                        "
-                                    >
-                                        <td class="py-1.5 pr-3 align-top">
-                                            <span
-                                                class="text-muted-foreground tabular-nums"
-                                                >{{ answer.item }}.</span
-                                            >
-                                            {{ answer.text }}
-                                            <span
-                                                v-if="answer.hint"
-                                                class="block text-muted-foreground"
-                                                >{{ answer.hint }}</span
-                                            >
-                                        </td>
-                                        <td
-                                            class="w-2/5 py-1.5 align-top"
-                                            :class="
-                                                answer.score > 0
-                                                    ? 'font-semibold'
-                                                    : ''
-                                            "
-                                        >
-                                            {{ answer.label }}
-                                            <span
-                                                class="text-muted-foreground tabular-nums"
-                                                >({{ answer.score }})</span
-                                            >
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                                :assessment="assessment"
+                            />
                         </div>
                     </details>
                 </li>

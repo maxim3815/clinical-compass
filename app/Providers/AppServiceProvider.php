@@ -41,6 +41,14 @@ class AppServiceProvider extends ServiceProvider
         // чем у ссылок. Сами ошибки PIN считает App\Support\PinAttempts.
         RateLimiter::for('join', fn (Request $request) => Limit::perMinute(30)->by($request->ip()));
 
+        // Ответы из очереди у двери терапевта: без входа, поэтому лимит по адресу. Ошибка встаёт
+        // над кнопкой отправки, а не отдельной страницей 429.
+        RateLimiter::for('queue', fn (Request $request) => Limit::perHour(10)
+            ->by('queue:'.$request->ip())
+            ->response(fn () => back()->withErrors([
+                'answers' => 'С этого телефона уже много ответов за последний час. Попробуйте позже или скажите терапевту, что не получилось.',
+            ])));
+
         // Отправка сообщений в чат. Ответ JSON: форма показывает текст под полем.
         RateLimiter::for('chat', fn (Request $request) => Limit::perMinute(30)
             ->by('chat:'.$request->user()?->id)

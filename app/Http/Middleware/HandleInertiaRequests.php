@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Enums\UserRole;
 use App\Support\Alerts\AlertPresenter;
 use App\Support\PatientSignals;
+use App\Support\QueueAnswers\QueueAnswerPresenter;
 use App\Support\UnreadMessages;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -53,12 +54,16 @@ class HandleInertiaRequests extends Middleware
             'patientSignals' => fn (): int => $request->user()?->role === UserRole::Doctor ? PatientSignals::count($request->user()) : 0,
             // Непринятые алерты врача: красная плашка на всех страницах кабинета. Дальше — событиями.
             'urgentAlerts' => fn (): array => $request->user()?->role === UserRole::Doctor ? AlertPresenter::banner($request->user()) : [],
+            // Ответы из очереди с сигналом по 9-му вопросу, которые терапевт ещё не открыл: в той же
+            // красной плашке. Дальше — событиями.
+            'urgentQueue' => fn (): array => $request->user()?->role === UserRole::Doctor ? QueueAnswerPresenter::banner($request->user()) : [],
             // Вид врача: у терапевта своё меню и свой кабинет. У пациента null.
             'doctorKind' => fn (): ?string => $request->user()?->doctorKind()?->value,
             // Пациента ведёт терапевт: чата и окна побочных эффектов нет, ссылки на них не показываются.
             'withTherapist' => fn (): bool => (bool) $request->user()?->isWithTherapist(),
-            // Кризисная линия на экране помощи пациента и в карточке «Если вам сейчас тяжело».
-            'crisisLine' => fn (): ?array => $request->user()?->role === UserRole::Patient ? [
+            // Кризисная линия на экране помощи пациента и в карточке «Если вам сейчас тяжело». Гостю —
+            // на странице опросников у двери терапевта.
+            'crisisLine' => fn (): ?array => $request->user()?->role !== UserRole::Doctor ? [
                 'label' => (string) config('help.crisis_line'),
                 'href' => 'tel:'.preg_replace('/\D/', '', (string) config('help.crisis_line')),
             ] : null,

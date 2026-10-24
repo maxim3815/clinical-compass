@@ -33,6 +33,7 @@ use App\Support\Safety\SafetySignals;
 use App\Support\UnreadMessages;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
@@ -42,7 +43,7 @@ class PatientController extends Controller
 {
     public const int PER_PAGE = 20;
 
-    public function index(Request $request): Response
+    public function index(Request $request): Response|RedirectResponse
     {
         // У терапевта свой кабинет на тех же адресах.
         if ($request->user()?->isTherapist()) {

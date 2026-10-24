@@ -230,6 +230,10 @@
     .print-sheet * {
         visibility: visible;
     }
+    /* Поля листа: многие принтеры не печатают край в 4–6 мм. */
+    @page {
+        margin: 12mm;
+    }
     .print-sheet {
         position: fixed;
         top: 0;

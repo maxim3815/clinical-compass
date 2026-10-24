@@ -28,6 +28,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $patient_name
  * @property string|null $pin_hash
  * @property CarbonImmutable|null $pin_entered_at
+ * @property int|null $queue_answer_id Ответы из очереди, к которым привязан PIN со страницы кода.
  * @property CarbonImmutable $expires_at
  * @property CarbonImmutable|null $used_at
  * @property CarbonImmutable|null $revoked_at
@@ -35,8 +36,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable|null $updated_at
  * @property-read User $doctor
  * @property-read User|null $patient
+ * @property-read QueueAnswer|null $queueAnswer
  */
-#[Fillable(['purpose', 'doctor_id', 'patient_id', 'token_hash', 'patient_name', 'pin_hash', 'pin_entered_at', 'expires_at', 'used_at', 'revoked_at'])]
+#[Fillable(['purpose', 'doctor_id', 'patient_id', 'token_hash', 'patient_name', 'pin_hash', 'pin_entered_at', 'queue_answer_id', 'expires_at', 'used_at', 'revoked_at'])]
 #[Hidden(['token_hash', 'pin_hash'])]
 class AccessLink extends Model
 {
@@ -111,6 +113,14 @@ class AccessLink extends Model
     public function patient(): BelongsTo
     {
         return $this->belongsTo(User::class, 'patient_id');
+    }
+
+    /**
+     * @return BelongsTo<QueueAnswer, $this>
+     */
+    public function queueAnswer(): BelongsTo
+    {
+        return $this->belongsTo(QueueAnswer::class);
     }
 
     public function status(): AccessLinkStatus

@@ -14,6 +14,8 @@ type Props = {
     doctor: InvitingDoctor;
     // Ввод закрыт после неверных попыток: текст с оставшимся временем.
     locked: string | null;
+    // Код из очереди у двери терапевта с этого телефона: сейчас нужен другой.
+    queueCode: string | null;
 };
 
 const props = defineProps<Props>();
@@ -84,6 +86,16 @@ function submit(value: (number | undefined)[]): void {
         <p id="pin-label" class="text-base font-medium">
             Нажмите на клетку и наберите 4 цифры, которые назвал врач
         </p>
+        <p
+            v-if="queueCode"
+            id="pin-queue-hint"
+            class="-mt-2 text-base text-muted-foreground"
+            data-test="join-queue-hint"
+        >
+            {{
+                `Это новый код, не тот, что вы получили в очереди (${queueCode}).`
+            }}
+        </p>
         <!--
             reka-ui в режиме otp отменяет нажатие на клетку правее первой пустой и ставит фокус
             скриптом, а на Android клавиатура от такого фокуса не открывается. Поэтому нажатие
@@ -118,7 +130,9 @@ function submit(value: (number | undefined)[]): void {
                     data-pin-cell
                     autocomplete="off"
                     :aria-invalid="error ? true : undefined"
-                    aria-describedby="pin-error"
+                    :aria-describedby="
+                        queueCode ? 'pin-queue-hint pin-error' : 'pin-error'
+                    "
                     class="size-16 min-w-0 rounded-xl border border-input bg-card text-center text-3xl font-semibold tabular-nums shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring focus-visible:outline-solid disabled:bg-muted disabled:opacity-70 aria-invalid:border-destructive"
                 />
             </PinInputRoot>

@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { Link, useHttp, usePage } from '@inertiajs/vue3';
-import { CircleCheck, Clock, Printer, QrCode, RefreshCw } from '@lucide/vue';
+import {
+    CircleCheck,
+    Clock,
+    ExternalLink,
+    Printer,
+    QrCode,
+    RefreshCw,
+} from '@lucide/vue';
 import {
     computed,
     nextTick,
@@ -33,14 +40,41 @@ import type { AppointmentPin, InvitationChanged } from '@/types';
  * «Пригласить на приёме»: PIN на 15 минут, QR постоянного адреса врача и что происходит
  * у пациента — ввёл код, зарегистрировался. Код, который врач уже назвал, случайно не гаснет:
  * окно не закрывается щелчком мимо, а открытое снова показывает тот же код, пока он действует.
+ *
+ * Со страницы ответов из очереди PIN привязан к ним: после регистрации ответы и HARS переходят
+ * пациенту. Такой код живёт только на этой странице, общее окно кабинета его не показывает.
+ * Окно, закрытое после регистрации, сообщает о ней странице (registered).
  */
-const { variant = 'outline' } = defineProps<{
+const {
+    variant = 'outline',
+    label = 'Пригласить на приёме',
+    queueAnswerId = null,
+    queueCode = null,
+} = defineProps<{
     variant?: 'default' | 'outline';
+    // Кнопка и заголовок окна: на странице ответов из очереди — «Зарегистрировать пациента».
+    label?: string;
+    queueAnswerId?: number | null;
+    // Код ответов из очереди: врач сверяет его с телефоном пациента.
+    queueCode?: string | null;
+}>();
+
+const emit = defineEmits<{
+    registered: [patient: NonNullable<InvitationChanged['patient']>];
+    openChange: [open: boolean];
 }>();
 
 const page = usePage();
 const open = ref(false);
-const { issued, deadline, stage, patient } = useAppointmentPin();
+const { issued, deadline, stage, patient } =
+    queueAnswerId === null
+        ? useAppointmentPin()
+        : {
+              issued: ref<AppointmentPin | null>(null),
+              deadline: ref(0),
+              stage: ref<AppointmentStage>('waiting'),
+              patient: ref<InvitationChanged['patient']>(null),
+          };
 const failed = ref(false);
 // Окно открыто снова: сервер подтверждает, что прежний код ещё ждёт ввода.
 const checking = ref(false);
@@ -49,7 +83,9 @@ const left = ref(0);
 const announcement = ref('');
 const closeButton = useTemplateRef<{ $el: HTMLElement }>('closeButton');
 
-const http = useHttp<Record<string, never>, AppointmentPin>({});
+const http = useHttp<{ queue_answer_id: number | null }, AppointmentPin>({
+    queue_answer_id: queueAnswerId,
+});
 const status = useHttp<
     Record<string, never>,
     {
@@ -110,7 +146,11 @@ function startTimer(): void {
 }
 
 function announce(pin: string): void {
-    announcement.value = `Код для пациента: ${pin.split('').join(' ')}`;
+    // Предупреждение о сверке кода вне описания окна: скринридер слышит его вместе с кодом.
+    announcement.value =
+        queueCode === null
+            ? `Код для пациента: ${pin.split('').join(' ')}`
+            : `Код для регистрации: ${pin.split('').join(' ')}. Сверьте код из очереди ${queueCode.split('').join(' ')} с телефоном пациента.`;
 }
 
 async function issue(): Promise<void> {
@@ -175,12 +215,20 @@ async function reopen(): Promise<void> {
 }
 
 watch(open, (value) => {
+    emit('openChange', value);
+
     if (value) {
         void reopen();
     } else {
         stopTimer();
         // Открыли снова — тот же код объявится заново.
         announcement.value = '';
+
+        // Страница ответов из очереди меняется, когда врач закрыл окно с «Регистрация завершена»,
+        // а не посреди него.
+        if (stage.value === 'registered' && patient.value) {
+            emit('registered', patient.value);
+        }
     }
 });
 
@@ -204,6 +252,11 @@ useRealtime<InvitationChanged>(
         if (stage.value !== 'registered') {
             stage.value = event.stage;
             patient.value = event.patient;
+
+            // Окно уже закрыли: страница узнаёт о регистрации сразу.
+            if (!open.value && event.stage === 'registered' && event.patient) {
+                emit('registered', event.patient);
+            }
         }
 
         stopTimer();
@@ -216,7 +269,7 @@ useRealtime<InvitationChanged>(
         <DialogTrigger as-child>
             <Button :variant="variant" data-test="appointment-invitation">
                 <QrCode />
-                Пригласить на приёме
+                {{ label }}
             </Button>
         </DialogTrigger>
         <!-- Окно закреплено от верха: при смене статуса код не прыгает. -->
@@ -227,12 +280,40 @@ useRealtime<InvitationChanged>(
             @open-auto-focus="focusClose"
         >
             <DialogHeader>
-                <DialogTitle>Пригласить на приёме</DialogTitle>
+                <DialogTitle>{{ label }}</DialogTitle>
                 <DialogDescription>
-                    Попросите пациента навести камеру телефона на QR-код и
-                    назовите ему код.
+                    {{
+                        queueAnswerId === null
+                            ? 'Попросите пациента навести камеру телефона на QR-код и назовите ему код.'
+                            : 'Попросите пациента навести камеру телефона на QR-код и назовите ему код для регистрации. Это новый код, не тот, что пациент получил в очереди.'
+                    }}
                 </DialogDescription>
             </DialogHeader>
+
+            <!-- Из общего окна ответы из очереди переходят только с того же телефона. -->
+            <p
+                v-if="
+                    queueAnswerId === null &&
+                    page.props.doctorKind === 'therapist'
+                "
+                class="text-sm text-muted-foreground"
+                data-test="appointment-queue-tip"
+            >
+                Пациент отвечал в очереди? Откройте его код в «Ответили сегодня»
+                и регистрируйте оттуда: ответы перейдут в карточку с любого
+                телефона.
+            </p>
+
+            <!-- Ответы уйдут тому, кто зарегистрируется: ослышаться в коде из очереди нельзя. -->
+            <p
+                v-if="queueCode"
+                class="rounded-lg border border-warning-border bg-warning-subtle p-3 text-sm"
+                data-test="appointment-queue-code"
+            >
+                {{
+                    `После регистрации ответы с кодом ${queueCode} и HARS перейдут в карточку пациента. Сверьте ${queueCode} с кодом на телефоне пациента.`
+                }}
+            </p>
 
             <p class="sr-only" aria-live="polite">{{ announcement }}</p>
 
@@ -261,7 +342,11 @@ useRealtime<InvitationChanged>(
                 <div class="flex flex-col gap-3">
                     <div class="flex flex-col gap-1">
                         <p class="text-sm text-muted-foreground">
-                            Код для пациента
+                            {{
+                                queueAnswerId === null
+                                    ? 'Код для пациента'
+                                    : 'Код для регистрации'
+                            }}
                         </p>
                         <p
                             class="text-6xl font-semibold tracking-[0.2em] tabular-nums"
@@ -315,8 +400,11 @@ useRealtime<InvitationChanged>(
                             <Clock
                                 class="mt-0.5 size-4 shrink-0 text-muted-foreground"
                             />
-                            Код введён, пациент заполняет форму. Окно можно
-                            закрыть: пациент появится в списке, когда закончит.
+                            {{
+                                queueAnswerId === null
+                                    ? 'Код введён, пациент заполняет форму. Окно можно закрыть: пациент появится в списке, когда закончит.'
+                                    : 'Код введён, пациент заполняет форму. Окно можно закрыть: когда пациент закончит, вы увидите это на странице.'
+                            }}
                         </p>
                         <div
                             v-else-if="stage === 'registered'"
@@ -338,7 +426,11 @@ useRealtime<InvitationChanged>(
                                 <Link
                                     :href="patientCard(patient.id)"
                                     data-test="appointment-open-patient"
-                                    >Открыть карточку</Link
+                                    >{{
+                                        queueAnswerId === null
+                                            ? 'Открыть карточку'
+                                            : 'Открыть карточку и направить'
+                                    }}</Link
                                 >
                             </Button>
                         </div>
@@ -387,6 +479,7 @@ useRealtime<InvitationChanged>(
                     >
                         <Printer />
                         Карточка для стола
+                        <ExternalLink class="size-3.5" />
                         <span class="sr-only">(в новой вкладке)</span>
                     </a>
                 </Button>

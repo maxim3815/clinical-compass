@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Doctor;
 use App\Actions\IssueAppointmentPin;
 use App\Http\Controllers\Controller;
 use App\Models\AccessLink;
+use App\Models\QueueAnswer;
 use App\Models\User;
 use App\Support\JoinAddress;
 use Illuminate\Http\JsonResponse;
@@ -19,14 +20,26 @@ use Inertia\Response;
 class AppointmentInvitationController extends Controller
 {
     /**
-     * Новый PIN. Ответ JSON: окно показывает код, не перезагружая страницу под собой.
+     * Новый PIN. Ответ JSON: окно показывает код, не перезагружая страницу под собой. Со страницы
+     * ответов из очереди PIN привязывается к ним.
      */
     public function store(Request $request, IssueAppointmentPin $issueAppointmentPin): JsonResponse
     {
         /** @var User $doctor */
         $doctor = $request->user();
 
-        $issued = $issueAppointmentPin->handle($doctor);
+        $validated = $request->validate([
+            'queue_answer_id' => ['nullable', 'integer'],
+        ]);
+
+        $queueAnswer = isset($validated['queue_answer_id'])
+            ? QueueAnswer::query()->pending()->where('doctor_id', $doctor->id)->whereKey($validated['queue_answer_id'])->first()
+            : null;
+
+        // Ответы привязали к пациенту или они истекли, пока окно открывалось: страница обновится.
+        abort_if(isset($validated['queue_answer_id']) && $queueAnswer === null, 409);
+
+        $issued = $issueAppointmentPin->handle($doctor, $queueAnswer);
 
         return response()->json([
             'id' => $issued->link->id,

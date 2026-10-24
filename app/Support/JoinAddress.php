@@ -11,8 +11,8 @@ use BaconQrCode\Renderer\RendererStyle\RendererStyle;
 use BaconQrCode\Writer;
 
 /**
- * Постоянный адрес врача для подключения на приёме: ссылка, короткая запись для диктовки
- * и QR-код. QR рисуется здесь же, без внешних сервисов.
+ * Постоянный адрес врача для подключения на приёме или страница опросников у двери терапевта:
+ * ссылка, короткая запись для диктовки и QR-код. QR рисуется здесь же, без внешних сервисов.
  */
 final readonly class JoinAddress
 {
@@ -21,6 +21,14 @@ final readonly class JoinAddress
     public static function of(User $doctor): self
     {
         return new self(route('join.show', (string) $doctor->doctorProfile?->join_code));
+    }
+
+    /**
+     * Страница у двери терапевта: опросники в очереди без регистрации. Код врача тот же.
+     */
+    public static function queue(User $doctor): self
+    {
+        return new self(route('queue.show', (string) $doctor->doctorProfile?->join_code));
     }
 
     /**

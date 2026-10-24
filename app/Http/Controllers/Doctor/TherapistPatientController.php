@@ -9,6 +9,7 @@ use App\Models\Assessment;
 use App\Models\AssessmentAnswer;
 use App\Models\AuditLog;
 use App\Models\CareRelationship;
+use App\Models\QueueAnswer;
 use App\Models\Referral;
 use App\Models\Scale;
 use App\Models\User;
@@ -17,12 +18,14 @@ use App\Support\Alerts\AlertSignals;
 use App\Support\Assessments\PatientAssessments;
 use App\Support\DisplayTime;
 use App\Support\PrescriptionPresenter;
+use App\Support\QueueAnswers\QueueAnswerPresenter;
 use App\Support\Referrals\ReferralEngine;
 use App\Support\Referrals\ReferralPresenter;
 use App\Support\Safety\ClinicalProfilePresenter;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
@@ -37,11 +40,27 @@ class TherapistPatientController extends Controller
 {
     public function __construct(private readonly ReferralEngine $engine) {}
 
-    public function index(Request $request): Response
+    public function index(Request $request): Response|RedirectResponse
     {
         /** @var User $therapist */
         $therapist = $request->user();
         $search = trim($request->string('search')->toString());
+
+        // 4 цифры в поиске — код из очереди, который назвал пациент: сразу его ответы.
+        if (preg_match('/^\d{4}$/', $search) === 1) {
+            $answer = QueueAnswer::query()
+                ->where('doctor_id', $therapist->id)
+                ->where('code', $search)
+                ->where('submitted_at', '>', now()->subHours(QueueAnswer::LIFETIME_HOURS))
+                ->orderByRaw('attached_at IS NOT NULL')
+                ->latest('submitted_at')
+                ->first();
+
+            // Страница кода сама ведёт в карточку, если пациент уже зарегистрировался.
+            if ($answer !== null) {
+                return to_route('doctor.queue-answers.show', $answer);
+            }
+        }
 
         $patients = CareRelationship::query()
             ->active()
@@ -70,8 +89,9 @@ class TherapistPatientController extends Controller
                 'alert' => isset($alerting[$care->patient_id]),
                 'referred' => isset($referred[$care->patient_id]),
             ]),
-            // Кто ответил на опросники сегодня: их терапевт смотрит на приёме первыми.
-            'answered' => fn (): array => $search === '' ? $this->answeredToday($therapist) : [],
+            // Кто ответил на опросники сегодня и ответы из очереди с кодами: их терапевт смотрит
+            // на приёме первыми.
+            'answered' => fn (): array => $search === '' ? $this->answered($therapist) : [],
             'referrals' => fn (): array => $search === '' ? ReferralPresenter::sentBy($therapist) : [],
             'search' => $search,
         ]);
@@ -124,8 +144,22 @@ class TherapistPatientController extends Controller
     }
 
     /**
+     * «Ответили сегодня»: пациенты терапевта и ответы из очереди у двери. Сначала неразобранные,
+     * внутри — ответившие последними.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function answered(User $therapist): array
+    {
+        return array_values(collect([...$this->answeredToday($therapist), ...QueueAnswerPresenter::rows($therapist, $this->engine)])
+            ->sortBy(fn (array $row): array => [$row['decision'] === null ? 0 : 1, -$row['timestamp']])
+            ->map(fn (array $row): array => array_diff_key($row, ['timestamp' => true]))
+            ->all());
+    }
+
+    /**
      * Пациенты терапевта, которые сегодня отправили опросники: суммы, ответ на 9-й вопрос PHQ-9
-     * и подсказка направления. Сначала ответившие последними.
+     * и подсказка направления.
      *
      * @return list<array<string, mixed>>
      */
@@ -146,15 +180,16 @@ class TherapistPatientController extends Controller
         $alerting = array_flip(AlertSignals::patientIds($therapist));
         $patientIds = $assessments->pluck('patient_id')->unique()->values()->all();
         $referred = Referral::query()->open()->whereIn('patient_id', $patientIds)->pluck('category', 'patient_id')->all();
-        // «Не направлять» после последних ответов: пациент разобран.
+        // Последнее «не направлять» за сегодня: когда и при какой подсказке.
         $declined = AuditLog::query()
             ->where('action', 'referral.declined')
             ->where('actor_id', $therapist->id)
             ->whereIn('patient_id', $patientIds)
             ->where('created_at', '>=', $since)
-            ->get(['patient_id', 'created_at'])
-            ->groupBy('patient_id')
-            ->map(fn (Collection $records): CarbonImmutable => $records->max('created_at'))
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get(['patient_id', 'created_at', 'after'])
+            ->keyBy('patient_id')
             ->all();
 
         return array_values($assessments
@@ -168,9 +203,10 @@ class TherapistPatientController extends Controller
                 $patient = $last->patient;
                 $suggestion = $this->engine->suggest($patient);
                 $category = $referred[$patient->id] ?? null;
-                $declinedAt = $declined[$patient->id] ?? null;
+                $decline = $declined[$patient->id] ?? null;
 
                 return [
+                    'kind' => 'patient',
                     'id' => $patient->id,
                     'name' => $patient->name,
                     'age' => $patient->patientProfile?->age(),
@@ -196,14 +232,14 @@ class TherapistPatientController extends Controller
                     // Решение терапевта: направлен (категория) или «не направлять» после этих ответов.
                     'decision' => match (true) {
                         $category !== null => ['kind' => 'referred', 'category' => $category instanceof ReferralCategory ? $category->value : (string) $category],
-                        $declinedAt !== null && $declinedAt->gte($last->submitted_at) => ['kind' => 'declined', 'category' => null],
+                        // Решение после этих ответов и при той же подсказке: HARS могла её поднять.
+                        $decline !== null
+                            && $decline->created_at->gte($last->submitted_at)
+                            && ($decline->after['suggested_category'] ?? null) === $suggestion->category?->value => ['kind' => 'declined', 'category' => null],
                         default => null,
                     },
                 ];
             })
-            // Сначала неразобранные, внутри — ответившие последними.
-            ->sortBy(fn (array $row): array => [$row['decision'] === null ? 0 : 1, -$row['timestamp']])
-            ->map(fn (array $row): array => array_diff_key($row, ['timestamp' => true]))
             ->values()
             ->all());
     }

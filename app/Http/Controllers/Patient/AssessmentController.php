@@ -6,7 +6,6 @@ use App\Actions\SubmitAssessments;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Patient\AssessmentRequest;
 use App\Models\Assessment;
-use App\Models\Scale;
 use App\Models\User;
 use App\Support\Alerts\AlertEngine;
 use App\Support\Assessments\PatientAssessments;
@@ -42,25 +41,7 @@ class AssessmentController extends Controller
         }
 
         return Inertia::render('patient/Questionnaire', [
-            'scales' => Scale::query()
-                ->active()
-                ->forPatients()
-                ->orderBy('position')
-                ->get()
-                ->map(fn (Scale $scale): array => [
-                    'code' => $scale->code,
-                    'name' => $scale->name,
-                    'title' => $scale->patient_title,
-                    'instruction' => $scale->instruction,
-                    'options' => $scale->options,
-                    'items' => array_column($scale->items, 'text'),
-                    'source' => [
-                        'validation' => $scale->source_validation,
-                        'url' => $scale->source_url,
-                        'license' => $scale->source_license,
-                    ],
-                ])
-                ->values(),
+            'scales' => PatientAssessments::questionnaire(),
         ]);
     }
 

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useForm } from '@inertiajs/vue3';
 import { watch } from 'vue';
-import ReferralController from '@/actions/App/Http/Controllers/Doctor/ReferralController';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,14 +16,18 @@ import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import type { ReferralCategory } from '@/types';
+import type { RouteDefinition } from '@/wayfinder';
 
 /**
- * Не направлять, хотя система подсказывает направление: почему — обязательно.
+ * Не направлять, хотя система подсказывает направление: почему — обязательно. В карточке пациента
+ * и на странице ответов из очереди.
  */
 const props = defineProps<{
-    patientId: number;
+    action: RouteDefinition<'post'>;
     suggestion: ReferralCategory;
     maxLength: number;
+    // Шкалы врача, которые сегодня не заполнены: с ними подсказка может стать выше.
+    missingScales?: string[];
 }>();
 
 const emit = defineEmits<{
@@ -52,7 +55,7 @@ watch(
 );
 
 function submit(): void {
-    form.submit(ReferralController.decline(props.patientId), {
+    form.submit(props.action, {
         preserveScroll: true,
         onSuccess: () => {
             emit('declined');
@@ -83,6 +86,17 @@ function submit(): void {
                     </DialogDescription>
                 </DialogHeader>
 
+                <p
+                    v-if="missingScales && missingScales.length > 0"
+                    id="decline_missing"
+                    class="rounded-lg border border-warning-border bg-warning-subtle p-3 text-sm"
+                    data-test="decline-missing"
+                >
+                    {{
+                        `${missingScales.join(', ')} не заполнена: подсказка может стать «обязательно». Если решаете без неё, напишите это в комментарии.`
+                    }}
+                </p>
+
                 <div class="grid gap-2">
                     <Label for="decline_comment"
                         >Комментарий (обязательно)</Label
@@ -95,7 +109,11 @@ function submit(): void {
                         :maxlength="maxLength"
                         aria-required="true"
                         :aria-invalid="form.errors.comment ? true : undefined"
-                        aria-describedby="decline_comment-hint decline_comment-error"
+                        :aria-describedby="
+                            missingScales && missingScales.length > 0
+                                ? 'decline_missing decline_comment-hint decline_comment-error'
+                                : 'decline_comment-hint decline_comment-error'
+                        "
                         data-test="decline-comment"
                     />
                     <p
@@ -103,11 +121,18 @@ function submit(): void {
                         class="text-sm text-muted-foreground"
                     >
                         До {{ maxLength }} символов. Решение сохранится в
-                        карточке и в журнале аудита.
+                        журнале аудита.
                     </p>
                     <InputError
                         id="decline_comment-error"
-                        :message="form.errors.comment ?? form.errors.suggested"
+                        :message="
+                            form.errors.comment ??
+                            form.errors.suggested ??
+                            (form.errors as Record<string, string | undefined>)
+                                .category ??
+                            (form.errors as Record<string, string | undefined>)
+                                .answer
+                        "
                     />
                 </div>
 

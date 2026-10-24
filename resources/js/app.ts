@@ -2,6 +2,7 @@ import { createInertiaApp } from '@inertiajs/vue3';
 import { initializeInstallPrompt } from '@/composables/useInstallApp';
 import AppLayout from '@/layouts/AppLayout.vue';
 import AuthLayout from '@/layouts/AuthLayout.vue';
+import QueueLayout from '@/layouts/QueueLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { initializeEcho } from '@/lib/echo';
 import { initializeFlashToast } from '@/lib/flashToast';
@@ -21,6 +22,8 @@ void createInertiaApp({
             case name.startsWith('password-reset/'):
             case name === 'Consent':
                 return AuthLayout;
+            case name.startsWith('queue/'):
+                return QueueLayout;
             case name.startsWith('settings/'):
                 return [AppLayout, SettingsLayout];
             default:

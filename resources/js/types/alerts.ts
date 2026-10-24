@@ -34,6 +34,19 @@ export type UrgentAlert = {
 };
 
 /**
+ * Ответы из очереди у двери терапевта с сигналом по 9-му вопросу: строка красной плашки, пока
+ * терапевт их не открыл.
+ */
+export type UrgentQueueAnswer = {
+    id: number;
+    code: string;
+    rule: string;
+    trigger: string;
+    // Когда пациент ответил, ДД.ММ.ГГГГ ЧЧ:ММ.
+    at: string;
+};
+
+/**
  * Кризисная линия на экране помощи пациента.
  */
 export type CrisisLine = {

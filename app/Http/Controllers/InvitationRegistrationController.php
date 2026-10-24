@@ -8,6 +8,7 @@ use App\Exceptions\AccessLinkUnavailable;
 use App\Http\Controllers\Concerns\RendersAccessLinkPages;
 use App\Http\Requests\InvitationRegistrationRequest;
 use App\Models\AccessLink;
+use App\Models\QueueAnswer;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -57,9 +58,18 @@ class InvitationRegistrationController extends Controller
                 login: $data['login'],
                 password: $data['password'],
                 birthDate: isset($data['birth_date']) ? CarbonImmutable::parse($data['birth_date']) : null,
+                // Отвечал в очереди у двери терапевта с этого телефона: ответы перейдут в аккаунт.
+                queueToken: QueueController::token($request),
             );
         } catch (AccessLinkUnavailable) {
             return to_route('invitation.show', $token);
+        }
+
+        // Пациент сверяет код: ответы из очереди должны быть его, а не чужие.
+        $code = QueueAnswer::query()->where('patient_id', $patient->id)->value('code');
+
+        if ($code !== null) {
+            Inertia::flash('toast', ['type' => 'success', 'message' => "Ваши ответы из очереди с кодом {$code} сохранены в приложении."]);
         }
 
         Auth::login($patient);

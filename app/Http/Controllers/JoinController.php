@@ -7,6 +7,7 @@ use App\Exceptions\AccessLinkUnavailable;
 use App\Http\Controllers\Concerns\RendersAccessLinkPages;
 use App\Http\Requests\JoinPinRequest;
 use App\Models\DoctorProfile;
+use App\Models\QueueAnswer;
 use App\Models\User;
 use App\Support\PinAttempts;
 use App\Support\Plural;
@@ -25,6 +26,8 @@ class JoinController extends Controller
     use RendersAccessLinkPages;
 
     public const string WRONG_PIN = 'Код не подошёл. Наберите 4 цифры ещё раз или попросите врача назвать код снова.';
+
+    public const string QUEUE_CODE = 'Это ваш код из очереди. Для регистрации нужен другой код: попросите врача назвать его.';
 
     public function show(Request $request, string $joinCode): Response
     {
@@ -47,6 +50,8 @@ class JoinController extends Controller
                 'specialty' => $doctor->doctorProfile?->specialty,
             ],
             'locked' => $lockedFor > 0 ? self::lockedMessage($lockedFor) : null,
+            // Код из очереди у двери этого телефона: подсказка, что сейчас нужен другой, и сверка с врачом.
+            'queueCode' => QueueAnswer::ofBrowser($doctor, QueueController::token($request))?->code,
         ])->toResponse($request);
     }
 
@@ -63,6 +68,11 @@ class JoinController extends Controller
 
         if ($lockedFor > 0) {
             return to_route('join.show', $joinCode)->withErrors(['pin' => self::lockedMessage($lockedFor)]);
+        }
+
+        // Пациент набрал свой код из очереди вместо PIN: это не перебор, попытка не считается.
+        if (QueueAnswer::ofBrowser($doctor, QueueController::token($request))?->code === $request->pin()) {
+            return to_route('join.show', $joinCode)->withErrors(['pin' => self::QUEUE_CODE]);
         }
 
         try {

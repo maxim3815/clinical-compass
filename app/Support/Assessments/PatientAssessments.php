@@ -139,29 +139,68 @@ final class PatientAssessments
                     'submitted_at' => DisplayTime::format($group->firstOrFail()->submitted_at),
                     'assessments' => $group
                         ->sortBy(fn (Assessment $assessment): int => $assessment->scale->position)
-                        ->map(fn (Assessment $assessment): array => [
-                            'id' => $assessment->id,
-                            'scale' => $assessment->scale->code,
-                            'name' => $assessment->scale->name,
-                            // Шкалу врача заполнил врач на приёме: кто именно.
-                            'rated_by' => $assessment->ratedBy?->name,
-                            'total' => $assessment->total,
-                            'max' => $assessment->scale->maxTotal(),
-                            'band' => $assessment->band,
-                            'answers' => $assessment->answers
-                                ->map(fn (AssessmentAnswer $answer): array => [
-                                    'item' => $answer->item,
-                                    'text' => $assessment->scale->items[$answer->item - 1]['text'] ?? "Вопрос {$answer->item}",
-                                    'hint' => $assessment->scale->items[$answer->item - 1]['hint'] ?? null,
-                                    'score' => $answer->score,
-                                    'label' => $assessment->scale->optionLabel($answer->score),
-                                    'highlight' => $assessment->scale->items[$answer->item - 1]['highlight'] ?? false,
-                                ])
-                                ->values()
-                                ->all(),
-                        ])
+                        ->map(fn (Assessment $assessment): array => self::presentFilled($assessment))
                         ->values()
                         ->all(),
+                ])
+                ->values()
+                ->all(),
+        ];
+    }
+
+    /**
+     * Действующие опросники пациента для заполнения: в приложении и в очереди у двери терапевта.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function questionnaire(): array
+    {
+        return array_values(Scale::query()
+            ->active()
+            ->forPatients()
+            ->orderBy('position')
+            ->get()
+            ->map(fn (Scale $scale): array => [
+                'code' => $scale->code,
+                'name' => $scale->name,
+                'title' => $scale->patient_title,
+                'instruction' => $scale->instruction,
+                'options' => $scale->options,
+                'items' => array_column($scale->items, 'text'),
+                'source' => [
+                    'validation' => $scale->source_validation,
+                    'url' => $scale->source_url,
+                    'license' => $scale->source_license,
+                ],
+            ])
+            ->all());
+    }
+
+    /**
+     * Заполнение с ответами на каждый вопрос: строка списка заполнений у врача. Годится и для
+     * заполнений, ещё не записанных в базу (ответы из очереди): нужны загруженные шкала и ответы.
+     *
+     * @return array<string, mixed>
+     */
+    public static function presentFilled(Assessment $assessment): array
+    {
+        return [
+            'id' => $assessment->id,
+            'scale' => $assessment->scale->code,
+            'name' => $assessment->scale->name,
+            // Шкалу врача заполнил врач на приёме: кто именно.
+            'rated_by' => $assessment->ratedBy?->name,
+            'total' => $assessment->total,
+            'max' => $assessment->scale->maxTotal(),
+            'band' => $assessment->band,
+            'answers' => $assessment->answers
+                ->map(fn (AssessmentAnswer $answer): array => [
+                    'item' => $answer->item,
+                    'text' => $assessment->scale->items[$answer->item - 1]['text'] ?? "Вопрос {$answer->item}",
+                    'hint' => $assessment->scale->items[$answer->item - 1]['hint'] ?? null,
+                    'score' => $answer->score,
+                    'label' => $assessment->scale->optionLabel($answer->score),
+                    'highlight' => $assessment->scale->items[$answer->item - 1]['highlight'] ?? false,
                 ])
                 ->values()
                 ->all(),

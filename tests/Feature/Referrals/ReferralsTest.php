@@ -108,6 +108,22 @@ test('answered patients show the decision instead of the suggestion and go after
         ->assertInertia(fn (Assert $page) => $page->where('answered.0.decision', ['kind' => 'declined', 'category' => null]));
 });
 
+test('a decline stops counting when hars raises the suggestion of the patient', function () {
+    ($this->answer)();
+    $this->actingAs($this->therapist)->post(route('doctor.patients.referrals.decline', $this->patient), ['suggested' => 'desirable', 'comment' => 'Наблюдаю сама.'])->assertSessionHasNoErrors();
+    $this->travel(1)->minutes();
+
+    $this->actingAs($this->therapist)->post(route('doctor.patients.scales.store', [$this->patient, 'hars']), [
+        'scores' => array_map(fn (int $item): int => max(0, min(4, 28 - 4 * $item)), range(0, 13)),
+        'facts' => ['mania_signs' => false, 'psychotic_symptoms' => false],
+    ])->assertSessionHas('inertia.flash_data.toast.message', 'HARS сохранена: 28 из 56, тяжелая степень выраженности тревожного расстройства. Подсказка изменилась: «обязательно», было «желательно».');
+
+    $this->actingAs($this->therapist)->get(route('doctor.patients.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('answered.0.decision', null)
+            ->where('answered.0.suggestion', 'required'));
+});
+
 test('the card shows the scales, the suggestion with its basis and what is missing', function () {
     ($this->answer)();
 
@@ -140,7 +156,7 @@ test('the therapist rates HARS with both signs, the psychiatrist rates it withou
             'facts' => ['mania_signs' => true, 'psychotic_symptoms' => false],
         ])
         ->assertRedirect(route('doctor.patients.show', $this->patient))
-        ->assertInertiaFlash('toast.message', 'HARS сохранена: 26 из 56, тяжелая степень выраженности тревожного расстройства.');
+        ->assertInertiaFlash('toast.message', 'HARS сохранена: 26 из 56, тяжелая степень выраженности тревожного расстройства. Подсказка изменилась: «обязательно», раньше направление не подсказывалось.');
 
     $assessment = Assessment::query()->with('scale')->sole();
 

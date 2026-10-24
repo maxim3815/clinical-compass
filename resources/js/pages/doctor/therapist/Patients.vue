@@ -1,7 +1,16 @@
 <script setup lang="ts">
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
-import { CircleCheck, Search, Send, Siren, UserPlus } from '@lucide/vue';
-import { ref } from 'vue';
+import {
+    CircleCheck,
+    ExternalLink,
+    Printer,
+    Search,
+    Send,
+    Siren,
+    UserPlus,
+} from '@lucide/vue';
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import QueueAnswerController from '@/actions/App/Http/Controllers/Doctor/QueueAnswerController';
 import AppointmentInvitation from '@/components/AppointmentInvitation.vue';
 import ListPagination from '@/components/ListPagination.vue';
 import PushBanner from '@/components/PushBanner.vue';
@@ -13,6 +22,7 @@ import { CHIP_ICON, DANGER_CHIP } from '@/lib/chips';
 import { formatAge } from '@/lib/plural';
 import { index as invitations } from '@/routes/doctor/invitations';
 import { index, show } from '@/routes/doctor/patients';
+import { poster } from '@/routes/doctor/queue';
 import type {
     AnsweredToday,
     InvitationChanged,
@@ -23,7 +33,8 @@ import type {
 
 /**
  * Список пациентов терапевта: кто ответил на опросники сегодня (их смотрят на приёме первыми),
- * кого направили к психиатру и все пациенты.
+ * кого направили к психиатру и все пациенты. В «Ответили сегодня» и ответы из очереди у двери:
+ * без регистрации, с кодом, который пациент называет на приёме.
  */
 const props = defineProps<{
     patients: Paginated<TherapistPatientRow>;
@@ -48,7 +59,8 @@ function submit(): void {
     router.get(
         index.url(),
         { search: search || undefined },
-        { preserveState: true, replace: true },
+        // Код из очереди уводит на страницу ответов: «Назад» вернёт к списку.
+        { preserveState: true, replace: !/^\d{4}$/.test(search) },
     );
 }
 
@@ -60,6 +72,29 @@ function details(patient: TherapistPatientRow): string {
             ? `${patient.diagnosis.code} ${patient.diagnosis.name}`
             : null,
         `наблюдается с ${patient.started_at}`,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+}
+
+function answeredHref(row: AnsweredToday) {
+    return row.kind === 'patient'
+        ? show(row.id)
+        : QueueAnswerController.show(row.id);
+}
+
+// Одной строкой: текст и <template v-if> подряд на сервере сливаются в один узел.
+function answeredDetails(row: AnsweredToday): string {
+    return [
+        row.kind === 'queue' ? 'из очереди, без регистрации' : null,
+        row.kind === 'patient' && row.age !== null ? formatAge(row.age) : null,
+        `ответы в ${row.at}`,
+        // Какие коды терапевт уже смотрел: к вечеру строк с кодами много.
+        row.kind === 'queue'
+            ? row.opened_at
+                ? `открыто в ${row.opened_at}`
+                : 'не открыто'
+            : null,
     ]
         .filter(Boolean)
         .join(' · ');
@@ -78,6 +113,52 @@ useRealtime(channel, 'patient-signals.changed', () =>
     router.reload({ only: ['patients', 'answered', 'referrals'] }),
 );
 
+// Новые ответы из очереди, HARS по ним, решение или регистрация.
+useRealtime(channel, 'queue-answers.changed', () =>
+    router.reload({ only: ['answered'] }),
+);
+
+// Новый код в списке объявляется скринридеру: строки приходят без перезагрузки.
+const announcement = ref('');
+
+watch(
+    () => props.answered,
+    (now, before) => {
+        const known = new Set(
+            before.filter((row) => row.kind === 'queue').map((row) => row.id),
+        );
+        const fresh = now.filter(
+            (row) => row.kind === 'queue' && !known.has(row.id),
+        );
+
+        if (fresh.length > 0) {
+            announcement.value = '';
+            void nextTick(() => {
+                announcement.value = `Новые ответы из очереди: ${fresh
+                    .map((row) =>
+                        row.kind === 'queue'
+                            ? `код ${row.code.split('').join(' ')}`
+                            : '',
+                    )
+                    .join(', ')}.`;
+            });
+        }
+    },
+);
+
+// Событие могло пропасть, пока вкладка была в фоне или пропадал интернет: при возврате
+// список обновляется.
+function refreshOnReturn(): void {
+    if (document.visibilityState === 'visible' && !props.search) {
+        router.reload({ only: ['answered', 'patients', 'referrals'] });
+    }
+}
+
+onMounted(() => document.addEventListener('visibilitychange', refreshOnReturn));
+onBeforeUnmount(() =>
+    document.removeEventListener('visibilitychange', refreshOnReturn),
+);
+
 useRealtime(channel, 'alerts.changed', () =>
     router.reload({
         only: ['patients', 'answered', 'urgentAlerts', 'patientSignals'],
@@ -94,6 +175,10 @@ useRealtime<InvitationChanged>(channel, 'invitation.changed', (event) => {
 <template>
     <Head title="Пациенты" />
 
+    <p class="sr-only" aria-live="polite" aria-atomic="true">
+        {{ announcement }}
+    </p>
+
     <div class="@container flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">
         <header class="flex flex-wrap items-center justify-between gap-3">
             <h1 class="text-2xl font-semibold tracking-tight">Пациенты</h1>
@@ -109,24 +194,59 @@ useRealtime<InvitationChanged>(channel, 'invitation.changed', (event) => {
                         Пригласить по ссылке
                     </Link>
                 </Button>
+                <!-- В новой вкладке: печать не уводит со списка. С телефона плакат не печатают. -->
+                <Button variant="outline" class="max-sm:hidden" as-child>
+                    <a
+                        :href="poster().url"
+                        target="_blank"
+                        rel="noopener"
+                        data-test="queue-poster-link"
+                    >
+                        <Printer />
+                        Плакат для двери
+                        <ExternalLink class="size-3.5" />
+                        <span class="sr-only">(в новой вкладке)</span>
+                    </a>
+                </Button>
             </div>
         </header>
 
         <PushBanner />
 
         <div
-            v-if="patients.total === 0 && !search"
+            v-if="patients.total === 0 && !search && answered.length === 0"
             class="rounded-xl border border-dashed bg-card p-6"
             data-test="patients-empty"
         >
             <p class="text-muted-foreground">
-                Пациентов пока нет. На приёме нажмите «Пригласить на приёме»:
-                пациент подключится по коду, ответит на вопросы о самочувствии
-                на своём телефоне и появится здесь.
+                Пациентов пока нет. Повесьте у двери «Плакат для двери» (печать
+                с компьютера): пациенты в очереди ответят на вопросы о
+                самочувствии, и ответы с кодами появятся здесь сами. Чтобы
+                направить пациента, на приёме нажмите «Пригласить на приёме»: он
+                зарегистрируется по коду.
             </p>
         </div>
 
         <template v-else>
+            <!-- Поиск над списками: пациент называет код, а строки с кодами — первые на странице. -->
+            <form
+                role="search"
+                class="flex w-full gap-2 sm:max-w-md"
+                @submit.prevent="submit"
+            >
+                <Input
+                    v-model="query"
+                    type="search"
+                    name="search"
+                    placeholder="Поиск по ФИО или коду"
+                    aria-label="Поиск по ФИО или коду из очереди"
+                />
+                <Button type="submit" variant="outline">
+                    <Search />
+                    Найти
+                </Button>
+            </form>
+
             <template v-if="!search">
                 <section
                     class="flex flex-col gap-3"
@@ -144,7 +264,9 @@ useRealtime<InvitationChanged>(channel, 'invitation.changed', (event) => {
                         </h2>
                         <p class="text-sm text-muted-foreground">
                             GAD-7 и PHQ-9, которые пациент заполнил сегодня, и
-                            подсказка направления к психиатру.
+                            подсказка направления к психиатру. Строки с кодом —
+                            ответы из очереди у двери: откройте ту, код которой
+                            назовёт пациент.
                         </p>
                     </div>
 
@@ -163,38 +285,38 @@ useRealtime<InvitationChanged>(channel, 'invitation.changed', (event) => {
                     >
                         <li
                             v-for="row in answered"
-                            :key="row.id"
+                            :key="`${row.kind}-${row.id}`"
                             class="relative flex flex-col gap-2 p-4 transition-colors hover:bg-accent/50 has-[a:focus-visible]:bg-accent/50 @2xl:flex-row @2xl:items-start @2xl:justify-between @2xl:gap-6"
-                            data-test="answered-row"
+                            :data-test="
+                                row.kind === 'queue'
+                                    ? 'answered-queue-row'
+                                    : 'answered-row'
+                            "
                         >
                             <div class="flex min-w-0 flex-col gap-0.5">
                                 <Link
-                                    :href="show(row.id)"
+                                    :href="answeredHref(row)"
                                     class="font-semibold underline-offset-4 after:absolute after:inset-0 hover:underline"
                                 >
-                                    {{ row.name }}
+                                    <template v-if="row.kind === 'patient'">{{
+                                        row.name
+                                    }}</template>
+                                    <span v-else class="tabular-nums">{{
+                                        `Код ${row.code}`
+                                    }}</span>
                                 </Link>
                                 <p class="text-sm text-muted-foreground">
-                                    {{
-                                        [
-                                            row.age === null
-                                                ? null
-                                                : formatAge(row.age),
-                                            `ответы в ${row.at}`,
-                                        ]
-                                            .filter(Boolean)
-                                            .join(' · ')
-                                    }}
+                                    {{ answeredDetails(row) }}
                                 </p>
-                                <p class="text-sm">
-                                    {{
-                                        row.scales
-                                            .map(
-                                                (scale) =>
-                                                    `${scale.name}: ${scale.total} из ${scale.max}, ${scale.band}`,
-                                            )
-                                            .join(' · ')
-                                    }}
+                                <!-- Шкала переносится целиком, а не посреди «умеренная депрессия». -->
+                                <p class="flex flex-wrap gap-x-1 text-sm">
+                                    <span
+                                        v-for="(scale, position) in row.scales"
+                                        :key="scale.name"
+                                        >{{
+                                            `${position > 0 ? '· ' : ''}${scale.name}: ${scale.total} из ${scale.max}, ${scale.band}`
+                                        }}</span
+                                    >
                                 </p>
                             </div>
                             <ul
@@ -253,8 +375,12 @@ useRealtime<InvitationChanged>(channel, 'invitation.changed', (event) => {
                                         />
                                         Направление не подсказывается
                                     </li>
+                                    <!-- При «обязательно» HARS подсказку уже не изменит. -->
                                     <li
-                                        v-if="row.scales_missing.length > 0"
+                                        v-if="
+                                            row.scales_missing.length > 0 &&
+                                            row.suggestion !== 'required'
+                                        "
                                         class="text-muted-foreground"
                                         data-test="answered-missing"
                                     >
@@ -348,28 +474,25 @@ useRealtime<InvitationChanged>(channel, 'invitation.changed', (event) => {
                             >· {{ patients.total }}</span
                         >
                     </h2>
-                    <form
-                        role="search"
-                        class="flex w-full gap-2 sm:w-auto"
-                        @submit.prevent="submit"
-                    >
-                        <Input
-                            v-model="query"
-                            type="search"
-                            name="search"
-                            class="sm:w-72"
-                            placeholder="Поиск по ФИО"
-                            aria-label="Поиск по ФИО"
-                        />
-                        <Button type="submit" variant="outline">
-                            <Search />
-                            Найти
-                        </Button>
-                    </form>
                 </div>
 
-                <p v-if="patients.total === 0" class="text-muted-foreground">
-                    По запросу «{{ search }}» никого не нашли.
+                <p
+                    v-if="patients.total === 0 && !search"
+                    class="text-muted-foreground"
+                    data-test="patients-none"
+                >
+                    Зарегистрированных пациентов пока нет. Пациент появится
+                    здесь, когда зарегистрируется на приёме по коду.
+                </p>
+                <p
+                    v-else-if="patients.total === 0"
+                    class="text-muted-foreground"
+                >
+                    {{
+                        /^\d{4}$/.test(search)
+                            ? `Ответов из очереди с кодом ${search} нет: код назван неверно, ответы уже удалены или пациент зарегистрирован — найдите его по ФИО.`
+                            : `По запросу «${search}» никого не нашли.`
+                    }}
                     <Link
                         :href="index()"
                         class="text-foreground underline underline-offset-4"

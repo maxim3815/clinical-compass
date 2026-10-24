@@ -2,11 +2,14 @@
 
 namespace App\Jobs;
 
+use App\Enums\AlertShownVia;
+use App\Events\AlertsChanged;
 use App\Models\Alert;
 use App\Models\Assessment;
 use App\Support\Alerts\AlertDelivery;
 use App\Support\Alerts\AlertEngine;
 use App\Support\Alerts\AlertMatch;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Queue\Queueable;
@@ -36,9 +39,14 @@ class CheckAlertRules implements ShouldQueue
 
     /**
      * @param  Collection<int, Assessment>  $assessments
+     * @param  int|null  $acknowledgedById  врач уже видел ответы (из очереди, до регистрации): алерт
+     *                                      создаётся принятым, без плашки, звука и пуша
      */
-    public function __construct(public Collection $assessments)
-    {
+    public function __construct(
+        public Collection $assessments,
+        public ?int $acknowledgedById = null,
+        public ?CarbonImmutable $acknowledgedAt = null,
+    ) {
         // Своя очередь: воркер берёт её раньше остальных, алерт не ждёт напоминаний и событий.
         $this->onQueue('alerts');
     }
@@ -48,9 +56,14 @@ class CheckAlertRules implements ShouldQueue
         foreach ($engine->check($this->assessments) as $match) {
             $alert = $this->create($match);
 
-            if ($alert !== null) {
-                DB::afterCommit(fn () => $delivery->deliver($alert));
+            if ($alert === null) {
+                continue;
             }
+
+            // Принятый алерт только появляется в карточке: терапевт уже видел эти ответы.
+            DB::afterCommit(fn () => $alert->acknowledged_at !== null
+                ? AlertsChanged::dispatch($alert->doctor)
+                : $delivery->deliver($alert));
         }
     }
 
@@ -76,6 +89,12 @@ class CheckAlertRules implements ShouldQueue
             'level' => $match->rule->level,
             'evidence' => $match->evidence,
             'submitted_at' => $match->assessment->submitted_at,
+            ...($this->acknowledgedById === null ? [] : [
+                'shown_at' => $this->acknowledgedAt,
+                'shown_via' => AlertShownVia::Page,
+                'acknowledged_at' => $this->acknowledgedAt,
+                'acknowledged_by_id' => $this->acknowledgedById,
+            ]),
         ]);
 
         return $alert->wasRecentlyCreated ? $alert : null;

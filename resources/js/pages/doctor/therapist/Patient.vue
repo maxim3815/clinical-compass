@@ -105,6 +105,13 @@ const missingDoctorScales = computed(() =>
     props.suggestion.missing.filter((scale) => scale.rater === 'doctor'),
 );
 
+// «Не направлять» решали при другой подсказке: HARS или новые ответы её изменили.
+const declinedStale = computed(
+    () =>
+        props.declined !== null &&
+        props.declined.suggested_category !== props.suggestion.category,
+);
+
 const declinedText = computed(() => {
     if (props.declined === null) {
         return null;
@@ -113,6 +120,17 @@ const declinedText = computed(() => {
     const comment = props.declined.comment
         ? `: «${props.declined.comment}»`
         : '';
+
+    if (declinedStale.value) {
+        const was =
+            props.declined.suggested_category === 'required'
+                ? '«обязательно»'
+                : props.declined.suggested_category === 'desirable'
+                  ? '«желательно»'
+                  : 'без подсказки';
+
+        return `${props.declined.at} вы решили не направлять при подсказке ${was}${comment}. С тех пор подсказка изменилась: решите снова.`;
+    }
 
     return `${props.declined.at} вы решили не направлять${comment}.`;
 });
@@ -277,7 +295,9 @@ useRealtime(channel, 'alerts.changed', () =>
                         >
                             <p v-if="missingDoctorScales.length > 0">
                                 {{
-                                    `${missingDoctorScales.map((scale) => scale.name).join(', ')} сегодня не заполнена: правила по ней не проверены.`
+                                    suggestion.category === 'required'
+                                        ? `${missingDoctorScales.map((scale) => scale.name).join(', ')} сегодня не заполнена. Подсказку она уже не изменит: выше «обязательно» категории нет. Заполнить можно для психиатра.`
+                                        : `${missingDoctorScales.map((scale) => scale.name).join(', ')} сегодня не заполнена: правила по ней не проверены, подсказка может стать выше.`
                                 }}
                             </p>
                             <p v-if="missingPatientScales.length > 0">
@@ -317,6 +337,14 @@ useRealtime(channel, 'alerts.changed', () =>
                             оно расходится с подсказкой, напишите почему.
                         </p>
 
+                        <p
+                            v-if="declinedText && declinedStale"
+                            class="rounded-lg border border-warning-border bg-warning-subtle p-3 text-sm"
+                            data-test="referral-declined"
+                        >
+                            {{ declinedText }}
+                        </p>
+
                         <div class="flex flex-wrap gap-2">
                             <Button data-test="refer" @click="referring = true">
                                 <Send />
@@ -333,7 +361,7 @@ useRealtime(channel, 'alerts.changed', () =>
                         </div>
 
                         <p
-                            v-if="declinedText"
+                            v-if="declinedText && !declinedStale"
                             class="text-sm text-muted-foreground"
                             data-test="referral-declined"
                         >
@@ -389,7 +417,12 @@ useRealtime(channel, 'alerts.changed', () =>
         <DeclineReferralDialog
             v-if="suggestion.category"
             v-model:open="declining"
-            :patient-id="patient.id"
+            :action="ReferralController.decline(patient.id)"
+            :missing-scales="
+                suggestion.category === 'required'
+                    ? []
+                    : missingDoctorScales.map((scale) => scale.name)
+            "
             :suggestion="suggestion.category"
             :max-length="commentLimit"
             @declined="onDecided"

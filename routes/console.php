@@ -17,3 +17,5 @@ Schedule::command('app:dose-events:send-reminders')->everyMinute()->withoutOverl
 // Находки проверки безопасности сразу пересчитывают сами действия. Раз в час — на случай, когда
 // назначение завершилось по дате или у пациента сменился возраст.
 Schedule::command('app:safety:sync')->hourly()->withoutOverlapping();
+// Непривязанные ответы из очереди у двери терапевта живут 12 часов.
+Schedule::command('app:queue-answers:prune')->hourly()->withoutOverlapping();

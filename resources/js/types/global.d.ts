@@ -1,6 +1,10 @@
 import type { Directive } from 'vue';
 import type { SideEffectReport } from '@/types/adverse-events';
-import type { CrisisLine, UrgentAlert } from '@/types/alerts';
+import type {
+    CrisisLine,
+    UrgentAlert,
+    UrgentQueueAnswer,
+} from '@/types/alerts';
 import type { Auth } from '@/types/auth';
 import type { FlashToast } from '@/types/ui';
 
@@ -29,6 +33,8 @@ declare module '@inertiajs/core' {
             patientSignals: number;
             // У врача — непринятые алерты для красной плашки, у пациента пусто.
             urgentAlerts: UrgentAlert[];
+            // Ответы из очереди с сигналом по 9-му вопросу, у терапевта.
+            urgentQueue: UrgentQueueAnswer[];
             // Открытый ключ VAPID для подписки на пуши. У гостя null.
             vapidPublicKey: string | null;
             // Пациентка: кнопки отметки приёма в женском роде.

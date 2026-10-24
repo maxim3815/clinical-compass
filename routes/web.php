@@ -13,6 +13,8 @@ use App\Http\Controllers\Doctor\InvitationController;
 use App\Http\Controllers\Doctor\PasswordResetLinkController;
 use App\Http\Controllers\Doctor\PatientController;
 use App\Http\Controllers\Doctor\PrescriptionController;
+use App\Http\Controllers\Doctor\QueueAnswerController;
+use App\Http\Controllers\Doctor\QueueAnswerScaleController;
 use App\Http\Controllers\Doctor\ReferralController;
 use App\Http\Controllers\Doctor\SafetyCheckController;
 use App\Http\Controllers\Doctor\SafetyFindingController;
@@ -33,6 +35,7 @@ use App\Http\Controllers\Patient\MedicationController;
 use App\Http\Controllers\Patient\OwnMedicationController;
 use App\Http\Controllers\Patient\SideEffectController;
 use App\Http\Controllers\PushDoseController;
+use App\Http\Controllers\QueueController;
 use App\Models\Drug;
 use App\Models\Scale;
 use Illuminate\Support\Facades\Route;
@@ -55,6 +58,12 @@ Route::middleware('throttle:access-link')->group(function () {
 Route::middleware('throttle:join')->group(function () {
     Route::get('join/{joinCode}', [JoinController::class, 'show'])->where('joinCode', '[A-Za-z0-9]+')->name('join.show');
     Route::post('join/{joinCode}', [JoinController::class, 'store'])->where('joinCode', '[A-Za-z0-9]+')->name('join.store');
+});
+
+// Опросники у двери терапевта: пациент в очереди отвечает без регистрации и получает код.
+Route::where(['joinCode' => '[A-Za-z0-9]+'])->group(function () {
+    Route::get('q/{joinCode}', [QueueController::class, 'show'])->middleware('throttle:join')->name('queue.show');
+    Route::post('q/{joinCode}', [QueueController::class, 'store'])->middleware('throttle:queue')->name('queue.store');
 });
 
 // Кнопки «Принял» и «Через 15 минут» в напоминании. Service worker отправляет их без сессии
@@ -118,6 +127,19 @@ Route::middleware('auth')->group(function () {
             Route::post('referrals/{referral}/withdraw', [ReferralController::class, 'withdraw'])
                 ->whereNumber('referral')
                 ->name('referrals.withdraw');
+
+            // Ответы из очереди у двери: страница кода, HARS до регистрации, «Не направлять», плакат.
+            Route::get('queue/poster', [QueueAnswerController::class, 'poster'])->name('queue.poster');
+            Route::whereNumber('queueAnswer')->group(function () {
+                Route::get('queue/{queueAnswer}', [QueueAnswerController::class, 'show'])->name('queue-answers.show');
+                Route::post('queue/{queueAnswer}/decline', [QueueAnswerController::class, 'decline'])->name('queue-answers.decline');
+            });
+            Route::withoutScopedBindings()->whereNumber('queueAnswer')->where(['scale' => Scale::CODE_PATTERN])->group(function () {
+                Route::get('queue/{queueAnswer}/scales/{scale:code}/create', [QueueAnswerScaleController::class, 'create'])
+                    ->name('queue-answers.scales.create');
+                Route::post('queue/{queueAnswer}/scales/{scale:code}', [QueueAnswerScaleController::class, 'store'])
+                    ->name('queue-answers.scales.store');
+            });
         });
 
         // Психиатр: ведение лечения. Терапевту эти адреса отвечают 404.

@@ -1,25 +1,66 @@
-<script setup lang="ts">
-import { Head, Link, useForm } from '@inertiajs/vue3';
-import { CircleAlert, ExternalLink } from '@lucide/vue';
-import { computed, nextTick, ref } from 'vue';
+<script lang="ts">
 import DoctorScaleController from '@/actions/App/Http/Controllers/Doctor/DoctorScaleController';
-import LeaveConfirmDialog from '@/components/LeaveConfirmDialog.vue';
-import { Button } from '@/components/ui/button';
-import { Spinner } from '@/components/ui/spinner';
-import { useLeaveGuard } from '@/composables/useLeaveGuard';
-import { plural } from '@/lib/plural';
-import { index, show } from '@/routes/doctor/patients';
+import QueueAnswerController from '@/actions/App/Http/Controllers/Doctor/QueueAnswerController';
+import QueueAnswerScaleController from '@/actions/App/Http/Controllers/Doctor/QueueAnswerScaleController';
+import { show } from '@/routes/doctor/patients';
 import type { DoctorScaleForm, ScreeningFact } from '@/types';
 
 /**
  * Шкала врача на приёме (HARS): пункт — одна строка с оценками 0–4, подписи оценок один раз
  * сверху, сумма и степень закреплены внизу. Терапевт ниже отмечает признаки, которых нет в шкалах.
+ * Заполняют для пациента или по ответам из очереди до регистрации (по коду).
  */
 type Props = {
-    patient: { id: number; name: string };
+    patient: { id: number; name: string } | null;
+    queueAnswer: { id: number; code: string } | null;
     scale: DoctorScaleForm;
     facts: ScreeningFact[];
 };
+
+// Для кого шкала: пациент или ответы из очереди. Ровно одно из двух.
+function subject(props: Props) {
+    if (props.patient !== null) {
+        return {
+            name: props.patient.name,
+            back: show(props.patient.id),
+            create: DoctorScaleController.create({
+                patient: props.patient.id,
+                scale: props.scale.code,
+            }),
+            store: DoctorScaleController.store({
+                patient: props.patient.id,
+                scale: props.scale.code,
+            }),
+        };
+    }
+
+    const answer = props.queueAnswer as { id: number; code: string };
+
+    return {
+        name: `Код ${answer.code}`,
+        back: QueueAnswerController.show(answer.id),
+        create: QueueAnswerScaleController.create({
+            queueAnswer: answer.id,
+            scale: props.scale.code,
+        }),
+        store: QueueAnswerScaleController.store({
+            queueAnswer: answer.id,
+            scale: props.scale.code,
+        }),
+    };
+}
+</script>
+
+<script setup lang="ts">
+import { Head, Link, useForm } from '@inertiajs/vue3';
+import { CircleAlert, ExternalLink } from '@lucide/vue';
+import { computed, nextTick, ref } from 'vue';
+import LeaveConfirmDialog from '@/components/LeaveConfirmDialog.vue';
+import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
+import { useLeaveGuard } from '@/composables/useLeaveGuard';
+import { plural } from '@/lib/plural';
+import { index } from '@/routes/doctor/patients';
 
 const props = defineProps<Props>();
 
@@ -27,17 +68,13 @@ defineOptions({
     layout: (props: Props) => ({
         breadcrumbs: [
             { title: 'Пациенты', href: index() },
-            { title: props.patient.name, href: show(props.patient.id) },
-            {
-                title: props.scale.name,
-                href: DoctorScaleController.create({
-                    patient: props.patient.id,
-                    scale: props.scale.code,
-                }),
-            },
+            { title: subject(props).name, href: subject(props).back },
+            { title: props.scale.name, href: subject(props).create },
         ],
     }),
 });
+
+const target = computed(() => subject(props));
 
 const form = useForm<{
     scores: (number | null)[];
@@ -145,18 +182,14 @@ function submit(): void {
 
     form.transform((data) =>
         props.facts.length > 0 ? data : { scores: data.scores },
-    ).submit(
-        DoctorScaleController.store({
-            patient: props.patient.id,
-            scale: props.scale.code,
-        }),
-        { onError: () => void focusFirstMissing() },
-    );
+    ).submit(target.value.store, {
+        onError: () => void focusFirstMissing(),
+    });
 }
 </script>
 
 <template>
-    <Head :title="`${scale.name}: ${patient.name}`" />
+    <Head :title="`${scale.name}: ${target.name}`" />
 
     <div class="@container flex w-full max-w-4xl flex-col gap-6 p-4 md:p-6">
         <header class="flex flex-col gap-1">
@@ -165,7 +198,7 @@ function submit(): void {
             </h1>
             <p class="text-muted-foreground">
                 {{
-                    `${patient.name} · ${scale.name}, ${scale.items.length} пунктов`
+                    `${target.name} · ${scale.name}, ${scale.items.length} пунктов`
                 }}
             </p>
         </header>
@@ -371,7 +404,7 @@ function submit(): void {
                 </div>
                 <div class="flex gap-2 max-sm:w-full sm:ml-auto">
                     <Button variant="outline" class="max-sm:flex-1" as-child>
-                        <Link :href="show(patient.id)">Отмена</Link>
+                        <Link :href="target.back">Отмена</Link>
                     </Button>
                     <Button
                         type="submit"

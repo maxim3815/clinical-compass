@@ -11,13 +11,14 @@ import {
     watch,
 } from 'vue';
 import AlertController from '@/actions/App/Http/Controllers/Doctor/AlertController';
+import QueueAnswerController from '@/actions/App/Http/Controllers/Doctor/QueueAnswerController';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { useRealtime } from '@/composables/useRealtime';
 import { alertRepeats, alertSubmitted, alertTitle } from '@/lib/alerts';
 import { playAlertSound, unlockAlertSound } from '@/lib/alertSound';
 import { show } from '@/routes/doctor/patients';
-import type { UrgentAlert } from '@/types';
+import type { UrgentAlert, UrgentQueueAnswer } from '@/types';
 
 /**
  * Красная плашка непринятых алертов на всех страницах кабинета врача. Новый алерт приходит
@@ -25,9 +26,23 @@ import type { UrgentAlert } from '@/types';
  * «показан»: от ответа пациента до этой отметки считается время доставки. «Принять» убирает
  * плашку, алерт остаётся в карточке пациента до решения. Если пациент снова нажал «Сообщить
  * врачу», алерт возвращается в плашку и звучит ещё раз.
+ *
+ * У терапевта в той же плашке ответы из очереди у двери с сигналом по 9-му вопросу: вместо ФИО
+ * код, а гаснет строка, когда терапевт открывает ответы.
  */
 const page = usePage();
 const alerts = computed(() => page.props.urgentAlerts);
+const queue = computed(() => page.props.urgentQueue);
+
+// Страница этих ответов уже открыта: строка гаснет сама, повторять её незачем.
+const openQueueId = computed(() =>
+    page.component === 'doctor/queue/Answer'
+        ? (page.props.answer as { id: number }).id
+        : null,
+);
+const visibleQueue = computed(() =>
+    queue.value.filter((answer) => answer.id !== openQueueId.value),
+);
 
 // В карточке пациента его алерт — первым блоком страницы, в плашке он бы повторился.
 const cardPatientId = computed(() =>
@@ -45,6 +60,8 @@ const realtime = new Set<number>();
 const reported = new Set<number>();
 // Звук уже прозвучал в этой вкладке: по алерту и числу повторов «Сообщить врачу».
 const heard = new Set<string>();
+// Ответы из очереди, по которым звук уже прозвучал в этой вкладке.
+const heardQueue = new Set<number>();
 
 function soundKey(alert: UrgentAlert): string {
     return `${alert.id}:${alert.repeats?.count ?? 0}`;
@@ -115,6 +132,34 @@ useRealtime<{ alerts: UrgentAlert[]; count: number }>(
     },
 );
 
+useRealtime<{ urgent: UrgentQueueAnswer[] }>(
+    `App.Models.User.${page.props.auth.user.id}`,
+    'queue-answers.changed',
+    (event) => {
+        const fresh = event.urgent.filter(
+            (answer) => !queue.value.some((known) => known.id === answer.id),
+        );
+
+        if (fresh.length > 0) {
+            announcement.value = '';
+            void nextTick(() => {
+                announcement.value = fresh
+                    .map(
+                        (answer) =>
+                            `Срочно: код ${answer.code.split('').join(' ')}. ${alertTitle(answer.rule, answer.trigger)}.`,
+                    )
+                    .join(' ');
+            });
+        }
+
+        router.replace({
+            preserveScroll: true,
+            preserveState: true,
+            props: (props) => ({ ...props, urgentQueue: event.urgent }),
+        });
+    },
+);
+
 // Алерт на экране и в карточке пациента: он показан, даже если плашка его не повторяет.
 function reportShown(): void {
     if (document.visibilityState !== 'visible') {
@@ -148,8 +193,14 @@ function ring(): void {
             (!alert.shown || alert.repeats !== null || realtime.has(alert.id)),
     );
 
-    if (fresh.length > 0) {
+    // Ответы из очереди звучат один раз: до открытия терапевтом строка не меняется.
+    const freshQueue = queue.value.filter(
+        (answer) => !heardQueue.has(answer.id),
+    );
+
+    if (fresh.length > 0 || freshQueue.length > 0) {
         fresh.forEach((alert) => heard.add(soundKey(alert)));
+        freshQueue.forEach((answer) => heardQueue.add(answer.id));
         playAlertSound();
     }
 }
@@ -179,8 +230,10 @@ watch(alerts, () => {
     reportShown();
 });
 
+watch(queue, ring);
+
 watch(
-    () => visible.value.length > 0,
+    () => visible.value.length + visibleQueue.value.length > 0,
     () => void nextTick(trackHeight),
 );
 
@@ -232,7 +285,7 @@ function accept(alert: UrgentAlert): void {
         {{ announcement }}
     </p>
     <section
-        v-if="visible.length > 0"
+        v-if="visible.length + visibleQueue.length > 0"
         ref="banner"
         class="max-h-[40dvh] overflow-y-auto border-b-2 border-danger bg-danger-subtle"
         aria-label="Срочные алерты"
@@ -282,6 +335,37 @@ function accept(alert: UrgentAlert): void {
                         Принять
                     </Button>
                 </div>
+            </li>
+            <li
+                v-for="answer in visibleQueue"
+                :key="`queue-${answer.id}`"
+                class="flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3 md:px-6"
+                data-test="urgent-queue-answer"
+            >
+                <div class="flex min-w-0 flex-1 basis-80 items-start gap-3">
+                    <Siren class="mt-0.5 size-6 shrink-0 text-danger" />
+                    <div class="flex min-w-0 flex-col">
+                        <p class="font-semibold text-danger">
+                            {{
+                                `Срочно: код ${answer.code}, пациент в очереди`
+                            }}
+                        </p>
+                        <p class="text-sm">
+                            {{
+                                `${alertTitle(answer.rule, answer.trigger)}. Ответы из очереди ${answer.at}.`
+                            }}
+                        </p>
+                    </div>
+                </div>
+                <Button size="sm" as-child>
+                    <Link
+                        :href="QueueAnswerController.show(answer.id)"
+                        data-test="urgent-queue-open"
+                        >Открыть ответы<span class="sr-only">{{
+                            `: код ${answer.code}`
+                        }}</span></Link
+                    >
+                </Button>
             </li>
         </ul>
     </section>

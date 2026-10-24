@@ -78,20 +78,23 @@ export type AssessmentAnswer = {
     highlight: boolean;
 };
 
+// Заполненный опросник или шкала врача с ответами на каждый вопрос.
+export type FilledAssessment = {
+    id: number;
+    scale: string;
+    name: string;
+    // Шкалу врача заполнил врач на приёме.
+    rated_by: string | null;
+    total: number;
+    max: number;
+    band: string;
+    answers: AssessmentAnswer[];
+};
+
 // Заполнения одной отправки.
 export type AssessmentFilling = {
     submitted_at: string;
-    assessments: {
-        id: number;
-        scale: string;
-        name: string;
-        // Шкалу врача заполнил врач на приёме.
-        rated_by: string | null;
-        total: number;
-        max: number;
-        band: string;
-        answers: AssessmentAnswer[];
-    }[];
+    assessments: FilledAssessment[];
 };
 
 // Шкала врача, которую можно заполнить на приёме.

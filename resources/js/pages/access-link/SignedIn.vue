@@ -6,12 +6,21 @@ import { Spinner } from '@/components/ui/spinner';
 import { signOut } from '@/lib/logout';
 import { home } from '@/routes';
 
+type Props = {
+    // QR-код у двери терапевта: по нему отвечают на вопросы без входа.
+    purpose?: 'queue';
+};
+
+const props = defineProps<Props>();
+
 defineOptions({
-    layout: {
+    layout: (props: Props) => ({
         title: 'Вы уже вошли',
         description:
-            'По этой ссылке регистрируются или задают новый пароль. Выйдите из кабинета и откройте её снова.',
-    },
+            props.purpose === 'queue'
+                ? 'По этому QR-коду пациенты в очереди к терапевту отвечают на вопросы о самочувствии без входа. Чтобы ответить так, выйдите из приложения и снова наведите камеру на QR-код.'
+                : 'По этой ссылке регистрируются или задают новый пароль. Выйдите из кабинета и откройте её снова.',
+    }),
 });
 
 const leaving = ref(false);
@@ -30,7 +39,12 @@ async function leave(): Promise<void> {
     <Head title="Вы уже вошли" />
 
     <p class="text-base" data-test="signed-in-as">
-        Сейчас открыт кабинет: <span class="font-semibold">{{ name }}</span>
+        {{
+            props.purpose === 'queue'
+                ? 'Вы вошли как:'
+                : 'Сейчас открыт кабинет:'
+        }}
+        <span class="font-semibold">{{ name }}</span>
     </p>
 
     <!-- Главное — вернуться: выход отключает напоминания на этом устройстве. -->
