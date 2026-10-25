@@ -371,6 +371,25 @@ test('accepting moves the patient with the open alerts and closes the card for t
     $this->actingAs($this->psychiatrist)->get(route('doctor.referrals.show', $referral))->assertRedirect(route('doctor.patients.show', $this->patient));
 });
 
+test('after the acceptance the therapist cannot act on the patient', function (string $method, string $route, array $data) {
+    ($this->answer)(3, 1, 1);
+    ($this->refer)(['category' => 'required', 'suggested' => 'required']);
+    $parameters = ['patient' => $this->patient, 'scale' => 'hars', 'alert' => Alert::query()->sole()];
+
+    // До принятия адрес терапевту открыт: 404 после принятия — из-за смены лечащего врача.
+    expect($this->actingAs($this->therapist)->{$method}(route($route, $parameters), $data)->status())->not->toBe(404);
+
+    $this->actingAs($this->psychiatrist)->post(route('doctor.referrals.accept', Referral::query()->sole()));
+
+    $this->actingAs($this->therapist)->{$method}(route($route, $parameters), $data)->assertNotFound();
+})->with([
+    'doctor scale' => ['get', 'doctor.patients.scales.create', []],
+    'doctor scale save' => ['post', 'doctor.patients.scales.store', []],
+    'new referral' => ['post', 'doctor.patients.referrals.store', ['category' => 'required']],
+    'alert acknowledge' => ['post', 'doctor.patients.alerts.acknowledge', []],
+    'password reset link' => ['post', 'doctor.patients.password-reset-link.store', []],
+]);
+
 test('a withdrawn referral cannot be accepted', function () {
     ($this->answer)();
     ($this->refer)();

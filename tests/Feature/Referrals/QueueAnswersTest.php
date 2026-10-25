@@ -249,7 +249,9 @@ test('item nine shows help to the patient and a red banner with sound to the the
     Notification::assertSentTo($this->therapist, UrgentQueueAnswer::class, function (UrgentQueueAnswer $notification) use ($answer): bool {
         $message = $notification->toWebPush($this->therapist)->toArray();
 
+        // Без слов о самочувствии: пуш видно на заблокированном экране.
         return $message['title'] === "Срочно: код {$answer->code}"
+            && $message['body'] === 'Ответы из очереди требуют внимания'
             && $message['data']['url'] === "/doctor/queue/{$answer->id}";
     });
 
