@@ -10,7 +10,8 @@ import type { NavItem } from '@/types';
 const page = usePage();
 
 // Раздел определяем по странице, а не по адресу: так вложенные страницы
-// («Самочувствие», «Календарь приёма», «Время приёма», «Свой препарат», «Побочные эффекты», все настройки)
+// («Самочувствие», «Календарь приёма», «Время приёма», «Свой препарат», «Побочные эффекты», все настройки,
+// правила и согласие из настроек)
 // подсвечивают свою вкладку.
 const tabs = computed<(NavItem & { name: string })[]>(() =>
     [
@@ -53,7 +54,13 @@ const tabs = computed<(NavItem & { name: string })[]>(() =>
             title: 'Настройки',
             href: settings(),
             icon: Settings,
-            isActive: page.component.startsWith('settings/'),
+            isActive:
+                page.component.startsWith('settings/') ||
+                // С экрана помощи правила открыты не из настроек: назад — «Помощь».
+                (['patient/Rules', 'patient/Consent'].includes(
+                    page.component,
+                ) &&
+                    !page.props.fromHelp),
         },
     ].filter(
         // Пока пациента ведёт терапевт, чата нет: он появится у психиатра.

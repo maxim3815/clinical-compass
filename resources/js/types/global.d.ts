@@ -45,6 +45,7 @@ declare module '@inertiajs/core' {
             doctorKind: 'psychiatrist' | 'therapist' | null;
             // Пациента ведёт терапевт: чата и окна побочных эффектов нет.
             withTherapist: boolean;
+            rulesPending: boolean;
             [key: string]: unknown;
         };
         flashDataType: {

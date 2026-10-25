@@ -75,6 +75,7 @@ class InvitationRegistrationController extends Controller
         Auth::login($patient);
         $request->session()->regenerate();
 
-        return to_route('patient.home');
+        // Сначала правила «Когда приложение не поможет», после «Понятно» — «Сегодня».
+        return to_route('patient.rules.show');
     }
 }

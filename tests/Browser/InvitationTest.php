@@ -32,18 +32,42 @@ test('doctor invites a patient who registers by the link and sees the cabinet', 
         ->fill('password_confirmation', 'secret-password')
         // Сначала без согласия: ошибка с сервера, введённое не пропало.
         ->press('Зарегистрироваться')
-        ->assertSee('Без согласия на обработку персональных данных зарегистрироваться нельзя.')
+        ->assertSee('Поставьте галочку «Даю согласие», чтобы зарегистрироваться.')
         ->assertAttribute('#consent', 'aria-invalid', 'true')
         ->assertValue('login', 'novikov')
         ->assertValue('password', 'secret-password')
         // Текст согласия открывается в окне на этой же странице, «Даю согласие» ставит галочку.
         ->click('[data-test="consent-text-button"]')
-        ->assertSee('Регистрируясь, вы соглашаетесь, что лечащий врач будет обрабатывать')
+        ->assertSee('Регистрируясь, вы соглашаетесь, что ваши персональные данные')
         ->click('[data-test="consent-agree"]')
         ->assertAttribute('#consent', 'aria-checked', 'true')
         ->press('Зарегистрироваться')
+        // Сразу после регистрации — правила: вкладок нет, кнопка помощи в шапке есть.
+        ->assertPathIs('/patient/rules')
+        ->assertSee('Как работает помощь в приложении')
+        ->assertMissing('nav[aria-label="Разделы"]')
+        ->assertPresent('[data-test="help-button"]')
+        ->click('[data-test="rules-acknowledge"]')
         ->assertPathIs('/patient')
         ->assertSee('Здравствуйте, Артём Сергеевич!')
+        ->assertNoJavaScriptErrors();
+
+    // Правила и согласие перечитываются из настроек, не выходя из кабинета, правила — и с экрана помощи.
+    $page->navigate(route('profile.edit'))
+        ->click('Как работает помощь в приложении')
+        ->assertPathIs('/patient/rules')
+        ->assertMissing('[data-test="rules-acknowledge"]')
+        ->assertPresent('nav[aria-label="Разделы"]')
+        ->click('[data-test="back-link"]')
+        ->assertPathIs('/settings/profile')
+        ->click('Согласие на обработку персональных данных')
+        ->assertPathIs('/patient/consent')
+        ->assertSeeIn('[data-test="consent-signed"]', 'Вы дали это согласие при регистрации')
+        ->assertSee('Кто отвечает за данные')
+        ->click('[data-test="help-button"]')
+        ->click('[data-test="help-rules-link"]')
+        ->assertPathIs('/patient/rules')
+        ->assertSeeIn('[data-test="back-link"]', 'Помощь')
         ->assertNoJavaScriptErrors();
 
     $patient = User::query()->where('login', 'novikov')->sole();

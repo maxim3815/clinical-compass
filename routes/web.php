@@ -26,6 +26,7 @@ use App\Http\Controllers\PasswordResetByLinkController;
 use App\Http\Controllers\Patient\AsNeededDoseController;
 use App\Http\Controllers\Patient\AssessmentController;
 use App\Http\Controllers\Patient\ChatController as PatientChatController;
+use App\Http\Controllers\Patient\ConsentController;
 use App\Http\Controllers\Patient\DoseController;
 use App\Http\Controllers\Patient\HelpController;
 use App\Http\Controllers\Patient\HomeController as PatientHomeController;
@@ -33,6 +34,7 @@ use App\Http\Controllers\Patient\IntakeCalendarController;
 use App\Http\Controllers\Patient\IntakeTimeController;
 use App\Http\Controllers\Patient\MedicationController;
 use App\Http\Controllers\Patient\OwnMedicationController;
+use App\Http\Controllers\Patient\RulesController;
 use App\Http\Controllers\Patient\SideEffectController;
 use App\Http\Controllers\PushDoseController;
 use App\Http\Controllers\QueueController;
@@ -219,7 +221,8 @@ Route::middleware('auth')->group(function () {
         });
     });
 
-    Route::middleware('role:patient')->prefix('patient')->name('patient.')->group(function () {
+    // Новый пациент сначала видит правила «Когда приложение не поможет» (EnsurePatientReadRules).
+    Route::middleware(['role:patient', 'rules.read'])->prefix('patient')->name('patient.')->group(function () {
         Route::get('/', PatientHomeController::class)->name('home');
         Route::get('medications', MedicationController::class)->name('medications');
         Route::get('calendar', IntakeCalendarController::class)->name('calendar');
@@ -258,6 +261,12 @@ Route::middleware('auth')->group(function () {
         Route::delete('side-effects/{adverseEvent}/resolve', [SideEffectController::class, 'unresolve'])
             ->whereNumber('adverseEvent')
             ->name('side-effects.unresolve');
+
+        // Правила: сразу после регистрации с «Понятно», потом из настроек и с экрана помощи.
+        // Согласие из настроек открывается в кабинете, гостевая /consent — для регистрации.
+        Route::get('rules', [RulesController::class, 'show'])->name('rules.show');
+        Route::post('rules', [RulesController::class, 'acknowledge'])->name('rules.acknowledge');
+        Route::get('consent', ConsentController::class)->name('consent');
 
         Route::get('help', [HelpController::class, 'show'])->name('help.show');
         Route::post('help/report', [HelpController::class, 'report'])->middleware('throttle:30,1')->name('help.report');

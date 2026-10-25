@@ -212,6 +212,15 @@ class User extends Authenticatable
     }
 
     /**
+     * Новый пациент ещё не прочитал правила «Как работает помощь в приложении»: кабинет открывает их
+     * первыми (EnsurePatientReadRules).
+     */
+    public function mustReadRules(): bool
+    {
+        return $this->patientProfile !== null && $this->patientProfile->rules_acknowledged_at === null;
+    }
+
+    /**
      * Пациента сейчас ведёт терапевт: до принятия психиатром у него нет чата и окна побочных
      * эффектов, терапевт только отбирает и направляет.
      */

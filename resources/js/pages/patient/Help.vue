@@ -4,6 +4,7 @@ import {
     BellRing,
     CircleAlert,
     CircleCheck,
+    Info,
     MessageCircle,
     UserRoundX,
 } from '@lucide/vue';
@@ -15,6 +16,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { home } from '@/routes/patient';
 import { show as chat } from '@/routes/patient/chat';
 import { show } from '@/routes/patient/help';
+import { show as rules } from '@/routes/patient/rules';
 
 /**
  * Экран помощи: открывается кнопкой в шапке с любого экрана. Сначала звонки в 112 и на кризисную
@@ -261,5 +263,15 @@ function report(): void {
                 ему отсюда нельзя. Позвоните 112 или на кризисную линию.
             </p>
         </div>
+
+        <!-- Тихо и в самом низу: не спорит со звонками и «Сообщить врачу». -->
+        <Link
+            :href="rules({ query: { from: 'help' } })"
+            class="inline-flex min-h-11 items-center gap-2 self-start text-base font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-solid"
+            data-test="help-rules-link"
+        >
+            <Info class="size-5 shrink-0" />
+            Как работает помощь в приложении
+        </Link>
     </div>
 </template>

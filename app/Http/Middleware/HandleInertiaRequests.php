@@ -59,6 +59,8 @@ class HandleInertiaRequests extends Middleware
             'urgentQueue' => fn (): array => $request->user()?->role === UserRole::Doctor ? QueueAnswerPresenter::banner($request->user()) : [],
             // Вид врача: у терапевта своё меню и свой кабинет. У пациента null.
             'doctorKind' => fn (): ?string => $request->user()?->doctorKind()?->value,
+            // Новый пациент ещё не прочитал правила: вкладки и логотип не уводят с экрана правил и помощи.
+            'rulesPending' => fn (): bool => (bool) $request->user()?->mustReadRules(),
             // Пациента ведёт терапевт: чата и окна побочных эффектов нет, ссылки на них не показываются.
             'withTherapist' => fn (): bool => (bool) $request->user()?->isWithTherapist(),
             // Кризисная линия на экране помощи пациента и в карточке «Если вам сейчас тяжело». Гостю —

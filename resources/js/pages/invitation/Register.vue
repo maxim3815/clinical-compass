@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Form, Head } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { ref, useTemplateRef } from 'vue';
 import InvitationRegistrationController from '@/actions/App/Http/Controllers/InvitationRegistrationController';
 import ConsentText from '@/components/ConsentText.vue';
 import InputError from '@/components/InputError.vue';
@@ -33,11 +33,30 @@ const props = defineProps<Props>();
 
 const consentGiven = ref(false);
 const consentOpen = ref(false);
+const consentTitle =
+    useTemplateRef<InstanceType<typeof DialogTitle>>('consentTitle');
+// Окно закрыто кнопкой «Даю согласие»: фокус на галочке, скринридер скажет, что она отмечена.
+let agreed = false;
 
 // Прочитал текст и согласился в окне — галочка ставится сама.
 function agree(): void {
+    agreed = true;
     consentGiven.value = true;
     consentOpen.value = false;
+}
+
+// Фокус на заголовке: иначе он попадает на «Закрыть» в конце длинного текста.
+function focusConsentTitle(event: Event): void {
+    event.preventDefault();
+    consentTitle.value?.$el.focus();
+}
+
+function focusConsent(event: Event): void {
+    if (agreed) {
+        event.preventDefault();
+        document.getElementById('consent')?.focus();
+        agreed = false;
+    }
 }
 
 defineOptions({
@@ -151,11 +170,21 @@ defineOptions({
                     v-model="consentGiven"
                     name="consent"
                     class="mt-0.5"
-                    :aria-invalid="errors.consent ? true : undefined"
+                    :aria-invalid="
+                        errors.consent && !consentGiven ? true : undefined
+                    "
                     aria-describedby="consent-error"
                 />
-                <span>Даю согласие на обработку персональных данных</span>
+                <span
+                    >Даю согласие на обработку персональных данных, в том числе
+                    сведений о здоровье</span
+                >
             </Label>
+            <!-- Галочку поставили: ошибка уже неверна. -->
+            <InputError
+                id="consent-error"
+                :message="consentGiven ? undefined : errors.consent"
+            />
             <Dialog v-model:open="consentOpen">
                 <DialogTrigger as-child>
                     <Button
@@ -167,25 +196,54 @@ defineOptions({
                         Прочитать текст согласия
                     </Button>
                 </DialogTrigger>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>
-                            Согласие на обработку персональных данных
+                <!--
+                    Текст длинный: заголовок с крестиком и кнопки закреплены, прокручивается только
+                    текст. Так из середины текста видно, как закрыть окно и как согласиться. На низком
+                    экране (телефон боком, крупный шрифт) места под текст не осталось бы: там окно
+                    прокручивается целиком.
+                -->
+                <DialogContent
+                    class="flex flex-col gap-0 overflow-hidden p-0 [@media(max-height:32rem)]:overflow-y-auto"
+                    @open-auto-focus="focusConsentTitle"
+                    @close-auto-focus="focusConsent"
+                >
+                    <DialogHeader class="border-b px-6 pt-5 pb-3">
+                        <DialogTitle
+                            ref="consentTitle"
+                            tabindex="-1"
+                            class="text-xl outline-none"
+                        >
+                            Согласие на обработку данных
                         </DialogTitle>
                         <DialogDescription class="sr-only">
                             Текст согласия, которое вы даёте при регистрации
                         </DialogDescription>
                     </DialogHeader>
-                    <ConsentText />
-                    <DialogFooter>
+                    <div
+                        class="min-h-0 overflow-y-auto px-6 py-4 outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring focus-visible:outline-solid [@media(max-height:32rem)]:shrink-0 [@media(max-height:32rem)]:overflow-visible"
+                        tabindex="0"
+                        role="region"
+                        aria-label="Текст согласия"
+                        data-test="consent-text"
+                    >
+                        <ConsentText heading="h3" />
+                    </div>
+                    <!-- Кнопки в ряд: закреплённая часть окна ниже, тексту больше места. -->
+                    <DialogFooter class="flex-row border-t px-6 pt-3 pb-5">
                         <DialogClose as-child>
-                            <Button type="button" variant="outline" size="lg">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="lg"
+                                class="flex-1"
+                            >
                                 Закрыть
                             </Button>
                         </DialogClose>
                         <Button
                             type="button"
                             size="lg"
+                            class="flex-1"
                             data-test="consent-agree"
                             @click="agree"
                         >
@@ -194,7 +252,6 @@ defineOptions({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-            <InputError id="consent-error" :message="errors.consent" />
         </div>
 
         <Button

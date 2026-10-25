@@ -44,6 +44,8 @@ test('a new patient goes from the invitation to an adherence signal at the docto
         ->fill('password_confirmation', 'secret-password')
         ->click('#consent')
         ->press('Зарегистрироваться')
+        ->assertPathIs('/patient/rules')
+        ->click('[data-test="rules-acknowledge"]')
         ->assertPathIs('/patient')
         ->assertSee('Врач пока не назначил препараты.')
         ->assertNoJavaScriptErrors();

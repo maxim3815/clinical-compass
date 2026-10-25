@@ -31,6 +31,9 @@ const isForm = computed(() =>
     ].includes(page.component),
 );
 
+// Новый пациент ещё не прочитал правила: вкладки только вернули бы его на экран правил.
+const showTabBar = computed(() => !isForm.value && !page.props.rulesPending);
+
 // Пока на телефоне открыта клавиатура, панель вкладок прячется: иначе Android поднимает её
 // над клавиатурой, и от переписки остаётся пара строк. Клавиатура открыта, когда фокус
 // в текстовом поле и видимая часть экрана заметно ниже обычной: «Назад» прячет клавиатуру,
@@ -105,7 +108,9 @@ const toastOptions = {
     <div
         class="flex min-h-svh flex-col [--patient-chrome:calc(3.5rem+1px+var(--tab-bar-height)+env(safe-area-inset-bottom)+1rem)]"
         :class="
-            typing ? '[--tab-bar-height:0px]' : '[--tab-bar-height:4.25rem]'
+            typing || !showTabBar
+                ? '[--tab-bar-height:0px]'
+                : '[--tab-bar-height:4.25rem]'
         "
     >
         <PatientHeader :breadcrumbs="breadcrumbs" />
@@ -116,14 +121,14 @@ const toastOptions = {
         <main
             class="mx-auto w-full max-w-xl flex-1 [&_[data-slot=input-error]]:text-base [&_[data-slot=label]]:text-base"
             :class="
-                isForm
+                !showTabBar
                     ? 'pb-[calc(env(safe-area-inset-bottom)+1rem)]'
                     : 'pb-[calc(var(--tab-bar-height)+env(safe-area-inset-bottom)+1rem)]'
             "
         >
             <slot />
         </main>
-        <PatientTabBar v-if="!isForm" v-show="!typing" />
+        <PatientTabBar v-if="showTabBar" v-show="!typing" />
         <Toaster
             position="top-center"
             container-aria-label="Уведомления"

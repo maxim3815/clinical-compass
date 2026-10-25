@@ -6,6 +6,7 @@ import AppLogoIcon from '@/components/AppLogoIcon.vue';
 import { home } from '@/routes/patient';
 import { helpOpenedInApp } from '@/lib/helpNavigation';
 import { show as help } from '@/routes/patient/help';
+import { show as rules } from '@/routes/patient/rules';
 import type { BreadcrumbItem } from '@/types';
 
 const props = withDefaults(
@@ -31,10 +32,17 @@ function markOpenedInApp(): void {
     helpOpenedInApp.value = true;
 }
 
-// На вложенной странице вместо названия приложения — путь назад в раздел.
-const parent = computed(() =>
-    props.breadcrumbs.length > 1 ? props.breadcrumbs.at(-2) : undefined,
-);
+// На вложенной странице вместо названия приложения — путь назад в раздел. Пока новый пациент
+// не прочитал правила, разделы ведут на них: с экрана помощи и из чата назад — сразу к правилам.
+const parent = computed(() => {
+    if (page.props.rulesPending) {
+        return page.component === 'patient/Rules'
+            ? undefined
+            : { title: 'Назад', href: rules() };
+    }
+
+    return props.breadcrumbs.length > 1 ? props.breadcrumbs.at(-2) : undefined;
+});
 </script>
 
 <template>
@@ -60,9 +68,11 @@ const parent = computed(() =>
                 <ChevronLeft class="size-6 shrink-0" />
                 <span class="truncate">{{ parent.title }}</span>
             </Link>
-            <Link
+            <!-- На экране правил логотип не ссылка: «Сегодня» вернуло бы на те же правила. -->
+            <component
+                :is="page.props.rulesPending ? 'div' : Link"
                 v-else
-                :href="home()"
+                v-bind="page.props.rulesPending ? {} : { href: home() }"
                 class="flex h-11 min-w-0 items-center gap-2.5 rounded-lg px-2 outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-solid"
             >
                 <span
@@ -79,7 +89,7 @@ const parent = computed(() =>
                     :class="{ 'max-[28rem]:sr-only': !onHelp }"
                     >{{ name }}</span
                 >
-            </Link>
+            </component>
             <!--
                 Одно касание с любого экрана, без «Вы уверены?»: врачу ничего не уходит, пока
                 пациент сам не нажмёт «Сообщить врачу». Не красная: красного нет там, где нет

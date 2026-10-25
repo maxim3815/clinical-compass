@@ -111,6 +111,8 @@ test('a patient in the queue answers at the door, the therapist opens the code, 
         ->click('[data-test="consent-text-button"]')
         ->click('[data-test="consent-agree"]')
         ->press('Зарегистрироваться')
+        ->assertPathIs('/patient/rules')
+        ->click('[data-test="rules-acknowledge"]')
         ->assertPathIs('/patient')
         // Ответы из очереди закрыли опросники дня 0: отвечать второй раз не нужно.
         ->assertMissing('[data-test="questionnaire-card"]')

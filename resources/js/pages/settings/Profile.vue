@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Form, Head, usePage } from '@inertiajs/vue3';
+import { Form, Head, Link, usePage } from '@inertiajs/vue3';
+import { FileText, Info } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import Heading from '@/components/Heading.vue';
@@ -8,6 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
+import { consent } from '@/routes/patient';
+import { show as rules } from '@/routes/patient/rules';
 import { edit } from '@/routes/profile';
 
 type PatientProfile = {
@@ -46,7 +49,7 @@ const timezone = ref(props.patientProfile?.timezone ?? '');
             title="Профиль"
             :description="
                 patientProfile
-                    ? 'ФИО, дата рождения и часовой пояс'
+                    ? 'ФИО, дата рождения, часовой пояс, правила и согласие'
                     : 'ФИО и логин'
             "
         />
@@ -145,5 +148,37 @@ const timezone = ref(props.patientProfile?.timezone ?? '');
                 Сохранить
             </Button>
         </Form>
+
+        <!-- Тексты, с которыми пациент согласился при регистрации: перечитать, не выходя из кабинета. -->
+        <section
+            v-if="patientProfile"
+            class="flex flex-col gap-2 border-t pt-6"
+            aria-labelledby="documents-title"
+            data-test="patient-documents"
+        >
+            <h2 id="documents-title" class="text-lg font-semibold">
+                Правила и согласие
+            </h2>
+            <ul class="flex flex-col gap-1">
+                <li>
+                    <Link
+                        :href="rules()"
+                        class="inline-flex min-h-11 items-center gap-2 text-base font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-solid"
+                    >
+                        <Info class="size-5 shrink-0" />
+                        Как работает помощь в приложении
+                    </Link>
+                </li>
+                <li>
+                    <Link
+                        :href="consent()"
+                        class="inline-flex min-h-11 items-center gap-2 text-base font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-solid"
+                    >
+                        <FileText class="size-5 shrink-0" />
+                        Согласие на обработку персональных данных
+                    </Link>
+                </li>
+            </ul>
+        </section>
     </div>
 </template>

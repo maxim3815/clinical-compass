@@ -6,6 +6,8 @@ use App\Enums\AccessLinkPurpose;
 use App\Events\InvitationChanged;
 use App\Exceptions\AccessLinkUnavailable;
 use App\Models\AccessLink;
+use App\Models\AuditLog;
+use App\Models\PatientProfile;
 use App\Models\QueueAnswer;
 use App\Models\User;
 use DateTimeInterface;
@@ -63,6 +65,10 @@ class RegisterInvitedPatient
             $invitation->update([
                 'patient_id' => $patient->id,
                 'used_at' => now(),
+            ]);
+
+            AuditLog::record($patient, 'patient.consented', $patient, $patient, null, [
+                'version' => PatientProfile::CONSENT_VERSION,
             ]);
 
             $queueAnswer = $this->queueAnswer($invitation, $queueToken);

@@ -49,7 +49,7 @@ beforeEach(function () {
                 'password_confirmation' => 'secret-password',
                 'consent' => '1',
             ])
-            ->assertRedirect(route('patient.home'));
+            ->assertRedirect(route('patient.rules.show'));
 
         auth()->logout();
 
@@ -657,6 +657,6 @@ test('the patient sees which queue code was saved after registration', function 
         'password_confirmation' => 'secret-password',
         'consent' => '1',
     ])
-        ->assertRedirect(route('patient.home'))
+        ->assertRedirect(route('patient.rules.show'))
         ->assertSessionHas('inertia.flash_data.toast.message', "Ваши ответы из очереди с кодом {$answer->code} сохранены в приложении.");
 });

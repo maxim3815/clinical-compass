@@ -63,6 +63,8 @@ test('doctor gives a pin at the appointment, the patient enters it on the phone 
         ->click('[data-test="consent-text-button"]')
         ->click('[data-test="consent-agree"]')
         ->press('Зарегистрироваться')
+        ->assertPathIs('/patient/rules')
+        ->click('[data-test="rules-acknowledge"]')
         ->assertPathIs('/patient')
         ->assertNoJavaScriptErrors();
 

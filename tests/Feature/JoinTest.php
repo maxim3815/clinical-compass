@@ -88,7 +88,7 @@ test('patient registers after the pin and is attached to the doctor', function (
         'password' => 'secret-password',
         'password_confirmation' => 'secret-password',
         'consent' => '1',
-    ])->assertRedirect(route('patient.home'));
+    ])->assertRedirect(route('patient.rules.show'));
 
     $patient = User::query()->where('login', 'kuzmin')->sole();
 

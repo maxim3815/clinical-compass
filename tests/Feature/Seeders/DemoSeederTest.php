@@ -15,6 +15,7 @@ use App\Models\DoseEvent;
 use App\Models\Drug;
 use App\Models\HelpEvent;
 use App\Models\Message;
+use App\Models\PatientProfile;
 use App\Models\Prescription;
 use App\Models\Referral;
 use App\Models\SafetyFinding;
@@ -55,6 +56,8 @@ test('demo seeder builds the planned doctors, patients and courses and can be ru
         ->and($therapist->patients()->pluck('login')->all())->toBe(['patient_4c'])
         ->and(User::query()->count())->toBe(18)
         ->and(User::query()->where('role', UserRole::Patient)->whereDoesntHave('patientProfile')->exists())->toBeFalse()
+        // Демо-пациенты уже прочитали правила: экран правил на показе видит только новый пациент.
+        ->and(PatientProfile::query()->whereNull('rules_acknowledged_at')->exists())->toBeFalse()
         ->and(User::query()->get()->every(fn (User $user) => Hash::check('password', $user->password)))->toBeTrue()
         ->and($doctor2->can('view', $patient('patient')))->toBeFalse()
         ->and(Drug::query()->active()->count())->toBe(5)

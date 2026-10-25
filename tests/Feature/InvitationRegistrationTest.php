@@ -3,6 +3,8 @@
 use App\Enums\AccessLinkPurpose;
 use App\Enums\UserRole;
 use App\Models\AccessLink;
+use App\Models\AuditLog;
+use App\Models\PatientProfile;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -40,7 +42,7 @@ test('patient registers by invitation and is attached to the doctor', function (
     $invitation = AccessLink::factory()->for($doctor, 'doctor')->withToken(INVITATION_TOKEN)->create();
 
     $this->post(route('invitation.store', INVITATION_TOKEN), registrationData(['login' => 'Novikov']))
-        ->assertRedirect(route('patient.home'));
+        ->assertRedirect(route('patient.rules.show'));
 
     $patient = User::query()->where('login', 'novikov')->sole();
 
@@ -49,6 +51,10 @@ test('patient registers by invitation and is attached to the doctor', function (
         ->and($patient->name)->toBe('Новиков Артём Сергеевич')
         ->and($patient->patientProfile?->birth_date?->toDateString())->toBe('1990-04-15')
         ->and($patient->patientProfile?->consented_at)->not->toBeNull()
+        // Какую редакцию согласия принял пациент. Правила он ещё не читал: экран правил после регистрации.
+        ->and($patient->patientProfile?->consent_version)->toBe(PatientProfile::CONSENT_VERSION)
+        ->and($patient->patientProfile?->rules_acknowledged_at)->toBeNull()
+        ->and(AuditLog::query()->where('action', 'patient.consented')->sole()->after)->toBe(['version' => PatientProfile::CONSENT_VERSION])
         ->and($patient->currentDoctor?->is($doctor))->toBeTrue()
         ->and($invitation->refresh()->used_at)->not->toBeNull()
         ->and($invitation->patient_id)->toBe($patient->id);
@@ -58,7 +64,7 @@ test('birth date is optional', function () {
     AccessLink::factory()->withToken(INVITATION_TOKEN)->create();
 
     $this->post(route('invitation.store', INVITATION_TOKEN), registrationData(['birth_date' => null]))
-        ->assertRedirect(route('patient.home'));
+        ->assertRedirect(route('patient.rules.show'));
 
     expect(User::query()->where('login', 'novikov')->sole()->patientProfile?->birth_date)->toBeNull();
 });
@@ -111,7 +117,7 @@ test('registration requires consent', function () {
     AccessLink::factory()->withToken(INVITATION_TOKEN)->create();
 
     $this->post(route('invitation.store', INVITATION_TOKEN), registrationData(['consent' => null]))
-        ->assertSessionHasErrors(['consent' => 'Без согласия на обработку персональных данных зарегистрироваться нельзя.']);
+        ->assertSessionHasErrors(['consent' => 'Поставьте галочку «Даю согласие», чтобы зарегистрироваться.']);
 
     $this->assertGuest();
     expect(User::query()->where('role', UserRole::Patient)->exists())->toBeFalse();

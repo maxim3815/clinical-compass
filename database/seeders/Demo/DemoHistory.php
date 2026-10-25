@@ -127,6 +127,8 @@ final class DemoHistory
                 password: $password,
                 birthDate: CarbonImmutable::parse($plan->birthDate),
                 consentedAt: now(),
+                // Демо-пациенты правила уже прочитали: экран правил на показе видит только новый пациент.
+                rulesAcknowledgedAt: now(),
             );
 
             $this->profile($patient, $doctor, $plan, $today);
