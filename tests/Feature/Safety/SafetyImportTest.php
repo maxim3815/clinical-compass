@@ -86,6 +86,17 @@ test('rule files load all rules, fact types and drug groups', function () {
         ->expectsOutputToContain('Правила не изменились. Правил в файлах: 52.');
 });
 
+test('texts of the rule files are not cut short', function () {
+    $this->artisan('app:rules:import')->assertSuccessful();
+
+    // « #» в строке без кавычек YAML читает как начало комментария, и конец текста молча пропадает.
+    SafetyRule::query()->active()->get()->each(function (SafetyRule $rule) {
+        foreach (array_filter([$rule->text, $rule->advice, $rule->source_quote]) as $text) {
+            expect($text)->toMatch('/[.…]$/u', "{$rule->code}: «{$text}»");
+        }
+    });
+});
+
 test('changed rule gets a new version and removed rule is deactivated', function () {
     [$code] = importRules([ruleRecord(), ruleRecord(['id' => 'epilepsy', 'condition' => "fact('epilepsy')"])]);
     expect($code)->toBe(0);
