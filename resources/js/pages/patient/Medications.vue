@@ -3,17 +3,19 @@ import { Head, Link, usePage } from '@inertiajs/vue3';
 import {
     CalendarDays,
     Clock,
+    MessageCircle,
     Plus,
     Thermometer,
     TriangleAlert,
 } from '@lucide/vue';
-import { computed, ref } from 'vue';
+import { computed, nextTick, onMounted, ref } from 'vue';
 import IntakeTimeController from '@/actions/App/Http/Controllers/Patient/IntakeTimeController';
 import OwnMedicationController from '@/actions/App/Http/Controllers/Patient/OwnMedicationController';
 import PrescriptionDetails from '@/components/PrescriptionDetails.vue';
 import StopMedicationDialog from '@/components/StopMedicationDialog.vue';
 import { Button } from '@/components/ui/button';
 import { calendar, medications } from '@/routes/patient';
+import { show as chat } from '@/routes/patient/chat';
 import { index as sideEffects } from '@/routes/patient/side-effects';
 import type { Prescription } from '@/types';
 
@@ -50,6 +52,27 @@ const doctorPrescriptions = computed(() => [
 function titleId(prescription: Prescription): string {
     return `prescription-${prescription.id}-title`;
 }
+
+// Добавленный препарат встаёт в список по алфавиту и может оказаться ниже экрана вместе с
+// подсказкой: список прокручивается к нему, карточка ненадолго выделена.
+const added = ref<number | null>(null);
+
+onMounted(async () => {
+    const id = page.flash.addedMedication ?? null;
+
+    if (id === null) {
+        return;
+    }
+
+    added.value = id;
+    await nextTick();
+    const title = document.getElementById(`prescription-${id}-title`);
+    title?.closest('article')?.scrollIntoView({ block: 'center' });
+    // Диктор начинает с добавленного препарата и сразу читает подсказку под ним.
+    title?.setAttribute('tabindex', '-1');
+    title?.focus({ preventScroll: true });
+    window.setTimeout(() => (added.value = null), 4000);
+});
 </script>
 
 <template>
@@ -169,7 +192,45 @@ function titleId(prescription: Prescription): string {
                 v-for="prescription in ownMedications"
                 :key="prescription.id"
                 :prescription="prescription"
+                class="transition-shadow duration-700"
+                :class="{
+                    'ring-2 ring-primary/40': added === prescription.id,
+                }"
             >
+                <!-- Препарат участвует в противопоказании, по которому врач ещё не решил. Ни сочетания,
+                     ни причины пациент не видит: только рассказать врачу и не бросать приём. -->
+                <template v-if="prescription.tell_doctor" #notice>
+                    <div
+                        class="flex flex-col gap-3 rounded-xl border border-primary/30 bg-secondary p-3"
+                        data-test="tell-doctor"
+                    >
+                        <p class="flex gap-2">
+                            <MessageCircle
+                                class="mt-0.5 size-5 shrink-0 text-primary"
+                            />
+                            Расскажите врачу, что принимаете этот препарат: врач
+                            посмотрит, как он подходит к вашему лечению. До
+                            разговора с врачом принимайте всё как обычно.
+                        </p>
+                        <!-- Пока пациента ведёт терапевт, чата нет: о препарате говорят на приёме. -->
+                        <Button
+                            v-if="!page.props.withTherapist"
+                            variant="outline"
+                            size="lg"
+                            class="self-start bg-card"
+                            as-child
+                        >
+                            <Link
+                                :href="chat()"
+                                :aria-describedby="titleId(prescription)"
+                                data-test="tell-doctor-chat"
+                            >
+                                <MessageCircle />
+                                Написать врачу
+                            </Link>
+                        </Button>
+                    </div>
+                </template>
                 <template #actions>
                     <Button variant="outline" size="lg" as-child>
                         <Link

@@ -67,6 +67,21 @@ export type SafetyFinding = SafetyRuleView & {
     } | null;
 };
 
+/**
+ * Находка у другого препарата, где препарат из списка препаратов от других врачей среди связанных:
+ * своих правил у такого препарата нет.
+ */
+export type RelatedFinding = {
+    id: number;
+    level: SafetyLevel;
+    awaitsDecision: boolean;
+    // Назначение с находкой и его название.
+    targetId: number;
+    targetName: string;
+    // Назначение с находкой выше в карточке.
+    above: boolean;
+};
+
 export type SafetyCard = {
     findings: SafetyFinding[];
     unchecked: string[];

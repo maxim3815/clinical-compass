@@ -23,11 +23,13 @@ const props = defineProps<{
     maxLength: number;
 }>();
 
-// Находка, по которой врач решает. Пока её нет, диалог закрыт.
-const finding = defineModel<{ finding: SafetyFinding; drug: string } | null>(
-    'finding',
-    { required: true },
-);
+// Находка, по которой врач решает. Пока её нет, диалог закрыт. patientHint — в паре есть
+// препарат, который добавил пациент: у него подсказка рассказать врачу, решение её снимет.
+const finding = defineModel<{
+    finding: SafetyFinding;
+    drug: string;
+    patientHint?: boolean;
+} | null>('finding', { required: true });
 
 const form = useForm({ justification: '' });
 
@@ -37,13 +39,16 @@ const description = computed(() => {
         return '';
     }
 
-    const { drug, finding: item } = finding.value;
+    const { drug, finding: item, patientHint } = finding.value;
     const related =
         item.related.length > 0
             ? ` Решение закроет противопоказание и у препарата ${item.related.join(', ')}.`
             : '';
+    const hint = patientHint
+        ? ' У пациента пропадёт подсказка рассказать вам о препарате: сообщите ему решение.'
+        : '';
 
-    return `${drug}: ${item.text}${related}`;
+    return `${drug}: ${item.text}${related}${hint}`;
 });
 
 watch(finding, () => {

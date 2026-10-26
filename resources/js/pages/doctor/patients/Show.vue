@@ -3,6 +3,7 @@ import { Form, Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
     Frown,
     ArrowDown,
+    CircleHelp,
     KeyRound,
     LifeBuoy,
     MessageCircle,
@@ -27,6 +28,7 @@ import AlertSection from '@/components/AlertSection.vue';
 import CancelPrescriptionDialog from '@/components/CancelPrescriptionDialog.vue';
 import ClinicalProfileSummary from '@/components/ClinicalProfileSummary.vue';
 import HelpEventsSection from '@/components/HelpEventsSection.vue';
+import KnownDrugSafety from '@/components/KnownDrugSafety.vue';
 import CloseAlertDialog from '@/components/CloseAlertDialog.vue';
 import ContinueFindingDialog from '@/components/ContinueFindingDialog.vue';
 import OneTimeLink from '@/components/OneTimeLink.vue';
@@ -53,6 +55,7 @@ import type {
     HelpEvent,
     PatientAlert,
     Prescription,
+    RelatedFinding,
     SafetyCard,
     SafetyFinding,
     SelectOption,
@@ -226,13 +229,25 @@ const adverseChip = computed(() => {
         : `${names.length > 1 ? 'Побочные эффекты' : 'Побочный эффект'}: ${names.join('; ')}`;
 });
 
-const continuing = ref<{ finding: SafetyFinding; drug: string } | null>(null);
+const continuing = ref<{
+    finding: SafetyFinding;
+    drug: string;
+    patientHint: boolean;
+} | null>(null);
 
 function continueDespite(
     prescription: Prescription,
     finding: SafetyFinding,
 ): void {
-    continuing.value = { finding, drug: prescription.drug.name };
+    const ownIds = props.ownMedications.map((own) => own.id);
+
+    continuing.value = {
+        finding,
+        drug: prescription.drug.name,
+        patientHint: [prescription.id, ...finding.related_ids].some((id) =>
+            ownIds.includes(id),
+        ),
+    };
 }
 const passwordResetUrl = computed(() => page.flash.passwordResetUrl);
 
@@ -318,9 +333,45 @@ const pairedFindingIds = computed(() => {
     return paired;
 });
 
-function awaitsDecision(prescription: Prescription): boolean {
-    return awaiting.value.includes(prescription);
+// У препарата из списка препаратов от других врачей своих правил нет: его сочетания — находки
+// у других препаратов, где он среди связанных.
+function relatedFindings(prescription: Prescription): RelatedFinding[] {
+    const order = [...props.prescriptions, ...props.ownMedications];
+    const position = (id: number) =>
+        order.findIndex((current) => current.id === id);
+
+    return Object.entries(props.safety).flatMap(([targetId, card]) =>
+        card.findings
+            .filter((finding) => finding.related_ids.includes(prescription.id))
+            .map((finding) => ({
+                id: finding.id,
+                level: finding.level,
+                awaitsDecision: finding.awaits_decision,
+                targetId: Number(targetId),
+                targetName: order[position(Number(targetId))]?.drug.name ?? '',
+                above: position(Number(targetId)) < position(prescription.id),
+            })),
+    );
 }
+
+function awaitsDecision(prescription: Prescription): boolean {
+    return (
+        awaiting.value.includes(prescription) ||
+        (prescription.drug.kind === 'known' &&
+            relatedFindings(prescription).some(
+                (finding) => finding.awaitsDecision,
+            ))
+    );
+}
+
+// В плашке шапки — и препарат из списка, из-за которого появилось противопоказание. По алфавиту,
+// как в очереди «Требуют внимания».
+const awaitingNames = computed(() =>
+    [...props.prescriptions, ...props.ownMedications]
+        .filter(awaitsDecision)
+        .map((prescription) => prescription.drug.name)
+        .sort((a, b) => a.localeCompare(b, 'ru')),
+);
 
 const profileHref = computed(() =>
     ClinicalProfileController.edit(props.patient.id),
@@ -473,11 +524,7 @@ const unreadLabel = computed(
                     >
                         <OctagonAlert :class="CHIP_ICON" />
                         Противопоказание без решения:
-                        {{
-                            awaiting
-                                .map((prescription) => prescription.drug.name)
-                                .join(', ')
-                        }}
+                        {{ awaitingNames.join(', ') }}
                         <ArrowDown class="mt-0.5 size-4 shrink-0" />
                     </a>
                 </li>
@@ -754,6 +801,31 @@ const unreadLabel = computed(
                                         continueDespite(prescription, finding)
                                 "
                             />
+                        </template>
+                        <template
+                            v-else-if="prescription.drug.kind === 'known'"
+                            #safety
+                        >
+                            <KnownDrugSafety
+                                :code="prescription.drug.code"
+                                :reason="prescription.drug.reason ?? null"
+                                :related="relatedFindings(prescription)"
+                            />
+                        </template>
+                        <!-- Препарата нет ни в справочнике, ни в списке: сочетания с ним не проверены. -->
+                        <template
+                            v-else-if="prescription.drug.kind === null"
+                            #safety
+                        >
+                            <p
+                                class="flex gap-1.5 text-sm text-muted-foreground"
+                                data-test="other-drug-unchecked"
+                            >
+                                <CircleHelp class="mt-0.5 size-4 shrink-0" />
+                                Препарата нет ни в справочнике, ни в списке
+                                препаратов от других врачей: сочетания с ним не
+                                проверены.
+                            </p>
                         </template>
                     </PrescriptionDetails>
                 </section>

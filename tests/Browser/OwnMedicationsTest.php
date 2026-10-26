@@ -26,8 +26,10 @@ test('patient on a phone adds another drug and marks it on the today screen', fu
         ->assertSee('Добавленные мной')
         ->click('[data-test="add-medication-button"]')
         ->assertPathIs('/patient/medications/create')
-        ->select('#drug_id', 'other')
-        ->fill('#drug_name', 'Фенибут')
+        // Фенибута в списке нет: предлагается добавить его с набранным названием.
+        ->fill('#drug_id', 'Фенибут')
+        ->click('[data-test="drug-option-other"]')
+        ->assertSee('Проверьте название по упаковке')
         ->fill('#dose', '1 таблетка 250 мг')
         ->assertValue('#intake_time_0', '08:00')
         ->fill('#intake_time_0', '07:30')
@@ -61,4 +63,73 @@ test('patient on a phone adds another drug and marks it on the today screen', fu
     expect($prescription->source)->toBe(PrescriptionSource::Patient)
         ->and($prescription->drug_name)->toBe('Фенибут')
         ->and(doseOn($patient, $day->toDateString(), 'morning')->status)->toBe(DoseEventStatus::Taken);
+});
+
+test('patient on a phone finds a drug by the trade name and is told to tell the doctor about a contraindicated combination', function () {
+    $day = CarbonImmutable::now('Europe/Moscow')->addDay()->startOfDay();
+    $this->travelTo($day->setTime(10, 0));
+    loadSafetyRules();
+    $doctor = User::factory()->doctor()->create();
+    $patient = User::factory()->patientOf($doctor)->create(['login' => 'smirnov']);
+    diagnose($patient, 'F41.1');
+    takes($patient, 'escitalopram');
+
+    $page = visit(route('login'))
+        ->on()->mobile()
+        ->fill('login', 'smirnov')
+        ->fill('password', 'password')
+        ->press('Войти')
+        ->click('[data-test="tab-medications"]')
+        ->click('[data-test="add-medication-button"]')
+        // Пока название набирается, «оставить как написано» не предлагается.
+        ->fill('#drug_id', 'трам')
+        ->assertMissing('[data-test="drug-option-other"]')
+        // Название с коробки в любом регистре: вариант с действующим веществом.
+        ->fill('#drug_id', 'трамал')
+        ->assertSeeIn('[data-test="drug-options"]', 'Трамал')
+        ->assertSeeIn('[data-test="drug-options"]', 'трамадол')
+        ->assertAttribute('#drug_id', 'aria-expanded', 'true')
+        // С клавиатуры: стрелка выделяет вариант, Enter выбирает его.
+        ->keys('#drug_id', ['ArrowDown', 'Enter'])
+        ->assertAttribute('#drug_id', 'aria-expanded', 'false')
+        ->assertValue('#drug_id', 'Трамал')
+        ->assertSee('Действующее вещество: трамадол')
+        ->fill('#dose', '1 капсула 50 мг')
+        ->assertScript(FITS_SCREEN)
+        ->click('[data-test="save-medication"]')
+        ->assertPathIs('/patient/medications')
+        ->assertSee('Препарат добавлен.')
+        ->assertSeeIn('[data-test="own-medications"]', 'Трамал')
+        // С эсциталопрамом трамадол — «с осторожностью»: пациент ничего не видит.
+        ->assertMissing('[data-test="tell-doctor"]')
+        ->assertNoJavaScriptErrors();
+
+    $page->click('[data-test="add-medication-button"]')
+        // Растительный «Корвалол Фито» — не «Корвалол»: можно оставить название как написано.
+        ->fill('#drug_id', 'Корвалол Фито')
+        ->assertSeeIn('[data-test="drug-option"]', 'Корвалол')
+        ->assertSeeIn('[data-test="drug-option-other"]', 'Оставить как написано: «Корвалол Фито»')
+        // С опечаткой — похожие названия, а не «другой» препарат без проверки.
+        ->fill('#drug_id', 'Кордорон')
+        ->assertSee('Точного совпадения нет. Может быть, вы имели в виду:')
+        ->assertSeeIn('[data-test="drug-option"]', 'Кордарон')
+        ->click('[data-test="drug-option"]')
+        ->assertValue('#drug_id', 'Кордарон')
+        // Переписанная с упаковки доза поиску не мешает: при уходе из поля выбран «Кордарон».
+        ->fill('#drug_id', 'Кордарон 200 мг')
+        ->assertMissing('[data-test="drug-option-other"]')
+        ->click('#dose')
+        ->assertValue('#drug_id', 'Кордарон')
+        ->assertSee('Действующее вещество: амиодарон')
+        ->fill('#dose', '1 таблетка 200 мг')
+        ->click('[data-test="save-medication"]')
+        ->assertPathIs('/patient/medications')
+        ->assertSee('Препарат добавлен. Расскажите врачу, что принимаете его.')
+        ->assertSeeIn('[data-test="tell-doctor"]', 'Расскажите врачу, что принимаете этот препарат: врач посмотрит, как он подходит к вашему лечению. До разговора с врачом принимайте всё как обычно.')
+        ->assertScript(FITS_SCREEN)
+        ->assertNoJavaScriptErrors()
+        ->click('[data-test="tell-doctor-chat"]')
+        ->assertPathIs('/patient/chat');
+
+    expect(Prescription::query()->where('source', PrescriptionSource::Patient)->orderBy('id')->pluck('trade_name')->all())->toBe(['Трамал', 'Кордарон']);
 });

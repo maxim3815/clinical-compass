@@ -107,6 +107,15 @@ class Drug extends Model
     }
 
     /**
+     * Почему препарат в списке препаратов от других врачей, для врача: пометка [медик] нужна
+     * только для сверки файла.
+     */
+    public function publicReason(): ?string
+    {
+        return $this->reason === null ? null : trim(str_replace(' [медик]', '', $this->reason));
+    }
+
+    /**
      * @param  Builder<self>  $query
      */
     #[Scope]

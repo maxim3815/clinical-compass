@@ -57,11 +57,11 @@ function ownIntakes(Prescription $prescription): array
         ->all();
 }
 
-test('medication form offers active drugs of the catalog and suggested times', function () {
+test('medication form offers active drugs of the catalog and of the list with names for search and suggested times', function () {
     catalogDrug('Агомелатин', attributes: ['is_active' => false]);
     $aviandr = catalogDrug('Авиандр', [20 => false]);
-    // Поиска по списку препаратов от других врачей в форме пока нет.
-    Drug::factory()->known()->create(['name' => 'Трамадол']);
+    $tramadol = Drug::factory()->known()->create(['name' => 'Трамадол', 'inn' => 'трамадол', 'trade_names' => ['Трамал', 'Залдиар']]);
+    Drug::factory()->known()->inactive()->create(['name' => 'Пимозид']);
 
     $this->actingAs($this->patient)
         ->get(route('patient.own-medications.create'))
@@ -69,8 +69,9 @@ test('medication form offers active drugs of the catalog and suggested times', f
         ->assertInertia(fn (Assert $page) => $page
             ->component('patient/MedicationForm')
             ->where('drugs', [
-                ['id' => $aviandr->id, 'name' => 'Авиандр'],
-                ['id' => $this->sertraline->id, 'name' => 'Сертралин'],
+                ['id' => $aviandr->id, 'name' => 'Авиандр', 'inn' => $aviandr->inn, 'trade_names' => []],
+                ['id' => $this->sertraline->id, 'name' => 'Сертралин', 'inn' => $this->sertraline->inn, 'trade_names' => []],
+                ['id' => $tramadol->id, 'name' => 'Трамадол', 'inn' => 'трамадол', 'trade_names' => ['Трамал', 'Залдиар']],
             ])
             ->where('timesOfDay.0', ['value' => 'morning', 'label' => 'Утром', 'time' => '08:00'])
             ->where('timesOfDay.3', ['value' => 'bedtime', 'label' => 'Перед сном', 'time' => '22:00'])
@@ -126,7 +127,7 @@ test('patient adds a catalog drug taken regularly and gets dose events at once',
             ->has('ownMedications', 1)
             ->where('ownMedications.0.id', $prescription->id)
             ->where('ownMedications.0.source', 'patient')
-            ->where('ownMedications.0.drug', ['code' => $this->sertraline->code, 'name' => 'Сертралин'])
+            ->where('ownMedications.0.drug', ['code' => $this->sertraline->code, 'name' => 'Сертралин', 'kind' => 'catalog'])
             ->where('ownMedications.0.strength', null)
             ->where('ownMedications.0.dose', '1 таблетка 50 мг')
             ->where('ownMedications.0.intakes', [
@@ -142,7 +143,7 @@ test('patient adds a catalog drug taken regularly and gets dose events at once',
 });
 
 test('patient adds a drug from the list of drugs from other doctors', function () {
-    $tramadol = Drug::factory()->known(['serotonergic'])->create(['name' => 'Трамадол']);
+    $tramadol = Drug::factory()->known(['serotonergic'])->create(['name' => 'Трамадол', 'trade_names' => ['Трамал']]);
 
     $this->actingAs($this->patient)
         ->post(route('patient.own-medications.store'), ownMedicationPayload([
@@ -157,7 +158,72 @@ test('patient adds a drug from the list of drugs from other doctors', function (
     expect($prescription->source)->toBe(PrescriptionSource::Patient)
         ->and($prescription->drug_id)->toBe($tramadol->id)
         ->and($prescription->drug_name)->toBeNull()
-        ->and($prescription->drugName())->toBe('Трамадол');
+        ->and($prescription->trade_name)->toBeNull()
+        ->and($prescription->drugName())->toBe('Трамадол')
+        ->and($prescription->doctorDrugName())->toBe('Трамадол');
+});
+
+test('patient sees the trade name the drug was found by, the doctor sees the drug and the trade name', function () {
+    $tramadol = Drug::factory()->known(['serotonergic'])->create(['name' => 'Трамадол', 'trade_names' => ['Трамал', 'Залдиар']]);
+
+    $this->actingAs($this->patient)
+        ->post(route('patient.own-medications.store'), ownMedicationPayload([
+            'drug_id' => $tramadol->id,
+            'trade_name' => 'Трамал',
+            'dose' => '1 капсула 50 мг',
+            'intakes' => [['time_of_day' => 'evening', 'time' => '20:00']],
+        ]))
+        ->assertRedirect(route('patient.medications'));
+
+    $prescription = Prescription::query()->sole();
+
+    expect($prescription->trade_name)->toBe('Трамал')
+        ->and($prescription->auditSnapshot()['trade_name'])->toBe('Трамал');
+
+    $this->get(route('patient.medications'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('ownMedications.0.drug', ['code' => $tramadol->code, 'name' => 'Трамал', 'kind' => 'known']));
+
+    $this->get(route('patient.home'))
+        ->assertInertia(fn (Assert $page) => $page->where('today.groups.0.doses.0.drug', 'Трамал'));
+
+    $this->get(route('patient.own-medications.edit', $prescription))
+        ->assertInertia(fn (Assert $page) => $page->where('prescription.drug_name', 'Трамал'));
+
+    // Изменение дозы название не теряет.
+    $this->put(route('patient.own-medications.update', $prescription), ownMedicationPayload([
+        'dose' => '2 капсулы 50 мг',
+        'intakes' => [['time_of_day' => 'evening', 'time' => '20:00']],
+    ]))->assertRedirect(route('patient.medications'));
+
+    expect(Prescription::query()->open()->sole()->trade_name)->toBe('Трамал');
+
+    $this->actingAs($this->doctor)
+        ->get(route('doctor.patients.show', $this->patient))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('ownMedications.0.drug', ['code' => $tramadol->code, 'name' => 'Трамадол (Трамал)', 'kind' => 'known', 'reason' => $tramadol->reason]));
+});
+
+test('trade name must be one of the names of the chosen drug', function (Closure $payload) {
+    $tramadol = Drug::factory()->known()->create(['trade_names' => ['Трамал']]);
+    Drug::factory()->known()->create(['trade_names' => ['Кордарон']]);
+
+    $this->actingAs($this->patient)
+        ->post(route('patient.own-medications.store'), ownMedicationPayload($payload($tramadol)))
+        ->assertSessionHasErrors(['trade_name' => 'Выберите препарат из вариантов под полем.']);
+
+    expect(Prescription::query()->exists())->toBeFalse();
+})->with([
+    'name of another drug' => [fn (Drug $drug): array => ['drug_id' => $drug->id, 'trade_name' => 'Кордарон']],
+    'case differs' => [fn (Drug $drug): array => ['drug_id' => $drug->id, 'trade_name' => 'трамал']],
+]);
+
+test('trade name is not saved for another drug', function () {
+    $this->actingAs($this->patient)
+        ->post(route('patient.own-medications.store'), ownMedicationPayload(['trade_name' => 'Трамал']))
+        ->assertRedirect(route('patient.medications'));
+
+    expect(Prescription::query()->sole()->trade_name)->toBeNull();
 });
 
 test('inactive drug from the list can not be added', function () {
@@ -165,7 +231,7 @@ test('inactive drug from the list can not be added', function () {
 
     $this->actingAs($this->patient)
         ->post(route('patient.own-medications.store'), ownMedicationPayload(['drug_id' => $tramadol->id]))
-        ->assertSessionHasErrors(['drug_id' => 'Выберите препарат из списка.']);
+        ->assertSessionHasErrors(['drug_id' => 'Выберите препарат из вариантов под полем.']);
 
     expect(Prescription::query()->exists())->toBeFalse();
 });
@@ -192,7 +258,7 @@ test('patient adds another drug as needed with or without a daily limit', functi
 
     $this->get(route('patient.medications'))
         ->assertInertia(fn (Assert $page) => $page
-            ->where('ownMedications.0.drug', ['code' => null, 'name' => 'Фенибут'])
+            ->where('ownMedications.0.drug', ['code' => null, 'name' => 'Фенибут', 'kind' => null])
             ->where('ownMedications.0.as_needed', [
                 'dose' => '½ таблетки',
                 'limit' => $limit === null ? null : 'Не больше 3 раз в сутки',
@@ -210,9 +276,9 @@ test('medication form explains what is wrong', function (array $overrides, array
 
     expect(Prescription::query()->count())->toBe(0);
 })->with([
-    'no drug' => [['drug_id' => null], ['drug_id' => 'Выберите препарат.']],
-    'inactive drug' => [fn () => ['drug_id' => catalogDrug('Агомелатин', attributes: ['is_active' => false])->id], ['drug_id' => 'Выберите препарат из списка.']],
-    'unknown drug' => [['drug_id' => 'something'], ['drug_id' => 'Выберите препарат из списка.']],
+    'no drug' => [['drug_id' => null], ['drug_id' => 'Напишите название и выберите препарат из вариантов под полем.']],
+    'inactive drug' => [fn () => ['drug_id' => catalogDrug('Агомелатин', attributes: ['is_active' => false])->id], ['drug_id' => 'Выберите препарат из вариантов под полем.']],
+    'unknown drug' => [['drug_id' => 'something'], ['drug_id' => 'Выберите препарат из вариантов под полем.']],
     'another drug without a name' => [['drug_name' => ' '], ['drug_name' => 'Напишите название препарата.']],
     'too long name' => [['drug_name' => str_repeat('а', 201)], ['drug_name' => 'Название длиннее 200 символов. Сократите его.']],
     'no dose' => [['dose' => ''], ['dose' => 'Напишите дозу, например «1 таблетка 50 мг».']],

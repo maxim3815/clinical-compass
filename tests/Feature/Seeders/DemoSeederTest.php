@@ -94,7 +94,8 @@ test('demo seeder builds the planned doctors, patients and courses and can be ru
         ->and($patient('patient_2c')->observations()->sole()->comment)->toBe('7 недель');
 
     // Находки: QT у своих препаратов Кузнецовой и сертралин вне показаний у Николаева ждут
-    // решения врача; у «Авиандра» Кузнецовой три жёлтые.
+    // решения врача; у «Авиандра» Кузнецовой три жёлтые, у эсциталопрама Смирнова с «Кардиомагнилом»
+    // от кардиолога — жёлтая.
     $findings = SafetyFinding::query()->with(['rule', 'patient'])->get()
         ->map(fn (SafetyFinding $finding): string => $finding->patient->login.' '.$finding->rule->code.' '.$finding->level->value)
         ->sort()->values()->all();
@@ -105,16 +106,30 @@ test('demo seeder builds the planned doctors, patients and courses and can be ru
         'patient2 maritupirdine.cyp2d6 caution',
         'patient2 maritupirdine.sedative caution',
         'patient2 maritupirdine.serotonergic caution',
+        'patient_1c escitalopram.bleeding caution',
         'patient_4b sertraline.indications contraindicated',
         'patient_4b sertraline.mania caution',
     ]);
+
+    // «Кардиомагнил» Смирнов добавил сам, вторая выкладка его не повторяет; Кузнецовой, у которой
+    // свои препараты уже были, ничего не добавлено.
+    $cardiomagnyl = Prescription::query()->whereRelation('drug', 'code', 'acetylsalicylic_acid')->sole();
+
+    expect($cardiomagnyl->patient_id)->toBe($patient('patient_1c')->id)
+        ->and($cardiomagnyl->source)->toBe(PrescriptionSource::Patient)
+        ->and($cardiomagnyl->trade_name)->toBe('Кардиомагнил')
+        ->and($cardiomagnyl->doctorDrugName())->toBe('Ацетилсалициловая кислота (Кардиомагнил)')
+        ->and($cardiomagnyl->starts_on->toDateString())->toBe($today->toDateString())
+        ->and($cardiomagnyl->intakes()->pluck('time')->all())->toBe(['20:00'])
+        ->and(SafetyFinding::query()->whereRelation('rule', 'code', 'escitalopram.bleeding')->sole()->related_prescription_ids)->toBe([$cardiomagnyl->id])
+        ->and($patient('patient2')->prescriptions()->where('source', PrescriptionSource::Patient)->count())->toBe(2);
 
     // У «Авиандра» Иванова ни находок, ни «Не проверено».
     $ivanov = app(SafetyPresenter::class)->card($patient('patient'));
 
     expect(array_values($ivanov))->toBe([['findings' => [], 'unchecked' => [], 'unknown_drugs' => []]]);
 
-    // «Авиандр» у трети пациентов, в демо-данных все препараты справочника.
+    // «Авиандр» у трети пациентов, в демо-данных все препараты справочника и «Кардиомагнил» из списка.
     $prescribed = fn (string $drug): array => Prescription::query()
         ->whereRelation('drug', 'code', $drug)
         ->with('patient')

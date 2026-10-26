@@ -25,8 +25,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * и окончания — по часовому поясу пациента.
  *
  * Назначение врача — препарат и дозировка из справочника, дозы в таблетках. Препарат,
- * добавленный пациентом, — из справочника без дозировки или «другой» с названием
- * drug_name, доза записана текстом в dose.
+ * добавленный пациентом, — из справочника или списка препаратов от других врачей без дозировки
+ * или «другой» с названием drug_name, доза записана текстом в dose. Если пациент нашёл препарат
+ * по торговому названию, оно хранится в trade_name.
  *
  * @property int $id
  * @property int $patient_id
@@ -35,6 +36,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $previous_id
  * @property int|null $drug_id
  * @property string|null $drug_name
+ * @property string|null $trade_name
  * @property int|null $drug_strength_id
  * @property PrescriptionKind $kind
  * @property string|null $tablets
@@ -68,6 +70,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'previous_id',
     'drug_id',
     'drug_name',
+    'trade_name',
     'drug_strength_id',
     'kind',
     'tablets',
@@ -181,11 +184,25 @@ class Prescription extends Model
     }
 
     /**
-     * Название препарата для интерфейса: из справочника или как его записал пациент.
+     * Название препарата для пациента: из справочника, торговое, по которому пациент нашёл свой
+     * препарат, или как его записал пациент.
      */
     public function drugName(): string
     {
-        return $this->drug->name ?? (string) $this->drug_name;
+        return $this->trade_name ?? $this->drug->name ?? (string) $this->drug_name;
+    }
+
+    /**
+     * Название препарата для врача: из справочника и в скобках торговое, которое выбрал пациент,
+     * — «Амиодарон (Кордарон)».
+     */
+    public function doctorDrugName(): string
+    {
+        if ($this->drug === null) {
+            return (string) $this->drug_name;
+        }
+
+        return $this->trade_name === null ? $this->drug->name : "{$this->drug->name} ({$this->trade_name})";
     }
 
     /**
@@ -268,6 +285,7 @@ class Prescription extends Model
                 'previous_id',
                 'drug_id',
                 'drug_name',
+                'trade_name',
                 'drug_strength_id',
                 'kind',
                 'tablets',

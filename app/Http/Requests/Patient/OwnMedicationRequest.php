@@ -10,6 +10,7 @@ use App\Models\Prescription;
 use App\Models\User;
 use App\Support\OwnMedicationData;
 use Carbon\CarbonImmutable;
+use Closure;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -17,8 +18,9 @@ use Illuminate\Validation\Rule;
 
 /**
  * Форма препарата, который пациент добавляет сам: новый препарат или изменение своего.
- * Препарат — из справочника (drug_id) или «другой» (drug_id = other и название). При изменении
- * препарат и вид приёма не меняются, а у начавшегося препарата не меняется и дата начала.
+ * Препарат — из справочника или списка препаратов от других врачей (drug_id, а если пациент
+ * нашёл его по торговому названию, то и trade_name) или «другой» (drug_id = other и название).
+ * При изменении препарат и вид приёма не меняются, а у начавшегося препарата не меняется и дата начала.
  */
 class OwnMedicationRequest extends FormRequest
 {
@@ -55,6 +57,10 @@ class OwnMedicationRequest extends FormRequest
             'drug_name' => $prescription === null && $isOther
                 ? ['required', 'string', 'max:'.Prescription::MAX_DRUG_NAME_LENGTH]
                 : ['exclude'],
+            // Торговое название — одно из названий выбранного препарата, как в списке.
+            'trade_name' => $prescription === null && ! $isOther
+                ? ['nullable', 'string', $this->tradeNameOfDrug(...)]
+                : ['exclude'],
             'dose' => ['required', 'string', 'max:'.Prescription::MAX_DOSE_LENGTH],
             'kind' => $prescription === null ? ['required', Rule::enum(PrescriptionKind::class)] : ['exclude'],
             'intakes' => [$regularOnly, 'required', 'list', 'max:'.Prescription::MAX_INTAKES],
@@ -79,10 +85,11 @@ class OwnMedicationRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'drug_id.required' => 'Выберите препарат.',
-            'drug_id' => 'Выберите препарат из списка.',
+            'drug_id.required' => 'Напишите название и выберите препарат из вариантов под полем.',
+            'drug_id' => 'Выберите препарат из вариантов под полем.',
             'drug_name.required' => 'Напишите название препарата.',
             'drug_name' => 'Название длиннее '.Prescription::MAX_DRUG_NAME_LENGTH.' символов. Сократите его.',
+            'trade_name' => 'Выберите препарат из вариантов под полем.',
             'dose.required' => 'Напишите дозу, например «1 таблетка 50 мг».',
             'dose' => 'Доза длиннее '.Prescription::MAX_DOSE_LENGTH.' символов. Сократите её.',
             'kind' => 'Выберите, как принимать препарат.',
@@ -113,12 +120,16 @@ class OwnMedicationRequest extends FormRequest
         if ($prescription !== null) {
             $drug = $prescription->drug;
             $drugName = $prescription->drug_name;
+            $tradeName = $prescription->trade_name;
         } elseif ($this->input('drug_id') === self::OTHER_DRUG) {
             $drug = null;
             $drugName = $this->string('drug_name')->toString();
+            $tradeName = null;
         } else {
             $drug = Drug::query()->findOrFail($this->integer('drug_id'));
             $drugName = null;
+            /** @var string|null $tradeName */
+            $tradeName = $this->validated('trade_name');
         }
 
         $intakes = [];
@@ -153,6 +164,7 @@ class OwnMedicationRequest extends FormRequest
             startsOn: $startsOn === null && $prescription !== null ? $prescription->starts_on : CarbonImmutable::parse((string) $startsOn),
             endsOn: $endsOn === null ? null : CarbonImmutable::parse($endsOn),
             prescribedBy: $prescribedBy,
+            tradeName: $tradeName,
         );
     }
 
@@ -169,6 +181,21 @@ class OwnMedicationRequest extends FormRequest
     {
         /** @var Prescription|null */
         return $this->route('prescription');
+    }
+
+    /**
+     * Торговое название есть у выбранного препарата. Если препарат не прошёл проверку, ошибка уже у drug_id.
+     *
+     * @param  Closure(string): mixed  $fail
+     */
+    private function tradeNameOfDrug(string $attribute, mixed $value, Closure $fail): void
+    {
+        $drugId = filter_var($this->input('drug_id'), FILTER_VALIDATE_INT);
+        $drug = $drugId === false ? null : Drug::query()->where('is_active', true)->find($drugId);
+
+        if ($drug !== null && ! in_array($value, $drug->trade_names, true)) {
+            $fail($this->messages()['trade_name']);
+        }
     }
 
     /**

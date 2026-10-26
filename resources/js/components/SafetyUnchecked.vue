@@ -91,8 +91,8 @@ const preview = computed(() =>
         <p v-for="drug in unknownDrugs" :key="drug" class="flex gap-1.5">
             <CircleHelp class="mt-0.5 size-4 shrink-0" />
             <span
-                >«{{ drug }}»: препарата нет в справочнике, сочетания с ним не
-                проверены.</span
+                >«{{ drug }}»: препарата нет ни в справочнике, ни в списке
+                препаратов от других врачей, сочетания с ним не проверены.</span
             >
         </p>
     </div>

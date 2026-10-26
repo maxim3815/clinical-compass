@@ -41,6 +41,7 @@ class ChangeOwnMedication
 
         if ($data->drug?->id !== $prescription->drug_id
             || ($data->drug === null && $data->drugName !== $prescription->drug_name)
+            || $data->tradeName !== $prescription->trade_name
             || $data->kind !== $prescription->kind) {
             throw new InvalidArgumentException('Препарат и вид приёма не меняются: для них нужно добавить препарат заново.');
         }

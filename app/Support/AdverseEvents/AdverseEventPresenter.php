@@ -85,7 +85,7 @@ final class AdverseEventPresenter
                     'reported_at' => DisplayTime::format($event->created_at),
                     'by_doctor' => $event->isByDoctor() ? PersonName::short($event->reportedBy->name) : null,
                     'medications' => array_map(fn (Course $course): array => [
-                        'drug' => $course->last()->drugName(),
+                        'drug' => $course->last()->doctorDrugName(),
                         'day' => $course->dayNumber($event->started_on),
                     ], $background),
                     'resolved' => $event->resolved_on === null ? null : [
@@ -186,7 +186,7 @@ final class AdverseEventPresenter
      */
     private static function outcome(Course $course, CarbonImmutable $reportedAt, string $timezone): ?string
     {
-        $drug = $course->last()->drugName();
+        $drug = $course->last()->doctorDrugName();
         $last = $course->last();
 
         if ($last->close_reason === PrescriptionCloseReason::Cancelled && $last->closed_at?->gte($reportedAt)) {

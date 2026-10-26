@@ -201,7 +201,7 @@ final class PatientAdherence
 
         return [
             'id' => $course->versions[0]->id,
-            'drug' => $last->drugName(),
+            'drug' => $last->doctorDrugName(),
             'kind' => $last->kind->value,
             'kind_label' => $last->kind->label(),
             'source' => $last->source->value,
@@ -319,7 +319,7 @@ final class PatientAdherence
     private static function byDrug(Collection $courses): Collection
     {
         return $courses->sortBy(fn (Course $course): array => [
-            $course->last()->drugName(),
+            $course->last()->doctorDrugName(),
             $course->kind() === PrescriptionKind::Regular ? 0 : 1,
             $course->start->toDateString(),
         ]);

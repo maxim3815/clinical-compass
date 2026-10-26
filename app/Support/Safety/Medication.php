@@ -19,11 +19,19 @@ final readonly class Medication
         public PrescriptionSource $source,
         // Оформляемое назначение заменит действующее: врач его изменяет.
         public bool $changing = false,
+        // Торговое название, по которому пациент нашёл свой препарат: «Кордарон».
+        public ?string $tradeName = null,
     ) {}
 
     public static function fromPrescription(Prescription $prescription): self
     {
-        return new self($prescription->id, $prescription->drug, $prescription->drugName(), $prescription->source);
+        return new self(
+            $prescription->id,
+            $prescription->drug,
+            $prescription->drug->name ?? (string) $prescription->drug_name,
+            $prescription->source,
+            tradeName: $prescription->trade_name,
+        );
     }
 
     /**
@@ -40,13 +48,23 @@ final readonly class Medication
     }
 
     /**
-     * «Эсциталопрам (добавил пациент)», «Гидроксизин (новое назначение)», «Авиандр (изменение назначения)».
+     * Название для врача: «Амиодарон (Кордарон)».
+     */
+    public function displayName(): string
+    {
+        return $this->tradeName === null ? $this->name : "{$this->name} ({$this->tradeName})";
+    }
+
+    /**
+     * «Эсциталопрам (добавил пациент)», «Амиодарон (Кордарон, добавил пациент)», «Гидроксизин (новое назначение)»,
+     * «Авиандр (изменение назначения)».
      */
     public function label(): string
     {
         return match (true) {
             $this->prescriptionId === null && $this->changing => $this->name.' (изменение назначения)',
             $this->prescriptionId === null => $this->name.' (новое назначение)',
+            $this->source === PrescriptionSource::Patient && $this->tradeName !== null => "{$this->name} ({$this->tradeName}, добавил пациент)",
             $this->source === PrescriptionSource::Patient => $this->name.' (добавил пациент)',
             default => $this->name,
         };

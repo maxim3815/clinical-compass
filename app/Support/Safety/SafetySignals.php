@@ -3,6 +3,7 @@
 namespace App\Support\Safety;
 
 use App\Models\CareRelationship;
+use App\Models\Prescription;
 use App\Models\SafetyFinding;
 use App\Models\User;
 use Illuminate\Database\Query\Builder;
@@ -56,21 +57,33 @@ final class SafetySignals
 
     /**
      * Препараты с красной находкой без решения у каждого из пациентов: причина в очереди
-     * «Требуют внимания».
+     * «Требуют внимания». Вместе с ними — препараты, с которыми сочетание: препарат из списка
+     * от других врачей своих находок не получает, а изменилось лечение именно из-за него.
      *
      * @param  array<int, int>  $patientIds
      * @return array<int, list<string>> id пациента => названия препаратов по алфавиту
      */
     public static function awaitingDrugs(array $patientIds): array
     {
-        return SafetyFinding::query()
+        $findings = SafetyFinding::query()
             ->awaitingDecision()
             ->whereIn('patient_id', $patientIds)
             ->with('prescription.drug')
+            ->get();
+        $related = Prescription::query()
+            ->whereKey($findings->pluck('related_prescription_ids')->flatten()->unique()->all())
+            ->with('drug')
             ->get()
+            ->keyBy('id');
+
+        return $findings
             ->groupBy('patient_id')
-            ->map(fn (Collection $findings): array => array_values($findings
-                ->map(fn (SafetyFinding $finding): string => $finding->prescription->drugName())
+            ->map(fn (Collection $patientFindings): array => array_values($patientFindings
+                ->flatMap(fn (SafetyFinding $finding): array => [
+                    $finding->prescription,
+                    ...array_filter(array_map(fn (int $id): ?Prescription => $related->get($id), $finding->related_prescription_ids)),
+                ])
+                ->map(fn (Prescription $prescription): string => $prescription->doctorDrugName())
                 ->unique()
                 ->sort()
                 ->all()))

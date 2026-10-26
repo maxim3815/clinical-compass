@@ -9,7 +9,12 @@ export type Prescription = {
     drug: {
         // У «другого» препарата пациента кода справочника нет.
         code: string | null;
+        // Пациенту — что он выбрал («Кордарон»), врачу — препарат и выбранное название («Амиодарон (Кордарон)»).
         name: string;
+        // catalog — справочник, known — список препаратов от других врачей, null — «другой» препарат.
+        kind: 'catalog' | 'known' | null;
+        // Только врачу: почему препарат в списке препаратов от других врачей.
+        reason?: string | null;
     };
     strength: string | null;
     // Доза текстом у препарата пациента, одна на все приёмы.
@@ -39,6 +44,8 @@ export type Prescription = {
     cancel_reason: string | null;
     cancel_comment: string | null;
     can_change: boolean;
+    // У своего препарата в «Моих препаратах»: он участвует в противопоказании, по которому врач ещё не решил.
+    tell_doctor?: boolean;
 };
 
 /**

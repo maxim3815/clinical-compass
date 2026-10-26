@@ -91,6 +91,7 @@ trait WritesOwnMedications
         return [
             'drug_id' => $data->drug?->id,
             'drug_name' => $data->drug === null ? $data->drugName : null,
+            'trade_name' => $data->drug === null ? null : $data->tradeName,
             'kind' => $data->kind,
             'dose' => $data->dose,
             'max_daily_doses' => $data->maxDailyDoses,

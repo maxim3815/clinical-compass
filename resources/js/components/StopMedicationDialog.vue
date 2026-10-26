@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { useForm } from '@inertiajs/vue3';
+import { Link, useForm, usePage } from '@inertiajs/vue3';
+import { MessageCircle } from '@lucide/vue';
 import { computed } from 'vue';
 import OwnMedicationController from '@/actions/App/Http/Controllers/Patient/OwnMedicationController';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { show as chat } from '@/routes/patient/chat';
 import type { Prescription } from '@/types';
 
 // Препарат, приём которого пациент собрался прекратить. Пока его нет, диалог закрыт.
@@ -20,6 +22,7 @@ const prescription = defineModel<Prescription | null>('prescription', {
 });
 
 const form = useForm({});
+const page = usePage();
 
 const open = computed({
     get: () => prescription.value !== null,
@@ -54,13 +57,39 @@ function submit(): void {
                 <DialogDescription v-if="prescription" class="text-base">
                     {{ prescription.drug.name }},
                     {{ prescription.kind_label.toLowerCase() }}. Уберите, если
-                    вы больше не принимаете препарат или его отменил врач.
-                    Препарат пропадёт из списка и с экрана «Сегодня», прошлые
-                    отметки останутся.
+                    вы больше не принимаете препарат, его отменил врач или вы
+                    добавили его по ошибке. Препарат пропадёт из списка и с
+                    экрана «Сегодня», прошлые отметки останутся.
+                    <!-- Препарат с подсказкой «Расскажите врачу»: бросать приём самому не стоит. -->
+                    <!-- У пациента терапевта чата нет: врачу говорят на приёме. -->
+                    <template
+                        v-if="
+                            prescription.tell_doctor && page.props.withTherapist
+                        "
+                        >Если хотите прекратить приём, сначала скажите об этом
+                        врачу на приёме.</template
+                    ><template v-else-if="prescription.tell_doctor"
+                        >Если хотите прекратить приём, сначала напишите
+                        врачу.</template
+                    >
                 </DialogDescription>
             </DialogHeader>
 
             <DialogFooter>
+                <!-- Препарат с подсказкой: «сначала напишите врачу» — сразу отсюда. Без чата при терапевте. -->
+                <Button
+                    v-if="
+                        prescription?.tell_doctor && !page.props.withTherapist
+                    "
+                    variant="outline"
+                    size="lg"
+                    as-child
+                >
+                    <Link :href="chat()" data-test="stop-medication-chat">
+                        <MessageCircle />
+                        Написать врачу
+                    </Link>
+                </Button>
                 <DialogClose as-child>
                     <Button type="button" variant="outline" size="lg">
                         Не убирать

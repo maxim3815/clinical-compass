@@ -15,6 +15,7 @@ use App\Models\Drug;
 use App\Models\Prescription;
 use App\Models\PrescriptionIntake;
 use App\Models\User;
+use App\Support\Safety\OwnMedicationHint;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -35,9 +36,14 @@ class OwnMedicationController extends Controller
 
     public function store(OwnMedicationRequest $request, AddOwnMedication $addOwnMedication): RedirectResponse
     {
-        $addOwnMedication->handle($request->patient(), $request->toData());
+        $prescription = $addOwnMedication->handle($request->patient(), $request->toData());
 
-        Inertia::flash('toast', ['type' => 'success', 'message' => 'Препарат добавлен.']);
+        // Список прокручивается к добавленному препарату, подсказка у него на экране; то же сразу и
+        // в сообщении.
+        Inertia::flash('toast', ['type' => 'success', 'message' => in_array($prescription->id, OwnMedicationHint::prescriptionIds($request->patient()), true)
+            ? 'Препарат добавлен. Расскажите врачу, что принимаете его.'
+            : 'Препарат добавлен.']);
+        Inertia::flash('addedMedication', $prescription->id);
 
         return to_route('patient.medications');
     }
@@ -114,15 +120,18 @@ class OwnMedicationController extends Controller
         $today = $patient->localToday();
 
         return [
-            // Поиск по списку препаратов от других врачей в форме ещё не сделан: в выборе только справочник.
-            // Запрос при этом принимает препараты обоих видов.
+            // Поиск в форме по названию, МНН и торговым названиям: справочник и список препаратов от других врачей.
             'drugs' => Drug::query()
-                ->catalog()
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->orderBy('code')
                 ->get()
-                ->map(fn (Drug $drug): array => ['id' => $drug->id, 'name' => $drug->name])
+                ->map(fn (Drug $drug): array => [
+                    'id' => $drug->id,
+                    'name' => $drug->name,
+                    'inn' => $drug->inn,
+                    'trade_names' => $drug->trade_names,
+                ])
                 ->all(),
             'timesOfDay' => array_map(
                 fn (TimeOfDay $timeOfDay): array => [

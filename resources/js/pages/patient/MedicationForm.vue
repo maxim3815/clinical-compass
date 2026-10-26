@@ -3,6 +3,7 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 import { ChevronDown, Info, Plus, Trash2 } from '@lucide/vue';
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue';
 import OwnMedicationController from '@/actions/App/Http/Controllers/Patient/OwnMedicationController';
+import DrugCombobox from '@/components/DrugCombobox.vue';
 import InputError from '@/components/InputError.vue';
 import LeaveConfirmDialog from '@/components/LeaveConfirmDialog.vue';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Spinner } from '@/components/ui/spinner';
 import { useLeaveGuard } from '@/composables/useLeaveGuard';
+import type { DrugChoice, SearchableDrug } from '@/lib/drugSearch';
 import { medications } from '@/routes/patient';
 
 type Kind = 'regular' | 'as_needed';
@@ -42,7 +44,8 @@ type EditedMedication = {
 };
 
 type Props = {
-    drugs: { id: number; name: string }[];
+    // Справочник и список препаратов от других врачей: поиск по названию, МНН и торговым названиям.
+    drugs: SearchableDrug[];
     timesOfDay: TimeOfDayOption[];
     limits: {
         intakes: number;
@@ -83,9 +86,11 @@ const editing = props.prescription;
 const title = editing === null ? 'Добавить препарат' : 'Изменить препарат';
 
 const form = useForm<{
-    // Препарат из справочника или «другой» с названием текстом.
+    // Препарат из справочника или списка (с торговым названием, если нашёлся по нему)
+    // или «другой» с названием текстом.
     drug_id: number | 'other' | null;
     drug_name: string;
+    trade_name: string | null;
     dose: string;
     kind: Kind;
     intakes: Intake[];
@@ -96,6 +101,7 @@ const form = useForm<{
 }>({
     drug_id: null,
     drug_name: '',
+    trade_name: null,
     dose: editing?.dose ?? '',
     kind: editing?.kind ?? 'regular',
     intakes: editing?.intakes.map((intake) => ({ ...intake })) ?? [
@@ -110,16 +116,43 @@ const form = useForm<{
     prescribed_by: editing?.prescribed_by ?? '',
 });
 
+const drugChoice = ref<DrugChoice | null>(null);
+
+watch(drugChoice, (value) => {
+    form.drug_id =
+        value === null ? null : value.kind === 'other' ? 'other' : value.drugId;
+    form.trade_name = value?.kind === 'drug' ? value.tradeName : null;
+    form.drug_name = value?.kind === 'other' ? value.name : '';
+});
+
 // Ошибки приёмов приходят с ключами вида «intakes.0.time».
 const errors = computed(
     () => form.errors as Record<string, string | undefined>,
 );
 
+const drugError = computed(
+    () =>
+        form.errors.drug_id ?? form.errors.drug_name ?? form.errors.trade_name,
+);
+
 // После правки поля прежняя ошибка уже не относится к введённому. Ошибка о назначении
 // врача зависит и от вида, и от дат.
 watch(
-    () => [form.drug_id, form.drug_name, form.starts_on, form.ends_on],
-    () => form.clearErrors('drug_id', 'drug_name', 'starts_on', 'ends_on'),
+    () => [
+        form.drug_id,
+        form.drug_name,
+        form.trade_name,
+        form.starts_on,
+        form.ends_on,
+    ],
+    () =>
+        form.clearErrors(
+            'drug_id',
+            'drug_name',
+            'trade_name',
+            'starts_on',
+            'ends_on',
+        ),
 );
 watch(
     () => form.kind,
@@ -271,51 +304,22 @@ const leaveGuard = useLeaveGuard(() => form.isDirty && !form.processing);
                 <!-- При изменении вместо поля текст, и подпись тоже текст. -->
                 <span v-else class="leading-none font-medium">Препарат</span>
                 <template v-if="editing === null">
-                    <NativeSelect
+                    <p id="drug_id-hint" class="text-muted-foreground">
+                        Название с упаковки или действующее вещество
+                    </p>
+                    <DrugCombobox
                         id="drug_id"
-                        v-model="form.drug_id"
-                        name="drug_id"
-                        :aria-invalid="form.errors.drug_id ? true : undefined"
-                        aria-describedby="drug_id-error"
-                    >
-                        <option :value="null" disabled>
-                            Выберите препарат
-                        </option>
-                        <option
-                            v-for="option in drugs"
-                            :key="option.id"
-                            :value="option.id"
-                        >
-                            {{ option.name }}
-                        </option>
-                        <option value="other">Другой препарат</option>
-                    </NativeSelect>
-                    <InputError
-                        id="drug_id-error"
-                        :message="form.errors.drug_id"
+                        v-model="drugChoice"
+                        :drugs="drugs"
+                        :maxlength="limits.drug_name"
+                        :error="drugError"
+                        describedby="drug_id-hint drug_id-error"
                     />
                 </template>
                 <template v-else>
                     <p class="text-lg font-semibold">{{ editing.drug_name }}</p>
                     <InputError :message="form.errors.drug_id" />
                 </template>
-            </div>
-
-            <div v-if="form.drug_id === 'other'" class="grid gap-2">
-                <Label for="drug_name">Название препарата</Label>
-                <Input
-                    id="drug_name"
-                    v-model="form.drug_name"
-                    name="drug_name"
-                    :maxlength="limits.drug_name"
-                    placeholder="Как написано на упаковке"
-                    :aria-invalid="form.errors.drug_name ? true : undefined"
-                    aria-describedby="drug_name-error"
-                />
-                <InputError
-                    id="drug_name-error"
-                    :message="form.errors.drug_name"
-                />
             </div>
 
             <div class="grid gap-2">

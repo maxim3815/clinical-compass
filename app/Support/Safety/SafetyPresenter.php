@@ -61,7 +61,7 @@ final readonly class SafetyPresenter
                     'label' => $level->label(),
                     'reason' => $own !== []
                         ? implode('; ', array_unique(array_map(self::reason(...), $own)))
-                        : 'в сочетании с препаратом '.implode(', ', array_unique(array_map(fn (RuleResult $result): string => $result->target->name, $caused))),
+                        : 'в сочетании с препаратом '.implode(', ', array_unique(array_map(fn (RuleResult $result): string => $result->target->displayName(), $caused))),
                 ];
             }
         }

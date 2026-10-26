@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Doctor;
 use App\Enums\DrugKind;
 use App\Http\Controllers\Controller;
 use App\Models\Drug;
+use App\Models\DrugGroup;
 use App\Models\DrugStrength;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Inertia\Inertia;
@@ -29,8 +30,27 @@ class DrugController extends Controller
                 'strengths' => $drug->strengths->map(fn (DrugStrength $strength): string => $strength->label())->all(),
             ]);
 
+        $groups = DrugGroup::query()->pluck('name', 'code');
+
+        // Список препаратов от других врачей: их добавляет пациент, а проверяют правила справочника по группам.
+        $known = Drug::query()
+            ->where('kind', DrugKind::Known)
+            ->active()
+            ->orderBy('name')
+            ->orderBy('code')
+            ->get()
+            ->map(fn (Drug $drug): array => [
+                'code' => $drug->code,
+                'name' => $drug->name,
+                'inn' => $drug->inn,
+                'trade_names' => $drug->trade_names,
+                'groups' => array_map(fn (string $code): string => $groups[$code] ?? $code, $drug->groups),
+                'reason' => $drug->publicReason(),
+            ]);
+
         return Inertia::render('doctor/drugs/Index', [
             'drugs' => $drugs,
+            'known' => $known,
         ]);
     }
 

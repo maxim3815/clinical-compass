@@ -11,13 +11,15 @@ use Illuminate\Database\Eloquent\Collection;
 /**
  * Назначение для страниц врача и пациента. Нужны загруженные drug, strength, intakes и prescriber.
  * У препарата, добавленного пациентом, дозировки нет, а доза одна на все приёмы и записана текстом.
+ * Название пациент видит то, что выбрал сам («Кордарон»), врач — препарат и в скобках выбранное
+ * название («Амиодарон (Кордарон)»).
  */
 final class PrescriptionPresenter
 {
     /**
      * @return array<string, mixed>
      */
-    public static function present(Prescription $prescription, CarbonImmutable $today): array
+    public static function present(Prescription $prescription, CarbonImmutable $today, bool $forPatient = false): array
     {
         $status = $prescription->status($today);
         $ownDose = $prescription->dose;
@@ -27,7 +29,11 @@ final class PrescriptionPresenter
             'source' => $prescription->source->value,
             'drug' => [
                 'code' => $prescription->drug?->code,
-                'name' => $prescription->drugName(),
+                'name' => $forPatient ? $prescription->drugName() : $prescription->doctorDrugName(),
+                // catalog — справочник, known — список препаратов от других врачей, null — «другой» препарат.
+                'kind' => $prescription->drug?->kind->value,
+                // Врачу у препарата списка — почему он в списке, без пометок для сверки медиком.
+                ...$forPatient ? [] : ['reason' => $prescription->drug?->publicReason()],
             ],
             'strength' => $prescription->strength?->label(),
             'dose' => $ownDose,
@@ -64,15 +70,15 @@ final class PrescriptionPresenter
      * @param  Collection<int, Prescription>  $prescriptions
      * @return array<int, array<string, mixed>>
      */
-    public static function presentList(Collection $prescriptions, CarbonImmutable $today): array
+    public static function presentList(Collection $prescriptions, CarbonImmutable $today, bool $forPatient = false): array
     {
         return $prescriptions
             ->sortBy(fn (Prescription $prescription): array => [
-                $prescription->drugName(),
+                $forPatient ? $prescription->drugName() : $prescription->doctorDrugName(),
                 $prescription->kind === PrescriptionKind::Regular ? 0 : 1,
                 $prescription->starts_on->toDateString(),
             ])
-            ->map(fn (Prescription $prescription): array => self::present($prescription, $today))
+            ->map(fn (Prescription $prescription): array => self::present($prescription, $today, $forPatient))
             ->values()
             ->all();
     }

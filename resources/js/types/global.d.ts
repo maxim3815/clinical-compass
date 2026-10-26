@@ -50,6 +50,8 @@ declare module '@inertiajs/core' {
         };
         flashDataType: {
             toast?: FlashToast;
+            // Пациент только что добавил свой препарат: id назначения, к нему прокручивается список.
+            addedMedication?: number;
             invitationUrl?: string;
             passwordResetUrl?: string;
             // Пациент нажал «Сообщить врачу»: время отправки ЧЧ:ММ.

@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Actions\AddOwnMedication;
 use App\Actions\CreateDoctor;
 use App\Actions\InvitePatient;
 use App\Actions\RateScale;
@@ -12,6 +13,7 @@ use App\Enums\DoctorKind;
 use App\Enums\DoseEventStatus;
 use App\Enums\HelpEventType;
 use App\Enums\Mood;
+use App\Enums\PrescriptionKind;
 use App\Enums\PrescriptionSource;
 use App\Enums\ReferralCategory;
 use App\Events\AlertsChanged;
@@ -24,6 +26,7 @@ use App\Models\AccessLink;
 use App\Models\AdverseEvent;
 use App\Models\Assessment;
 use App\Models\DoseEvent;
+use App\Models\Drug;
 use App\Models\HelpEvent;
 use App\Models\Referral;
 use App\Models\Scale;
@@ -32,6 +35,7 @@ use App\Models\User;
 use App\Support\DisplayTime;
 use App\Support\DoseEventPresenter;
 use App\Support\Moods\MoodPresenter;
+use App\Support\OwnMedicationData;
 use App\Support\Referrals\ReferralEngine;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -133,6 +137,36 @@ class DemoSeeder extends Seeder
         $this->quietly(fn () => $this->hads('patient_4c', $doctors['therapist']));
         // Лица настроения после отметок приёма до вчера; у Смирнова последние дни грустные — метка в списке.
         $this->moods();
+        // Смирнов принимает «Кардиомагнил» от кардиолога: с эсциталопрамом — «с осторожностью».
+        $this->quietly(fn () => $this->otherDoctorDrug('patient_1c', 'acetylsalicylic_acid', 'Кардиомагнил', '1 таблетка 75 мг', 'кардиолог Белова Н. П.'));
+    }
+
+    /**
+     * Препарат из списка препаратов от других врачей, который пациент добавил сам: приём вечером
+     * с сегодняшнего дня. Только если своих препаратов у пациента ещё не было: на стенде без
+     * сброса добавляется к сыгранной истории, а повторная выкладка ничего не меняет.
+     */
+    private function otherDoctorDrug(string $login, string $code, string $tradeName, string $dose, string $prescribedBy): void
+    {
+        $patient = User::query()->where('login', $login)->first();
+        $drug = Drug::query()->where('code', $code)->active()->first();
+
+        if ($patient === null || $drug === null || $patient->prescriptions()->where('source', PrescriptionSource::Patient)->exists()) {
+            return;
+        }
+
+        app(AddOwnMedication::class)->handle($patient, new OwnMedicationData(
+            drug: $drug,
+            drugName: null,
+            dose: $dose,
+            kind: PrescriptionKind::Regular,
+            intakes: ['evening' => '20:00'],
+            maxDailyDoses: null,
+            startsOn: $patient->localToday(),
+            endsOn: null,
+            prescribedBy: $prescribedBy,
+            tradeName: $tradeName,
+        ));
     }
 
     /**
