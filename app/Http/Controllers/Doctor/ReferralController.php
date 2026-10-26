@@ -124,7 +124,8 @@ class ReferralController extends Controller
                 'birth_date' => $patient->patientProfile?->birth_date?->format('d.m.Y'),
                 'age' => $patient->patientProfile?->age(),
             ],
-            'wellbeing' => PatientAssessments::forDoctor($patient),
+            // Шкалы врача здесь только смотрят: пустой HARS психиатра на странице направления нет.
+            'wellbeing' => PatientAssessments::forDoctor($patient, $psychiatrist->doctorKind(), rating: false),
             'clinicalProfile' => ClinicalProfilePresenter::present($patient),
             'medications' => PrescriptionPresenter::presentList(
                 $patient->prescriptions()->current($today)->with(['drug', 'strength', 'intakes', 'prescriber'])->get(),

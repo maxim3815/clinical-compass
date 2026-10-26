@@ -113,7 +113,7 @@ useRealtime(channel, 'patient-signals.changed', () =>
     router.reload({ only: ['patients', 'answered', 'referrals'] }),
 );
 
-// Новые ответы из очереди, HARS по ним, решение или регистрация.
+// Новые ответы из очереди, HADS по ним, решение или регистрация.
 useRealtime(channel, 'queue-answers.changed', () =>
     router.reload({ only: ['answered'] }),
 );
@@ -375,7 +375,7 @@ useRealtime<InvitationChanged>(channel, 'invitation.changed', (event) => {
                                         />
                                         Направление не подсказывается
                                     </li>
-                                    <!-- При «обязательно» HARS подсказку уже не изменит. -->
+                                    <!-- При «обязательно» HADS подсказку уже не изменит. -->
                                     <li
                                         v-if="
                                             row.scales_missing.length > 0 &&

@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Enums\DoctorKind;
 use App\Enums\ScaleRater;
 use App\Exceptions\InvalidScales;
 use App\Models\Scale;
@@ -13,7 +14,10 @@ use Symfony\Component\Yaml\Yaml;
 
 /**
  * Загрузка шкал из YAML-файлов, по файлу на шкалу. Шкалу пациента он заполняет сам по календарю,
- * у шкалы врача (`rater: doctor`) нет нейтрального названия для пациента и календаря. Всё проверяется до записи в БД:
+ * у шкалы врача (`rater: doctor`) нет нейтрального названия для пациента и календаря, зато может
+ * быть вид врача, который её заполняет (`doctor_kind`). Варианты ответа общие для шкалы
+ * (`options`) или свои у каждого вопроса; у шкалы с подшкалами (`subscales`) степени свои
+ * у каждой подшкалы, а вопрос называет свою подшкалу. Всё проверяется до записи в БД:
  * при ошибке в любом файле не загружается ничего. Шкалы сопоставляются по коду, повторная
  * загрузка тех же файлов ничего не меняет. Шкала, которой в файлах больше нет, выключается,
  * а не удаляется: на неё ссылаются заполнения.
@@ -23,12 +27,15 @@ use Symfony\Component\Yaml\Yaml;
  *     name: string,
  *     title: string,
  *     rater?: 'patient'|'doctor',
+ *     doctor_kind?: 'psychiatrist'|'therapist',
  *     patient_title?: string,
  *     position: int,
  *     instruction: string,
- *     options: list<array{score: int, label: string}>,
- *     items: list<array{text: string, hint?: string, highlight?: bool}>,
- *     bands: list<array{min: int, max: int, label: string}>,
+ *     prompt?: string,
+ *     options?: list<array{score: int, label: string}>,
+ *     items: list<array{text: string, hint?: string, highlight?: bool, subscale?: string, options?: list<array{score: int, label: string}>}>,
+ *     bands?: list<array{min: int, max: int, label: string}>,
+ *     subscales?: list<array{code: string, name: string, bands: list<array{min: int, max: int, label: string}>}>,
  *     schedule?: array{days: list<int>, then_every: int},
  *     source: array{original: string, validation: string, url: string, license: string, note?: string|null},
  * }
@@ -37,11 +44,13 @@ class ImportScales
 {
     public const string DEFAULT_PATH = 'database/data/scales';
 
-    private const array FIELDS = ['code', 'name', 'title', 'rater', 'patient_title', 'position', 'instruction', 'options', 'items', 'bands', 'schedule', 'source'];
+    private const array FIELDS = ['code', 'name', 'title', 'rater', 'doctor_kind', 'patient_title', 'position', 'instruction', 'prompt', 'options', 'items', 'bands', 'subscales', 'schedule', 'source'];
 
     private const array OPTION_FIELDS = ['score', 'label'];
 
-    private const array ITEM_FIELDS = ['text', 'hint', 'highlight'];
+    private const array ITEM_FIELDS = ['text', 'hint', 'highlight', 'subscale', 'options'];
+
+    private const array SUBSCALE_FIELDS = ['code', 'name', 'bands'];
 
     private const array BAND_FIELDS = ['min', 'max', 'label'];
 
@@ -150,11 +159,20 @@ class ImportScales
             }
         }
 
-        foreach (['options' => self::OPTION_FIELDS, 'items' => self::ITEM_FIELDS, 'bands' => self::BAND_FIELDS] as $list => $allowed) {
+        foreach (['options' => self::OPTION_FIELDS, 'items' => self::ITEM_FIELDS, 'bands' => self::BAND_FIELDS, 'subscales' => self::SUBSCALE_FIELDS] as $list => $allowed) {
             foreach (is_array($scale[$list] ?? null) ? $scale[$list] : [] as $index => $entry) {
                 if (is_array($entry)) {
                     foreach (self::extraKeys($entry, $allowed) as $field) {
                         $errors[] = "неизвестное поле {$list}.".($index + 1).".{$field}.";
+                    }
+
+                    // Варианты вопроса и степени подшкалы — те же поля, что у шкалы.
+                    foreach (['options' => self::OPTION_FIELDS, 'bands' => self::BAND_FIELDS] as $nested => $nestedAllowed) {
+                        foreach (is_array($entry[$nested] ?? null) && in_array($nested, $allowed, true) ? $entry[$nested] : [] as $position => $value) {
+                            foreach (is_array($value) ? self::extraKeys($value, $nestedAllowed) : [] as $field) {
+                                $errors[] = "неизвестное поле {$list}.".($index + 1).".{$nested}.".($position + 1).".{$field}.";
+                            }
+                        }
                     }
                 }
             }
@@ -163,16 +181,24 @@ class ImportScales
         // Шкалу врача пациент не видит и по календарю не заполняет.
         $byDoctor = ($scale['rater'] ?? null) === ScaleRater::Doctor->value;
         $patientOnly = $byDoctor ? 'prohibited' : 'required';
+        // Варианты ответа общие для шкалы или свои у каждого вопроса; степени у шкалы или у подшкал.
+        $ownOptions = is_array($scale['items'] ?? null) && array_filter($scale['items'], fn (mixed $item): bool => is_array($item) && array_key_exists('options', $item)) !== [];
+        $withSubscales = $byDoctor && array_key_exists('subscales', $scale);
+        $subscaleCodes = is_array($scale['subscales'] ?? null) ? array_filter(array_column(array_filter($scale['subscales'], is_array(...)), 'code'), is_string(...)) : [];
 
         $validator = Validator::make($scale, [
             'code' => ['required', 'string', 'max:64', 'regex:/^'.Scale::CODE_PATTERN.'$/'],
             'name' => ['required', 'string', 'max:255'],
             'title' => ['required', 'string', 'max:255'],
             'rater' => ['sometimes', 'string', 'in:'.ScaleRater::Patient->value.','.ScaleRater::Doctor->value],
+            'doctor_kind' => [$byDoctor ? 'sometimes' : 'prohibited', 'string', 'in:'.DoctorKind::Psychiatrist->value.','.DoctorKind::Therapist->value],
             'patient_title' => [$patientOnly, 'string', 'max:255'],
             'position' => ['required', 'integer', 'min:1'],
             'instruction' => ['required', 'string'],
-            'options' => ['required', 'list', 'min:2'],
+            'prompt' => [$byDoctor ? 'sometimes' : 'prohibited', 'string', 'max:500'],
+            // Экран пациента знает только общие варианты и одну сумму: свои варианты у вопроса
+            // и подшкалы — только у шкалы врача.
+            'options' => [$ownOptions ? 'prohibited' : 'required', 'list', 'min:2'],
             'options.*' => ['array'],
             'options.*.score' => ['required', 'integer', 'min:0', 'distinct'],
             'options.*.label' => ['required', 'string', 'max:255'],
@@ -181,11 +207,27 @@ class ImportScales
             'items.*.text' => ['required', 'string'],
             'items.*.hint' => ['sometimes', 'string'],
             'items.*.highlight' => ['sometimes', 'boolean:strict'],
-            'bands' => ['required', 'list', 'min:1'],
+            'items.*.subscale' => [$withSubscales ? 'required' : 'prohibited', 'string', 'in:'.implode(',', $subscaleCodes)],
+            // Свои варианты — у всех вопросов или ни у одного. Повторы баллов внутри вопроса —
+            // в scoringErrors: distinct с двумя звёздочками сравнивал бы баллы всех вопросов.
+            'items.*.options' => [$ownOptions && $byDoctor ? 'required' : 'prohibited', 'list', 'min:2'],
+            'items.*.options.*' => ['array'],
+            'items.*.options.*.score' => ['required', 'integer', 'min:0'],
+            'items.*.options.*.label' => ['required', 'string', 'max:255'],
+            'bands' => [$withSubscales ? 'prohibited' : 'required', 'list', 'min:1'],
             'bands.*' => ['array'],
             'bands.*.min' => ['required', 'integer', 'min:0'],
             'bands.*.max' => ['required', 'integer', 'min:0'],
             'bands.*.label' => ['required', 'string', 'max:255'],
+            'subscales' => [$byDoctor ? 'sometimes' : 'prohibited', 'list', 'min:2'],
+            'subscales.*' => ['array'],
+            'subscales.*.code' => ['required', 'string', 'max:64', 'regex:/^'.Scale::CODE_PATTERN.'$/', 'distinct'],
+            'subscales.*.name' => ['required', 'string', 'max:255'],
+            'subscales.*.bands' => ['required', 'list', 'min:1'],
+            'subscales.*.bands.*' => ['array'],
+            'subscales.*.bands.*.min' => ['required', 'integer', 'min:0'],
+            'subscales.*.bands.*.max' => ['required', 'integer', 'min:0'],
+            'subscales.*.bands.*.label' => ['required', 'string', 'max:255'],
             'schedule' => [$patientOnly, 'array'],
             'schedule.days' => [$byDoctor ? 'exclude' : 'required', 'list', 'min:1'],
             'schedule.days.*' => ['integer', 'min:0', 'distinct'],
@@ -208,8 +250,9 @@ class ImportScales
     }
 
     /**
-     * Степени покрывают все суммы от 0 до наибольшей без пропусков и пересечений, сроки идут
-     * по возрастанию с дня 0.
+     * У каждого вопроса наименьший балл 0 и баллы не повторяются; степени шкалы (или каждой
+     * подшкалы) покрывают все суммы от 0 до наибольшей без пропусков и пересечений; у каждой
+     * подшкалы есть вопросы; сроки идут по возрастанию с дня 0.
      *
      * @param  array<mixed>  $scale
      * @return list<string>
@@ -218,30 +261,58 @@ class ImportScales
     {
         /** @var ScaleData $scale */
         $errors = [];
-        $scores = array_column($scale['options'], 'score');
-        $maxTotal = count($scale['items']) * max([0, ...$scores]);
-        $expected = 0;
+        $itemMax = [];
 
-        if ($scores === [] || min($scores) !== 0) {
-            $errors[] = 'наименьший балл варианта ответа должен быть 0.';
-        }
+        foreach ($scale['items'] as $index => $item) {
+            $scores = array_column($item['options'] ?? $scale['options'] ?? [], 'score');
+            $itemMax[$index] = max([0, ...$scores]);
+            $label = isset($item['options']) ? 'вопрос '.($index + 1).': ' : '';
 
-        foreach ($scale['bands'] as $index => $band) {
-            $label = 'степень '.($index + 1);
-
-            if ($band['min'] !== $expected) {
-                $errors[] = "{$label}: должна начинаться с суммы {$expected}, а начинается с {$band['min']}.";
+            if ($scores === [] || min($scores) !== 0) {
+                $errors[] = "{$label}наименьший балл варианта ответа должен быть 0.";
             }
 
-            if ($band['max'] < $band['min']) {
-                $errors[] = "{$label}: max меньше min.";
+            if (count($scores) !== count(array_unique($scores))) {
+                $errors[] = "{$label}баллы вариантов ответа повторяются.";
             }
-
-            $expected = $band['max'] + 1;
         }
 
-        if ($expected - 1 !== $maxTotal) {
-            $errors[] = "последняя степень должна заканчиваться наибольшей суммой {$maxTotal}.";
+        // Шкала без подшкал — одна «подшкала» из всех вопросов со степенями шкалы.
+        $groups = isset($scale['subscales'])
+            ? array_map(fn (array $subscale): array => [
+                'prefix' => "подшкала {$subscale['code']}, ",
+                'bands' => $subscale['bands'],
+                'items' => array_keys(array_filter($scale['items'], fn (array $item): bool => ($item['subscale'] ?? null) === $subscale['code'])),
+            ], $scale['subscales'])
+            : [['prefix' => '', 'bands' => $scale['bands'] ?? [], 'items' => array_keys($scale['items'])]];
+
+        foreach ($groups as $group) {
+            if ($group['items'] === []) {
+                $errors[] = rtrim($group['prefix'], ', ').': ни один вопрос в неё не входит.';
+
+                continue;
+            }
+
+            $maxTotal = array_sum(array_map(fn (int $index): int => $itemMax[$index], $group['items']));
+            $expected = 0;
+
+            foreach ($group['bands'] as $index => $band) {
+                $label = $group['prefix'].'степень '.($index + 1);
+
+                if ($band['min'] !== $expected) {
+                    $errors[] = "{$label}: должна начинаться с суммы {$expected}, а начинается с {$band['min']}.";
+                }
+
+                if ($band['max'] < $band['min']) {
+                    $errors[] = "{$label}: max меньше min.";
+                }
+
+                $expected = $band['max'] + 1;
+            }
+
+            if ($expected - 1 !== $maxTotal) {
+                $errors[] = "{$group['prefix']}последняя степень должна заканчиваться наибольшей суммой {$maxTotal}.";
+            }
         }
 
         if (isset($scale['schedule'])) {
@@ -271,16 +342,21 @@ class ImportScales
                 'name' => $data['name'],
                 'title' => $data['title'],
                 'rater' => $data['rater'] ?? ScaleRater::Patient->value,
+                'doctor_kind' => $data['doctor_kind'] ?? null,
                 'patient_title' => $data['patient_title'] ?? null,
                 'position' => $data['position'],
                 'instruction' => $data['instruction'],
-                'options' => $data['options'],
+                'prompt' => $data['prompt'] ?? null,
+                'options' => $data['options'] ?? [],
                 'items' => array_map(fn (array $item): array => array_filter([
                     'text' => $item['text'],
                     'hint' => $item['hint'] ?? null,
                     'highlight' => $item['highlight'] ?? false,
+                    'subscale' => $item['subscale'] ?? null,
+                    'options' => $item['options'] ?? null,
                 ], fn (mixed $value): bool => $value !== null), $data['items']),
-                'bands' => $data['bands'],
+                'bands' => $data['bands'] ?? [],
+                'subscales' => $data['subscales'] ?? null,
                 'schedule_days' => $data['schedule']['days'] ?? null,
                 'schedule_then_every' => $data['schedule']['then_every'] ?? null,
                 'source_original' => $data['source']['original'],
@@ -292,8 +368,10 @@ class ImportScales
 
             $scale = $existing->get($data['code']) ?? new Scale(['code' => $data['code']]);
             $isNew = ! $scale->exists;
-            // Шкалы пациента появились раньше поля rater: без него их версия не меняется.
-            $hashed = $attributes['rater'] === ScaleRater::Patient->value ? array_diff_key($attributes, ['rater' => true]) : $attributes;
+            // Шкалы пациента появились раньше поля rater, а doctor_kind, prompt и subscales — позже всех:
+            // без них версия прежних шкал не меняется.
+            $hashed = array_filter($attributes, fn (mixed $value, string $key): bool => ! in_array($key, ['doctor_kind', 'prompt', 'subscales'], true) || $value !== null, ARRAY_FILTER_USE_BOTH);
+            $hashed = $attributes['rater'] === ScaleRater::Patient->value ? array_diff_key($hashed, ['rater' => true]) : $hashed;
             $version = hash('sha256', $data['code'].'|'.json_encode($hashed, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
             $changed = $isNew || $scale->version !== $version || ! $scale->is_active;
 

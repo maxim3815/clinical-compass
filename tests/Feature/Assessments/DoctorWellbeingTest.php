@@ -43,6 +43,7 @@ test('doctor sees the last sums with band and change, the chart and every answer
                 'item' => 9,
                 'text' => 'Мысли о том, что мне бы хотелось умереть или причинить себе боль',
                 'hint' => null,
+                'group' => null,
                 'score' => 2,
                 'label' => 'Более, чем половину этого времени',
                 'highlight' => true,

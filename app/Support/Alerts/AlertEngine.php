@@ -77,7 +77,7 @@ final readonly class AlertEngine
             'item' => $reference[2],
             'text' => $scale->items[$reference[2] - 1]['text'],
             'score' => $score,
-            'label' => $scale->optionLabel($score),
+            'label' => $scale->optionLabel($score, $reference[2]),
         ];
     }
 }

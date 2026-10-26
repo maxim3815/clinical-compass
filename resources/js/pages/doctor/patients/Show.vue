@@ -95,7 +95,7 @@ const props = defineProps<{
         today: string;
         min_date: string;
     };
-    // Опросники пациента и шкалы врача (HARS): суммы, степени, изменение и ответы.
+    // Опросники пациента и шкалы врача (HARS, HADS терапевта): суммы, степени, изменение и ответы.
     wellbeing: Wellbeing;
     // Шкалы, которые врач заполняет на приёме.
     doctorScales: RatableScale[];
@@ -349,7 +349,7 @@ function closing(prescription: Prescription): string {
 
 // Опросники в шапке: дата и суммы со степенью последнего заполнения и незаполненный срок.
 const questionnaires = computed(() => {
-    // В плашке — опросники пациента, HARS видна в блоке «Самочувствие».
+    // В плашке — опросники пациента, шкалы врача видны в блоке «Самочувствие».
     const filled = props.wellbeing.scales.filter(
         (scale) => scale.rater === 'patient' && scale.latest !== null,
     );

@@ -167,6 +167,11 @@ class ImportReferralRules
                 $errors[] = "шкалы {$reference[1]} нет среди загруженных.";
             } elseif ($reference[0] === 'answer' && ($reference[2] < 1 || $reference[2] > count($scale->items))) {
                 $errors[] = "в шкале {$scale->code} нет вопроса {$reference[2]}, вопросов ".count($scale->items).'.';
+            } elseif ($reference[0] === 'total' && isset($reference[2]) && ! in_array($reference[2], array_column($scale->subscales ?? [], 'code'), true)) {
+                $errors[] = "у шкалы {$scale->code} нет подшкалы {$reference[2]}.";
+            } elseif ($reference[0] === 'total' && ! isset($reference[2]) && $scale->hasSubscales()) {
+                // Общая сумма HADS ничего не значит: степени есть только у подшкал.
+                $errors[] = "у шкалы {$scale->code} суммы по подшкалам: total('{$scale->code}', 'код подшкалы').";
             }
         }
 

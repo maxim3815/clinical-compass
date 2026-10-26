@@ -16,13 +16,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Ответы из очереди: пациент у двери терапевта без регистрации ответил на опросники и получил
- * код из 4 цифр. Терапевт открывает ответы по коду, заполняет HARS и признаки. При регистрации
+ * код из 4 цифр. Терапевт открывает ответы по коду, заполняет HADS и признаки. При регистрации
  * по PIN ответы становятся обычными заполнениями пациента, непривязанные удаляются через 12 часов.
  *
  * @phpstan-import-type Evidence from Alert
+ * @phpstan-import-type Subscore from Scale
  *
- * @phpstan-type QueueScale array{scale_id: int, scale: string, version: string, scores: list<int>, total: int, band: string}
- * @phpstan-type QueueDoctorScale array{scale_id: int, scale: string, version: string, scores: list<int>, total: int, band: string, rated_by_id: int, rated_at: string}
+ * @phpstan-type QueueScale array{scale_id: int, scale: string, version: string, scores: list<int>, total: int, band: string, subscores?: list<Subscore>|null}
+ * @phpstan-type QueueDoctorScale array{scale_id: int, scale: string, version: string, scores: list<int>, total: int, band: string, subscores?: list<Subscore>|null, rated_by_id: int, rated_at: string}
  * @phpstan-type QueueAlert array{rule_id: int, rule_version: string, evidence: list<Evidence>}
  *
  * @property int $id
@@ -134,7 +135,7 @@ class QueueAnswer extends Model
     }
 
     /**
-     * Решение «не направлять» действует, пока подсказка та же, при которой его приняли. Если HARS
+     * Решение «не направлять» действует, пока подсказка та же, при которой его приняли. Если HADS
      * подняла подсказку, терапевт решает снова.
      */
     public function isDeclinedFor(?ReferralCategory $suggestion): bool
@@ -160,6 +161,7 @@ class QueueAnswer extends Model
                 'scale_version' => $entry['version'],
                 'total' => $entry['total'],
                 'band' => $entry['band'],
+                'subscores' => $entry['subscores'] ?? null,
                 'local_date' => self::localDate($this->submitted_at),
                 'submitted_at' => isset($entry['rated_at']) ? CarbonImmutable::parse($entry['rated_at']) : $this->submitted_at,
                 'rated_by_id' => $entry['rated_by_id'] ?? null,
@@ -177,7 +179,7 @@ class QueueAnswer extends Model
     }
 
     /**
-     * Данные для подсказки направления: опросники из очереди, HARS и признаки с этого приёма.
+     * Данные для подсказки направления: опросники из очереди, HADS и признаки с этого приёма.
      */
     public function referralData(): ReferralData
     {

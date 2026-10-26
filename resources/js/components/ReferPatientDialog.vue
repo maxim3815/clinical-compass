@@ -31,7 +31,7 @@ const props = defineProps<{
     patientName: string;
     suggestion: ReferralCategory | null;
     psychiatrists: { id: number; name: string }[];
-    // Шкалы врача, без которых подсказка может быть ниже (HARS сегодня не заполнена).
+    // Шкалы врача, без которых подсказка может быть ниже (HADS сегодня не заполнена).
     missingScales: { scale: string; name: string }[];
     maxLength: number;
 }>();

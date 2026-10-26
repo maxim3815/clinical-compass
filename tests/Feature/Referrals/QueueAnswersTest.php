@@ -34,7 +34,6 @@ beforeEach(function () {
     // GAD-7 = 21 и PHQ-9 = 9: подсказка «желательно» по GAD-7.
     $this->submit = fn (int $gad7 = 3, int $phq9 = 1, int $item9 = 0, ?string $cookie = null): TestResponse => ($cookie === null ? $this : $this->withCookie(QueueController::COOKIE, $cookie))
         ->post(route('queue.store', 'kravtsova'), ['answers' => assessmentAnswers(gad7: $gad7, phq9: $phq9, phq9Item9: $item9)]);
-    $this->harsScores = fn (int $total): array => array_map(fn (int $item): int => max(0, min(4, $total - 4 * $item)), range(0, 13));
     // Пациент вводит PIN на адресе врача и регистрируется: с cookie ответов из очереди или без.
     $this->register = function (string $pin, ?string $cookie = null, string $login = 'zaytseva'): User {
         auth()->logout();
@@ -229,7 +228,7 @@ test('the therapist sees the code among the answered in real time', function () 
                 'alert' => false,
                 'unopened' => false,
                 'suggestion' => 'desirable',
-                'scales_missing' => ['HARS'],
+                'scales_missing' => ['HADS'],
                 'decision' => null,
                 'opened_at' => null,
             ]),
@@ -301,7 +300,7 @@ test('the psychiatrist has no queue banner and no door', function () {
     $this->actingAs($this->psychiatrist)->get(route('doctor.queue.poster'))->assertNotFound();
 });
 
-test('the code page shows the answers and the suggestion, hars there changes it', function () {
+test('the code page shows the answers and the suggestion, hads there changes it', function () {
     ($this->submit)();
     $answer = QueueAnswer::query()->sole();
 
@@ -313,34 +312,43 @@ test('the code page shows the answers and the suggestion, hars there changes it'
             ->where('answer.expires_at', 'сегодня в 22:00')
             ->where('answer.alert', null)
             ->where('suggestion.category', 'desirable')
-            ->where('suggestion.missing.0.scale', 'hars')
+            ->where('suggestion.missing.0.scale', 'hads')
             ->has('fillings', 2)
             ->where('fillings.1.name', 'PHQ-9')
             ->where('fillings.1.answers.8.highlight', true)
-            ->where('doctorScales', [['code' => 'hars', 'name' => 'HARS']]),
+            ->where('doctorScales', [['code' => 'hads', 'name' => 'HADS']]),
         );
 
-    $this->actingAs($this->therapist)->get(route('doctor.queue-answers.scales.create', [$answer, 'hars']))
+    $this->actingAs($this->therapist)->get(route('doctor.queue-answers.scales.create', [$answer, 'hads']))
         ->assertInertia(fn (Assert $page) => $page
             ->component('doctor/ScaleForm')
             ->where('patient', null)
             ->where('queueAnswer', ['id' => $answer->id, 'code' => $answer->code])
-            ->where('scale.code', 'hars')
+            ->where('scale.code', 'hads')
             ->where('facts.0', ['code' => 'mania_signs', 'name' => 'Признаки мании или гипомании', 'value' => null]),
         );
 
-    $this->actingAs($this->therapist)->post(route('doctor.queue-answers.scales.store', [$answer, 'hars']), [
-        'scores' => ($this->harsScores)(26),
+    $this->actingAs($this->therapist)->post(route('doctor.queue-answers.scales.store', [$answer, 'hads']), [
+        'scores' => hadsScores(4, 15),
         'facts' => ['mania_signs' => false, 'psychotic_symptoms' => false],
     ])
         ->assertRedirect(route('doctor.queue-answers.show', $answer))
-        ->assertSessionHas('inertia.flash_data.toast.message', 'HARS сохранена: 26 из 56, тяжелая степень выраженности тревожного расстройства. Подсказка изменилась: «обязательно», было «желательно».');
+        ->assertSessionHas('inertia.flash_data.toast.message', 'HADS сохранена: тревога 4, депрессия 15 из 21. Подсказка изменилась: «обязательно», было «желательно».');
 
     $answer->refresh();
 
-    expect($answer->doctor_scale)->toMatchArray(['scale' => 'hars', 'total' => 26, 'band' => 'тяжелая степень выраженности тревожного расстройства', 'rated_by_id' => $this->therapist->id])
+    expect($answer->doctor_scale)->toMatchArray([
+        'scale' => 'hads',
+        'total' => 19,
+        'subscores' => [
+            ['code' => 'anxiety', 'total' => 4, 'band' => 'норма'],
+            ['code' => 'depression', 'total' => 15, 'band' => 'клинически выраженная депрессия'],
+        ],
+        'rated_by_id' => $this->therapist->id,
+    ])
         ->and($answer->facts)->toBe(['mania_signs' => false, 'psychotic_symptoms' => false])
-        ->and(AuditLog::query()->where('action', 'queue_answer.rated')->sole()->after)->toBe(['code' => $answer->code, 'scale' => 'hars'])
+        // В журнале без баллов: ответы из очереди удаляются через 12 часов, журнал остаётся.
+        ->and(AuditLog::query()->where('action', 'queue_answer.rated')->sole()->after)->toBe(['code' => $answer->code, 'scale' => 'hads'])
         ->and(Assessment::query()->count())->toBe(0);
 
     $this->actingAs($this->therapist)->get(route('doctor.queue-answers.show', $answer))
@@ -348,12 +356,15 @@ test('the code page shows the answers and the suggestion, hars there changes it'
             ->where('suggestion.category', 'required')
             ->where('suggestion.missing', [])
             ->has('fillings', 3)
-            ->where('fillings.2.name', 'HARS')
+            ->where('fillings.2.name', 'HADS')
+            ->where('fillings.2.subscores.1', ['code' => 'depression', 'name' => 'депрессия', 'total' => 15, 'max' => 21, 'band' => 'клинически выраженная депрессия'])
+            ->where('fillings.2.answers.1.group', 'депрессия')
+            ->where('fillings.2.answers.1.label', 'это совсем не так')
             ->where('fillings.2.rated_by', 'Кравцова Ирина Олеговна')
             ->where('fillings.2.submitted_at', '25.10.2026 10:00'),
         );
 
-    $this->actingAs($this->therapist)->get(route('doctor.queue-answers.scales.create', [$answer, 'hars']))
+    $this->actingAs($this->therapist)->get(route('doctor.queue-answers.scales.create', [$answer, 'hads']))
         ->assertInertia(fn (Assert $page) => $page->where('facts.0.value', false));
 });
 
@@ -363,7 +374,8 @@ test('only the therapist of the door opens the answers, and only for 12 hours', 
     $other = User::factory()->therapist()->create();
 
     $this->actingAs($other)->get(route('doctor.queue-answers.show', $answer))->assertNotFound();
-    $this->actingAs($other)->get(route('doctor.queue-answers.scales.create', [$answer, 'hars']))->assertNotFound();
+    $this->actingAs($other)->get(route('doctor.queue-answers.scales.create', [$answer, 'hads']))->assertNotFound();
+    $this->actingAs($this->therapist)->get(route('doctor.queue-answers.scales.create', [$answer, 'hars']))->assertNotFound();
     $this->actingAs($other)->post(route('doctor.queue-answers.decline', $answer), ['suggested' => 'desirable', 'comment' => 'нет'])->assertNotFound();
     $this->actingAs($this->therapist)->get(route('doctor.queue-answers.scales.create', [$answer, 'gad7']))->assertNotFound();
 
@@ -408,11 +420,11 @@ test('not referring needs a comment when the system suggests a referral', functi
         ->assertInertia(fn (Assert $page) => $page->where('answer.declined.comment', 'Тревога ситуативная, повторный приём через 2 недели'));
 });
 
-test('a pin from the code page moves the answers, hars and signs to the patient from any phone', function () {
+test('a pin from the code page moves the answers, hads and signs to the patient from any phone', function () {
     ($this->submit)();
     $answer = QueueAnswer::query()->sole();
-    $this->actingAs($this->therapist)->post(route('doctor.queue-answers.scales.store', [$answer, 'hars']), [
-        'scores' => ($this->harsScores)(20),
+    $this->actingAs($this->therapist)->post(route('doctor.queue-answers.scales.store', [$answer, 'hads']), [
+        'scores' => hadsScores(12, 8),
         'facts' => ['mania_signs' => true, 'psychotic_symptoms' => false],
     ]);
     $this->travel(10)->minutes();
@@ -438,7 +450,11 @@ test('a pin from the code page moves the answers, hars and signs to the patient 
         ])->all())->toBe([
             ['gad7', 21, '10:00', '2026-10-25', null],
             ['phq9', 8, '10:00', '2026-10-25', null],
-            ['hars', 20, '10:00', '2026-10-25', $this->therapist->id],
+            ['hads', 20, '10:00', '2026-10-25', $this->therapist->id],
+        ])
+        ->and($assessments[2]->subscores)->toBe([
+            ['code' => 'anxiety', 'total' => 12, 'band' => 'клинически выраженная тревога'],
+            ['code' => 'depression', 'total' => 8, 'band' => 'субклинически выраженная депрессия'],
         ])
         ->and($assessments[1]->answers()->orderBy('item')->pluck('score')->all())->toBe([1, 1, 1, 1, 1, 1, 1, 1, 0])
         ->and(Observation::query()->where('patient_id', $patient->id)->with('type')->get()->mapWithKeys(fn (Observation $observation) => [$observation->type->code => $observation->value_boolean])->all())
@@ -459,7 +475,7 @@ test('a pin from the code page moves the answers, hars and signs to the patient 
 
     $this->actingAs($this->therapist)->get(route('doctor.queue-answers.show', $answer))
         ->assertRedirect(route('doctor.patients.show', $patient))
-        ->assertSessionHas('inertia.flash_data.toast.message', "Код {$answer->code}: пациент зарегистрирован (Зайцева Ольга Петровна), ответы и HARS в карточке.");
+        ->assertSessionHas('inertia.flash_data.toast.message', "Код {$answer->code}: пациент зарегистрирован (Зайцева Ольга Петровна), ответы и HADS в карточке.");
 
     // Код после регистрации в поиске ведёт к пациенту через страницу кода.
     $this->actingAs($this->therapist)->get(route('doctor.patients.index', ['search' => $answer->code]))
@@ -569,7 +585,7 @@ test('scales for the door are the active patient scales', function () {
         ->assertInertia(fn (Assert $page) => $page->has('scales', 1)->where('scales.0.code', 'gad7'));
 });
 
-test('a decline stops counting when hars raises the suggestion', function () {
+test('a decline stops counting when hads raises the suggestion', function () {
     ($this->submit)();
     $answer = QueueAnswer::query()->sole();
     $this->actingAs($this->therapist)->post(route('doctor.queue-answers.decline', $answer), [
@@ -579,8 +595,8 @@ test('a decline stops counting when hars raises the suggestion', function () {
 
     expect($answer->fresh()->declined_suggestion?->value)->toBe('desirable');
 
-    $this->actingAs($this->therapist)->post(route('doctor.queue-answers.scales.store', [$answer, 'hars']), [
-        'scores' => ($this->harsScores)(28),
+    $this->actingAs($this->therapist)->post(route('doctor.queue-answers.scales.store', [$answer, 'hads']), [
+        'scores' => hadsScores(16, 2),
         'facts' => ['mania_signs' => false, 'psychotic_symptoms' => false],
     ]);
 

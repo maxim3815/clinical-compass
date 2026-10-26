@@ -3,7 +3,6 @@
 namespace App\Actions;
 
 use App\Actions\Concerns\EditsClinicalProfile;
-use App\Enums\ScaleRater;
 use App\Models\Assessment;
 use App\Models\AuditLog;
 use App\Models\ObservationType;
@@ -14,9 +13,9 @@ use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
- * Врач заполняет шкалу на приёме (HARS). Заполнение — такая же неизменяемая запись, как опросник
- * пациента, с врачом, который его заполнил. Терапевт вместе с HARS отмечает признаки, которых
- * нет ни в одной шкале: они записываются фактами клинического профиля.
+ * Врач заполняет шкалу на приёме: психиатр — HARS, терапевт — HADS. Заполнение — такая же
+ * неизменяемая запись, как опросник пациента, с врачом, который его заполнил. Терапевт вместе
+ * с HADS отмечает признаки, которых нет ни в одной шкале: они записываются фактами клинического профиля.
  */
 class RateScale
 {
@@ -32,18 +31,18 @@ class RateScale
     {
         $this->ensureDoctorAndPatient($doctor, $patient);
 
-        if ($scale->rater !== ScaleRater::Doctor || ! $scale->is_active) {
-            throw new InvalidArgumentException("{$scale->name}: врач заполняет только действующие шкалы врача.");
+        if (! $scale->isRatableBy($doctor->doctorKind())) {
+            throw new InvalidArgumentException("{$scale->name}: врач заполняет только действующие шкалы врача своего вида.");
         }
 
-        $total = $scale->total($scores);
+        $result = $scale->score($scores);
         $types = ObservationType::query()->whereIn('code', array_keys($facts))->get()->keyBy('code');
 
         if ($types->count() !== count($facts)) {
             throw new InvalidArgumentException('Неизвестный вид факта: '.implode(', ', array_diff(array_keys($facts), $types->keys()->all())).'.');
         }
 
-        return DB::transaction(function () use ($doctor, $patient, $scale, $scores, $total, $facts, $types): Assessment {
+        return DB::transaction(function () use ($doctor, $patient, $scale, $scores, $result, $facts, $types): Assessment {
             $patient = $this->lockPatient($patient);
             $today = $patient->localToday();
 
@@ -51,8 +50,9 @@ class RateScale
                 'patient_id' => $patient->id,
                 'scale_id' => $scale->id,
                 'scale_version' => $scale->version,
-                'total' => $total,
-                'band' => $scale->band($total),
+                'total' => $result['total'],
+                'band' => $result['band'],
+                'subscores' => $result['subscores'],
                 'local_date' => $today,
                 'submitted_at' => CarbonImmutable::now(),
                 'rated_by_id' => $doctor->id,
@@ -70,8 +70,9 @@ class RateScale
 
             AuditLog::record($doctor, 'assessment.rated', $patient, $assessment, null, [
                 'scale' => $scale->code,
-                'total' => $total,
+                'total' => $result['total'],
                 'band' => $assessment->band,
+                'subscores' => $result['subscores'],
                 'scores' => $scores,
                 'facts' => $facts,
             ]);

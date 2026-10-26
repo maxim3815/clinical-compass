@@ -114,19 +114,19 @@ final class QueueAnswerPresenter
                 'suggestion' => $answer->declined_suggestion?->value,
                 'current' => $answer->isDeclinedFor($suggestion),
             ],
-            // Признаки, которые терапевт отметил вместе с HARS.
+            // Признаки, которые терапевт отметил вместе с HADS.
             'facts' => self::facts($answer),
         ];
     }
 
     /**
-     * Ответы на каждый вопрос: опросники пациента и HARS, если терапевт её заполнил.
+     * Ответы на каждый вопрос: опросники пациента и HADS, если терапевт её заполнил.
      *
      * @return list<array<string, mixed>>
      */
     public static function fillings(QueueAnswer $answer): array
     {
-        $raters = User::query()->whereKey($answer->doctor_scale['rated_by_id'] ?? 0)->get()->keyBy('id');
+        $raters = User::query()->with('doctorProfile')->whereKey($answer->doctor_scale['rated_by_id'] ?? 0)->get()->keyBy('id');
 
         return array_values($answer->assessments()
             ->each(fn (Assessment $assessment) => $assessment->setRelation('ratedBy', $raters[$assessment->rated_by_id ?? 0] ?? null))

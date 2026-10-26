@@ -11,7 +11,6 @@ use App\Http\Controllers\Controller;
 use App\Models\AdverseEvent;
 use App\Models\CareRelationship;
 use App\Models\Prescription;
-use App\Models\Scale;
 use App\Models\User;
 use App\Support\Adherence\AdherenceSignal;
 use App\Support\Adherence\AdherenceSignals;
@@ -182,12 +181,10 @@ class PatientController extends Controller
                 'min_date' => $today->subDays(AdverseEventController::MAX_DAYS_AGO)->toDateString(),
             ],
             'alertCommentLimit' => AlertController::MAX_COMMENT_LENGTH,
-            // Опросники пациента и шкалы врача (HARS): суммы, степени, изменение и ответы.
-            'wellbeing' => PatientAssessments::forDoctor($patient),
-            // Шкалы, которые врач заполняет на приёме: кнопка «Заполнить HARS».
-            'doctorScales' => Scale::query()->active()->forDoctors()->orderBy('position')->get(['code', 'name'])
-                ->map(fn (Scale $scale): array => ['code' => $scale->code, 'name' => $scale->name])
-                ->values(),
+            // Опросники пациента и шкалы врача (HARS, HADS терапевта): суммы, степени, изменение и ответы.
+            'wellbeing' => PatientAssessments::forDoctor($patient, $doctor->doctorKind()),
+            // Шкалы, которые психиатр заполняет на приёме: кнопка «Заполнить HARS».
+            'doctorScales' => PatientAssessments::ratableScales($doctor->doctorKind()),
             // По какому направлению терапевта пациент пришёл к врачу.
             'referral' => ReferralPresenter::forPsychiatristCard($doctor, $patient),
             // Находки и «Не проверено» по id назначения, у назначений врача и своих препаратов пациента.

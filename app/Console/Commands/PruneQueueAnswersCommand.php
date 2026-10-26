@@ -15,7 +15,7 @@ class PruneQueueAnswersCommand extends Command
     /**
      * @var string
      */
-    protected $description = 'Удалить ответы из очереди старше 12 часов вместе с HARS и признаками';
+    protected $description = 'Удалить ответы из очереди старше 12 часов вместе с HADS и признаками';
 
     /**
      * Привязанные ответы уже стали заполнениями пациента: их строка — только ссылка для страницы

@@ -195,9 +195,18 @@
      * браузер прокручивает при переходе по Tab.
      */
     html:has([data-test='prescription-summary']),
-    html:has([data-test='facts-save-bar']),
-    html:has([data-test='scale-save-bar']) {
+    html:has([data-test='facts-save-bar']) {
         scroll-padding-bottom: 8rem;
+    }
+    /*
+     * Панель шкалы врача бывает выше 8rem (ошибка на телефоне): её высоту пишет ScaleForm. Сверху
+     * отступ на шапку (h-14) и плашку алертов: при Shift+Tab группа не прячется под шапкой.
+     */
+    html:has([data-test='scale-save-bar']) {
+        scroll-padding-top: calc(3.5rem + var(--alert-banner-height, 0px));
+        scroll-padding-bottom: calc(
+            var(--scale-save-bar-height, 8rem) + 0.5rem
+        );
     }
     /*
      * Красная плашка алертов закреплена под шапкой врача: раздел по ссылке и поле в фокусе

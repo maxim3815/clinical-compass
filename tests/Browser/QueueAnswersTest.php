@@ -37,7 +37,7 @@ function answerAtDoor(mixed $page, int $gad7 = 3, int $item9 = 0): mixed
     return $page->press('Получить код')->assertSee('Ваш код для приёма');
 }
 
-test('a patient in the queue answers at the door, the therapist opens the code, rates hars, invites and refers', function () {
+test('a patient in the queue answers at the door, the therapist opens the code, rates hads, invites and refers', function () {
     $therapistPage = visit(route('login'))
         ->fill('login', 'therapist')
         ->fill('password', 'password')
@@ -72,27 +72,30 @@ test('a patient in the queue answers at the door, the therapist opens the code, 
     // Код появился у терапевта без перезагрузки.
     waitForText($therapistPage, "Код {$code}")
         ->assertSeeIn('[data-test="answered-queue-row"]', 'из очереди, без регистрации')
-        ->assertSeeIn('[data-test="answered-queue-row"]', 'нет HARS')
+        ->assertSeeIn('[data-test="answered-queue-row"]', 'нет HADS')
         ->click('[data-test="answered-queue-row"] a')
         ->assertPathBeginsWith('/doctor/queue/')
         ->assertSee("Код {$code}")
         ->assertPresent('[data-test="referral-suggestion"] > div [data-test="referral-category-desirable"]')
         ->assertSeeIn('[data-test="queue-filling-gad7"]', 'GAD-7: 21 из 21')
-        ->click('[data-test="missing-rate-hars"]')
-        ->assertSee('Шкала М. Гамильтона для оценки тревоги')
-        ->assertSee("Код {$code} · HARS");
+        ->click('[data-test="missing-rate-hads"]')
+        ->assertSee('Госпитальная шкала тревоги и депрессии')
+        ->assertSee("Код {$code} · HADS");
 
+    // Депрессия: самые тяжёлые ответы (3), тревога: «нет» (0) — «обязательно» по депрессии.
     foreach (range(0, 13) as $item) {
-        $therapistPage->click("[data-test=\"score-{$item}-2\"]");
+        $therapistPage->click('[data-test="score-'.$item.'-'.($item % 2 === 1 ? 3 : 0).'"]');
     }
 
     $therapistPage
+        ->click('[data-test="open-scale-facts"]')
         ->click('[data-test="fact-mania_signs-no"]')
         ->click('[data-test="fact-psychotic_symptoms-no"]')
         ->click('[data-test="save-scale"]')
         ->assertPathBeginsWith('/doctor/queue/')
         ->assertPresent('[data-test="referral-suggestion"] > div [data-test="referral-category-required"]')
-        ->assertSeeIn('[data-test="queue-filling-hars"]', 'Врач: Кравцова Ирина Олеговна')
+        ->assertSeeIn('[data-test="queue-filling-hads"]', 'Врач: Кравцова Ирина Олеговна')
+        ->assertSeeIn('[data-test="queue-filling-hads"]', 'депрессия 21 из 21')
         ->press('Зарегистрировать пациента')
         ->assertSeeIn('[data-test="appointment-queue-code"]', "Сверьте {$code} с кодом на телефоне пациента")
         ->assertNoJavaScriptErrors();
@@ -124,7 +127,7 @@ test('a patient in the queue answers at the door, the therapist opens the code, 
 
     waitForText($therapistPage, 'Регистрация завершена: Зайцева Ольга Петровна.')
         ->press('Закрыть')
-        ->assertSeeIn('[data-test="queue-registered"]', 'Ответы из очереди и HARS — в карточке пациента')
+        ->assertSeeIn('[data-test="queue-registered"]', 'Ответы из очереди и HADS — в карточке пациента')
         ->click('[data-test="queue-open-patient"]')
         ->assertPathIs('/doctor/patients/'.$patient->id)
         ->assertPresent('[data-test="referral-suggestion"] > div [data-test="referral-category-required"]')

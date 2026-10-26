@@ -3,7 +3,6 @@
 namespace App\Actions;
 
 use App\Actions\Concerns\HandlesQueueAnswers;
-use App\Enums\ScaleRater;
 use App\Events\QueueAnswersChanged;
 use App\Models\AuditLog;
 use App\Models\ObservationType;
@@ -16,7 +15,7 @@ use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
 /**
- * Терапевт заполняет HARS и признаки по ответам из очереди, до регистрации пациента. Хранятся
+ * Терапевт заполняет HADS и признаки по ответам из очереди, до регистрации пациента. Хранятся
  * вместе с ответами: последнее заполнение заменяет прежнее, при регистрации оно становится
  * обычным заполнением шкалы врача и фактами профиля.
  */
@@ -32,18 +31,18 @@ class RateQueueScale
      */
     public function handle(User $therapist, QueueAnswer $answer, Scale $scale, array $scores, array $facts): QueueAnswer
     {
-        if ($scale->rater !== ScaleRater::Doctor || ! $scale->is_active) {
-            throw new InvalidArgumentException("{$scale->name}: врач заполняет только действующие шкалы врача.");
+        if (! $scale->isRatableBy($therapist->doctorKind())) {
+            throw new InvalidArgumentException("{$scale->name}: врач заполняет только действующие шкалы врача своего вида.");
         }
 
-        $total = $scale->total($scores);
+        $result = $scale->score($scores);
         $known = ObservationType::query()->whereIn('code', array_keys($facts))->pluck('code')->all();
 
         if (count($known) !== count($facts)) {
             throw new InvalidArgumentException('Неизвестный вид факта: '.implode(', ', array_diff(array_keys($facts), $known)).'.');
         }
 
-        return DB::transaction(function () use ($therapist, $answer, $scale, $scores, $total, $facts): QueueAnswer {
+        return DB::transaction(function () use ($therapist, $answer, $scale, $scores, $result, $facts): QueueAnswer {
             $answer = $this->lockPending($therapist, $answer);
 
             $answer->update([
@@ -52,8 +51,9 @@ class RateQueueScale
                     'scale' => $scale->code,
                     'version' => $scale->version,
                     'scores' => $scores,
-                    'total' => $total,
-                    'band' => $scale->band($total),
+                    'total' => $result['total'],
+                    'band' => $result['band'],
+                    'subscores' => $result['subscores'],
                     'rated_by_id' => $therapist->id,
                     'rated_at' => CarbonImmutable::now()->toIso8601ZuluString('millisecond'),
                 ],

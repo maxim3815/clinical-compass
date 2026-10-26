@@ -18,7 +18,7 @@ use Symfony\Component\ExpressionLanguage\SyntaxError;
  * и методов, что у правил алертинга, плюс факты клинического профиля:
  *
  * - answer('phq9', 9) — балл ответа на 9-й вопрос PHQ-9;
- * - total('hars') — сумма баллов шкалы;
+ * - total('hars') — сумма баллов шкалы, total('hads', 'anxiety') — сумма подшкалы;
  * - fact('mania_signs') — текущее значение факта, null — записи нет.
  */
 final class ReferralLanguage extends ExpressionLanguage
@@ -45,17 +45,20 @@ final class ReferralLanguage extends ExpressionLanguage
 
     /**
      * Ответы, суммы и факты, на которые смотрит условие, по порядку появления, без повторов:
-     * [['answer', 'phq9', 9], ['total', 'hars'], ['fact', 'mania_signs']]. Бросает SyntaxError,
+     * [['answer', 'phq9', 9], ['total', 'hars'], ['total', 'hads', 'anxiety'], ['fact', 'mania_signs']]. Бросает SyntaxError,
      * если условие не разбирается или использует что-то кроме функций выше.
      *
-     * @return list<array{0: 'answer', 1: string, 2: int}|array{0: 'total', 1: string}|array{0: 'fact', 1: string}>
+     * @return list<array{0: 'answer', 1: string, 2: int}|array{0: 'total', 1: string, 2?: string}|array{0: 'fact', 1: string}>
      */
     public function references(string $condition): array
     {
         $references = [];
         $this->collect($this->parse($condition, [])->getNodes(), $references);
 
-        return array_values(array_unique($references, SORT_REGULAR));
+        /** @var list<array{0: 'answer', 1: string, 2: int}|array{0: 'total', 1: string, 2?: string}|array{0: 'fact', 1: string}> $unique */
+        $unique = array_values(array_unique($references, SORT_REGULAR));
+
+        return $unique;
     }
 
     /**
@@ -66,7 +69,7 @@ final class ReferralLanguage extends ExpressionLanguage
         $data = fn (): ReferralData => $this->data ?? throw new LogicException('Условие вычисляется только через evaluateFor().');
 
         $this->register('answer', self::notCompiled(...), fn (array $values, string $scale, int $item) => $data()->answer($scale, $item));
-        $this->register('total', self::notCompiled(...), fn (array $values, string $scale) => $data()->total($scale));
+        $this->register('total', self::notCompiled(...), fn (array $values, string $scale, ?string $subscale = null) => $data()->total($scale, $subscale));
         $this->register('fact', self::notCompiled(...), fn (array $values, string $code) => $data()->fact($code));
     }
 
@@ -76,7 +79,10 @@ final class ReferralLanguage extends ExpressionLanguage
     }
 
     /**
-     * @param  list<array{0: 'answer', 1: string, 2: int}|array{0: 'total', 1: string}|array{0: 'fact', 1: string}>  $references
+     * Ссылки копятся в общем виде: phpstan сливает формы total и fact в одну и не узнаёт их.
+     * Точный вид — у references().
+     *
+     * @param  list<list<int|string>>  $references
      */
     private function collect(Node $node, array &$references): void
     {
@@ -99,7 +105,13 @@ final class ReferralLanguage extends ExpressionLanguage
                 return;
             }
 
-            throw new SyntaxError("Функция {$name}(): ожидается answer('код шкалы', номер вопроса), total('код шкалы') или fact('код факта').");
+            if ($name === 'total' && count($args) === 2 && is_string($args[0]) && is_string($args[1])) {
+                $references[] = ['total', $args[0], $args[1]];
+
+                return;
+            }
+
+            throw new SyntaxError("Функция {$name}(): ожидается answer('код шкалы', номер вопроса), total('код шкалы'), total('код шкалы', 'код подшкалы') или fact('код факта').");
         }
 
         // Node без подкласса — список аргументов функции.

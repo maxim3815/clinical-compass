@@ -73,7 +73,7 @@ export type IncomingReferral = {
     category: ReferralCategory;
     from: ReferralDoctor;
     created_at: string;
-    // Основание одной строкой: «HARS 28 · GAD-7 16».
+    // Основание одной строкой: «HADS, тревога 12 · GAD-7 16».
     summary: string;
 };
 
@@ -97,7 +97,7 @@ type AnsweredCommon = {
     highlight: boolean;
     alert: boolean;
     suggestion: ReferralCategory | null;
-    // Шкалы, без которых подсказка может быть ниже (обычно HARS).
+    // Шкалы, без которых подсказка может быть ниже (у терапевта — HADS).
     scales_missing: string[];
     // Решение терапевта после этих ответов.
     decision: {

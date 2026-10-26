@@ -6,9 +6,11 @@ import { show } from '@/routes/doctor/patients';
 import type { DoctorScaleForm, ScreeningFact } from '@/types';
 
 /**
- * Шкала врача на приёме (HARS): пункт — одна строка с оценками 0–4, подписи оценок один раз
- * сверху, сумма и степень закреплены внизу. Терапевт ниже отмечает признаки, которых нет в шкалах.
- * Заполняют для пациента или по ответам из очереди до регистрации (по коду).
+ * Шкала врача на приёме. HARS у психиатра: пункт — одна строка с оценками 0–4, подписи оценок
+ * один раз сверху. HADS у терапевта: у каждого утверждения свои варианты ответа словами, без
+ * баллов — терапевт зачитывает их или даёт пациенту ответить на своём экране. Сумма и степень
+ * (у HADS — по тревоге и депрессии) закреплены внизу. Терапевт ниже отмечает признаки, которых
+ * нет в шкалах. Заполняют для пациента или по ответам из очереди до регистрации (по коду).
  */
 type Props = {
     patient: { id: number; name: string } | null;
@@ -54,7 +56,8 @@ function subject(props: Props) {
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { CircleAlert, ExternalLink } from '@lucide/vue';
-import { computed, nextTick, ref } from 'vue';
+import { useResizeObserver } from '@vueuse/core';
+import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef } from 'vue';
 import LeaveConfirmDialog from '@/components/LeaveConfirmDialog.vue';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -88,11 +91,27 @@ const form = useForm<{
 
 // Пропуски подсвечиваются после первой попытки сохранить и гаснут сами, когда пункт оценён.
 const attempted = ref(false);
-// Текст ошибки — на момент нажатия «Сохранить»: живой счётчик перебивал бы скринридер на каждом выборе.
-const submitError = ref<string | null>(null);
+// Видимая ошибка считается на лету, а скринридер слышит её один раз — в момент нажатия
+// «Сохранить»: живой счётчик перебивал бы его на каждом выборе.
+const announced = ref('');
 
 const unanswered = computed(() =>
     form.scores.flatMap((score, item) => (score === null ? [item] : [])),
+);
+
+// Варианты свои у каждого утверждения (HADS): подписи словами в строке пункта, баллы скрыты.
+const ownOptions = computed(() =>
+    props.scale.items.some((item) => item.options !== null),
+);
+
+function optionsFor(position: number) {
+    return props.scale.items[position]?.options ?? props.scale.options;
+}
+
+const itemWords = computed<[string, string, string]>(() =>
+    ownOptions.value
+        ? ['утверждение', 'утверждения', 'утверждений']
+        : ['пункт', 'пункта', 'пунктов'],
 );
 
 const missingFacts = computed(() =>
@@ -103,32 +122,71 @@ const total = computed(() =>
     form.scores.reduce<number>((sum, score) => sum + (score ?? 0), 0),
 );
 
-const band = computed(
-    () =>
-        props.scale.bands.find(
-            (band) => total.value >= band.min && total.value <= band.max,
-        )?.label ?? null,
-);
-
-const summary = computed(() =>
-    unanswered.value.length > 0
-        ? `Оценено ${props.scale.items.length - unanswered.value.length} из ${props.scale.items.length}.`
-        : `Сумма ${total.value} из ${props.scale.max}: ${band.value}.`,
-);
-
-function missingText(): string {
-    return unanswered.value.length > 0
-        ? `Оцените ещё ${unanswered.value.length} ${plural(unanswered.value.length, ['пункт', 'пункта', 'пунктов'])}.`
-        : 'Отметьте, есть ли каждый признак.';
+function bandOf(
+    bands: DoctorScaleForm['bands'],
+    sum: number,
+): string | undefined {
+    return bands.find((band) => sum >= band.min && sum <= band.max)?.label;
 }
 
-// Одна короткая строка: чего не хватало при сохранении, пока пропуски остаются. Ошибки сервера — следом.
+const band = computed(() => bandOf(props.scale.bands, total.value) ?? null);
+
+// У HADS экран может держать пациент: сумм и степеней до сохранения нет, итог — после
+// сохранения в уведомлении и карточке. У HARS врач видит сумму сразу.
+const summary = computed(() => {
+    const answered = props.scale.items.length - unanswered.value.length;
+
+    if (ownOptions.value) {
+        return unanswered.value.length > 0
+            ? `Отмечено ${answered} из ${props.scale.items.length}.`
+            : `Отмечено ${answered} из ${props.scale.items.length}. Суммы — после сохранения.`;
+    }
+
+    return unanswered.value.length > 0
+        ? `Оценено ${answered} из ${props.scale.items.length}.`
+        : `Сумма ${total.value} из ${props.scale.max}: ${band.value}.`;
+});
+
+// Признаки отмечает врач: у HADS блок свёрнут, чтобы пациент с экраном в руках их не читал.
+const factsOpen = ref(!ownOptions.value);
+
+// Признаки не отмечены: блок не раскрывали (значения из профиля врач не проверил — сохранить
+// мог и пациент) или в нём есть пустые.
+const factsPending = computed(
+    () =>
+        props.facts.length > 0 &&
+        (!factsOpen.value || missingFacts.value.length > 0),
+);
+
+async function openFacts(): Promise<void> {
+    factsOpen.value = true;
+    await nextTick();
+    document
+        .querySelector<HTMLElement>('[data-test="scale-facts"] input')
+        ?.focus();
+}
+
+function missingText(): string {
+    if (unanswered.value.length === 0) {
+        return factsOpen.value
+            ? 'Отметьте, есть ли каждый признак.'
+            : 'Отметьте признаки: их заполняет врач.';
+    }
+
+    const count = `${unanswered.value.length} ${plural(unanswered.value.length, itemWords.value)}`;
+
+    return ownOptions.value
+        ? `Нет ответа ещё на ${count}.`
+        : `Оцените ещё ${count}.`;
+}
+
+// Одна короткая строка: чего не хватает после попытки сохранить, пока пропуски остаются. Ошибки сервера — следом.
 const error = computed(() => {
     if (
-        submitError.value !== null &&
-        (unanswered.value.length > 0 || missingFacts.value.length > 0)
+        attempted.value &&
+        (unanswered.value.length > 0 || factsPending.value)
     ) {
-        return submitError.value;
+        return missingText();
     }
 
     const server = Object.entries(form.errors).find(
@@ -149,32 +207,68 @@ function missing(position: number): boolean {
     return attempted.value && form.scores[position] === null;
 }
 
+// Первый пропуск — по центру экрана целиком, с текстом утверждения: фокус на радиокнопке
+// прокрутил бы только к ней, к краю под шапку или панель.
+// Свёрнутые признаки сами не раскрываются: «Сохранить» мог нажать пациент. Фокус — на кнопку.
 async function focusFirstMissing(): Promise<void> {
     await nextTick();
 
-    const selector =
-        unanswered.value.length > 0
-            ? `input[name="score-${unanswered.value[0]}"]`
-            : missingFacts.value.length > 0
-              ? `input[name="fact-${missingFacts.value[0].code}"]`
-              : '[data-test="scale-error"]';
+    let selector = '[data-test="scale-error"]';
 
-    document.querySelector<HTMLElement>(selector)?.focus();
+    if (unanswered.value.length > 0) {
+        selector = `input[name="score-${unanswered.value[0]}"]`;
+    } else if (props.facts.length > 0 && !factsOpen.value) {
+        selector = '[data-test="open-scale-facts"]';
+    } else if (missingFacts.value.length > 0) {
+        selector = `input[name="fact-${missingFacts.value[0].code}"]`;
+    }
+
+    const target = document.querySelector<HTMLElement>(selector);
+
+    target
+        ?.closest('fieldset, [role="radiogroup"]')
+        ?.scrollIntoView({ block: 'center' });
+    target?.focus({ preventScroll: true });
 }
 
-function optionLabel(score: number | null): string {
+// Высота закреплённой панели: на неё браузер отступает, прокручивая к полю в фокусе (app.css).
+const saveBar = useTemplateRef<HTMLElement>('saveBar');
+
+useResizeObserver(saveBar, () =>
+    document.documentElement.style.setProperty(
+        '--scale-save-bar-height',
+        `${saveBar.value?.offsetHeight ?? 0}px`,
+    ),
+);
+
+onBeforeUnmount(() =>
+    document.documentElement.style.removeProperty('--scale-save-bar-height'),
+);
+
+function optionLabel(position: number, score: number | null): string {
     return (
-        props.scale.options.find((option) => option.score === score)?.label ??
+        optionsFor(position).find((option) => option.score === score)?.label ??
         ''
     );
 }
 
-function submit(): void {
-    attempted.value = true;
-    submitError.value = null;
+function preventRadioEnter(event: KeyboardEvent): void {
+    if (
+        event.target instanceof HTMLInputElement &&
+        event.target.type === 'radio'
+    ) {
+        event.preventDefault();
+    }
+}
 
-    if (unanswered.value.length > 0 || missingFacts.value.length > 0) {
-        submitError.value = missingText();
+async function submit(): Promise<void> {
+    attempted.value = true;
+    // Пустая строка и новый текст в разных тиках: тот же текст при повторном нажатии объявляется снова.
+    announced.value = '';
+
+    if (unanswered.value.length > 0 || factsPending.value) {
+        await nextTick();
+        announced.value = missingText();
         void focusFirstMissing();
 
         return;
@@ -198,7 +292,7 @@ function submit(): void {
             </h1>
             <p class="text-muted-foreground">
                 {{
-                    `${target.name} · ${scale.name}, ${scale.items.length} пунктов`
+                    `${target.name} · ${scale.name}, ${scale.items.length} ${plural(scale.items.length, itemWords)}`
                 }}
             </p>
         </header>
@@ -214,24 +308,45 @@ function submit(): void {
                 <p v-if="scale.source.note" class="mt-2 text-muted-foreground">
                     {{ scale.source.note }}
                 </p>
+                <!-- Источник свёрнут: пациенту с экраном в руках название чужой рекомендации ни к чему. -->
+                <p class="mt-2 text-muted-foreground">
+                    {{ `Текст шкалы: ${scale.source.validation}` }}
+                    <a
+                        :href="scale.source.url"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex items-center gap-1 text-primary underline underline-offset-4"
+                    >
+                        Открыть документ
+                        <ExternalLink class="size-4" />
+                    </a>
+                </p>
             </details>
-            <p class="text-muted-foreground">
-                {{ `Текст шкалы: ${scale.source.validation}` }}
-                <a
-                    :href="scale.source.url"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="inline-flex items-center gap-1 text-primary underline underline-offset-4"
-                >
-                    Открыть документ
-                    <ExternalLink class="size-4" />
-                </a>
-            </p>
         </div>
 
-        <form class="flex flex-col gap-4" novalidate @submit.prevent="submit">
+        <!-- Enter на радиокнопке (утверждения и признаки) не отправляет форму: фокус прыгал бы к пропуску. -->
+        <form
+            class="flex flex-col gap-4"
+            novalidate
+            @submit.prevent="submit"
+            @keydown.enter="preventRadioEnter"
+        >
+            <!-- Для того, кто отвечает: у HADS — о каком времени речь. -->
+            <p
+                v-if="scale.prompt"
+                class="text-base font-medium"
+                data-test="scale-prompt"
+            >
+                {{ scale.prompt }}
+            </p>
+
             <!-- Подписи оценок один раз: в строках пунктов только цифры. -->
-            <p id="scale-options" class="text-sm" data-test="scale-options">
+            <p
+                v-if="!ownOptions"
+                id="scale-options"
+                class="text-sm"
+                data-test="scale-options"
+            >
                 <template
                     v-for="(option, position) in scale.options"
                     :key="option.score"
@@ -245,16 +360,31 @@ function submit(): void {
                 </template>
             </p>
 
-            <ol class="divide-y rounded-xl border bg-card shadow-xs">
+            <ol
+                class="divide-y overflow-hidden rounded-xl border bg-card shadow-xs"
+            >
                 <li v-for="(item, position) in scale.items" :key="position">
+                    <!-- Пропуск — полосой слева и словами, без заливки: красного не больше, чем нужно. -->
                     <fieldset
-                        class="grid grid-cols-[minmax(0,1fr)] items-center gap-x-6 gap-y-2 px-4 py-3 @2xl:grid-cols-[minmax(0,1fr)_auto]"
-                        :class="missing(position) ? 'bg-danger-subtle' : ''"
+                        class="grid grid-cols-[minmax(0,1fr)] items-center gap-x-6 gap-y-2 border-l-4 py-3 pr-4 pl-3"
+                        :class="[
+                            missing(position)
+                                ? 'border-l-danger'
+                                : 'border-l-transparent',
+                            ownOptions
+                                ? ''
+                                : '@2xl:grid-cols-[minmax(0,1fr)_auto]',
+                        ]"
+                        role="radiogroup"
+                        aria-required="true"
+                        :aria-invalid="missing(position) ? true : undefined"
                         :aria-labelledby="`scale-item-${position}-title`"
                         :aria-describedby="
                             [
                                 item.hint ? `scale-item-${position}-hint` : '',
-                                missing(position) ? 'scale-error' : '',
+                                missing(position)
+                                    ? `scale-item-${position}-missing`
+                                    : '',
                             ]
                                 .filter(Boolean)
                                 .join(' ') || undefined
@@ -278,16 +408,43 @@ function submit(): void {
                             </p>
                             <p
                                 v-if="missing(position)"
+                                :id="`scale-item-${position}-missing`"
                                 class="mt-1 flex items-center gap-1 text-sm font-medium text-danger"
                             >
                                 <CircleAlert
                                     class="size-4 shrink-0"
                                     aria-hidden="true"
                                 />
-                                Не оценено
+                                {{ ownOptions ? 'Нет ответа' : 'Не оценено' }}
                             </p>
                         </div>
-                        <div class="flex flex-col gap-1">
+                        <!--
+                            HADS: варианты словами, баллы не видны — отвечать может сам пациент. Порядок
+                            вариантов строго по строке: столбик или четыре в ряд, без сетки 2×2.
+                        -->
+                        <div
+                            v-if="ownOptions"
+                            class="grid grid-cols-1 gap-2 @3xl:grid-cols-4"
+                        >
+                            <label
+                                v-for="option in optionsFor(position)"
+                                :key="option.score"
+                                class="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-input bg-card px-3 py-2 text-base transition-colors hover:border-primary/60 has-checked:border-primary has-checked:bg-secondary has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring has-focus-visible:outline-solid"
+                                :data-test="`score-${position}-${option.score}`"
+                            >
+                                <input
+                                    v-model="form.scores[position]"
+                                    type="radio"
+                                    :name="`score-${position}`"
+                                    :value="option.score"
+                                    class="size-4 shrink-0 outline-none"
+                                />
+                                <span class="block first-letter:uppercase">{{
+                                    option.label
+                                }}</span>
+                            </label>
+                        </div>
+                        <div v-else class="flex flex-col gap-1">
                             <div class="flex gap-1.5">
                                 <label
                                     v-for="option in scale.options"
@@ -303,9 +460,6 @@ function submit(): void {
                                         :value="option.score"
                                         class="sr-only"
                                         :aria-label="`${option.score} — ${option.label}`"
-                                        :aria-invalid="
-                                            missing(position) ? true : undefined
-                                        "
                                     />
                                     <span aria-hidden="true">{{
                                         option.score
@@ -317,21 +471,38 @@ function submit(): void {
                                 class="min-h-5 text-sm text-muted-foreground"
                                 aria-hidden="true"
                             >
-                                {{ optionLabel(form.scores[position]) }}
+                                {{
+                                    optionLabel(position, form.scores[position])
+                                }}
                             </p>
                         </div>
                     </fieldset>
                 </li>
             </ol>
 
+            <!-- Признаки — часть врача, не шкалы: у HADS свёрнуты до нажатия или пропуска при сохранении. -->
+            <Button
+                v-if="facts.length > 0 && !factsOpen"
+                type="button"
+                variant="outline"
+                class="self-start"
+                aria-controls="scale-facts"
+                :aria-expanded="false"
+                data-test="open-scale-facts"
+                @click="openFacts"
+            >
+                Отметить признаки (заполняет врач)
+            </Button>
             <fieldset
                 v-if="facts.length > 0"
+                v-show="factsOpen"
+                id="scale-facts"
                 class="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-xs"
                 aria-describedby="scale-facts-hint"
                 data-test="scale-facts"
             >
                 <legend class="float-left w-full font-semibold">
-                    Признаки, которых нет в шкалах
+                    Признаки, которых нет в шкалах · заполняет врач
                 </legend>
                 <p
                     id="scale-facts-hint"
@@ -341,16 +512,23 @@ function submit(): void {
                     «обязательно». Отметка сохранится в клиническом профиле
                     пациента.
                 </p>
+                <!-- Пропуск — как у утверждений: полоса слева, без заливки. -->
                 <div
                     v-for="fact in facts"
                     :key="fact.code"
-                    class="clear-left flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg"
+                    class="clear-left flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-l-4 pl-2"
                     :class="
                         attempted && form.facts[fact.code] === null
-                            ? 'bg-danger-subtle p-2'
-                            : ''
+                            ? 'border-l-danger'
+                            : 'border-l-transparent'
                     "
                     role="radiogroup"
+                    aria-required="true"
+                    :aria-invalid="
+                        attempted && form.facts[fact.code] === null
+                            ? true
+                            : undefined
+                    "
                     :aria-labelledby="`fact-${fact.code}-label`"
                 >
                     <p :id="`fact-${fact.code}-label`">{{ fact.name }}</p>
@@ -370,11 +548,6 @@ function submit(): void {
                                 :name="`fact-${fact.code}`"
                                 :value="choice.value"
                                 class="size-4 shrink-0 outline-none"
-                                :aria-invalid="
-                                    attempted && form.facts[fact.code] === null
-                                        ? true
-                                        : undefined
-                                "
                             />
                             {{ choice.label }}
                         </label>
@@ -384,6 +557,7 @@ function submit(): void {
 
             <!-- Сумма и сохранение закреплены внизу: пунктов много, а итог нужен всё время. -->
             <div
+                ref="saveBar"
                 class="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t bg-background/95 px-4 py-3 backdrop-blur-sm md:-mx-6 md:px-6"
                 data-test="scale-save-bar"
             >
@@ -395,12 +569,12 @@ function submit(): void {
                         v-if="error"
                         id="scale-error"
                         tabindex="-1"
-                        role="alert"
                         class="text-sm text-danger outline-none"
                         data-test="scale-error"
                     >
                         {{ error }}
                     </p>
+                    <p class="sr-only" role="alert">{{ announced }}</p>
                 </div>
                 <div class="flex gap-2 max-sm:w-full sm:ml-auto">
                     <Button variant="outline" class="max-sm:flex-1" as-child>
@@ -422,7 +596,7 @@ function submit(): void {
 
         <LeaveConfirmDialog
             :pending="leaveGuard.pending.value"
-            :lost="`Оценки ${scale.name} не сохранятся.`"
+            :lost="`${ownOptions ? 'Ответы' : 'Оценки'} ${scale.name} не сохранятся.`"
             @leave="leaveGuard.leave"
             @stay="leaveGuard.stay"
         />

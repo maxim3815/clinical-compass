@@ -88,8 +88,8 @@ Route::middleware('auth')->group(function () {
             ->whereNumber('patient')
             ->name('patients.password-reset-link.store');
 
-        // Шкала врача (HARS): заполняют на приёме и психиатр, и терапевт. Шкала общая, а не шкала
-        // пациента: без withoutScopedBindings ключ {scale:code} искался бы через пациента.
+        // Шкала врача на приёме: HARS у психиатра, HADS у терапевта, чужая отвечает 404. Шкала общая,
+        // а не шкала пациента: без withoutScopedBindings ключ {scale:code} искался бы через пациента.
         Route::withoutScopedBindings()->whereNumber('patient')->where(['scale' => Scale::CODE_PATTERN])->group(function () {
             Route::get('patients/{patient}/scales/{scale:code}/create', [DoctorScaleController::class, 'create'])
                 ->name('patients.scales.create');
@@ -130,7 +130,7 @@ Route::middleware('auth')->group(function () {
                 ->whereNumber('referral')
                 ->name('referrals.withdraw');
 
-            // Ответы из очереди у двери: страница кода, HARS до регистрации, «Не направлять», плакат.
+            // Ответы из очереди у двери: страница кода, HADS до регистрации, «Не направлять», плакат.
             Route::get('queue/poster', [QueueAnswerController::class, 'poster'])->name('queue.poster');
             Route::whereNumber('queueAnswer')->group(function () {
                 Route::get('queue/{queueAnswer}', [QueueAnswerController::class, 'show'])->name('queue-answers.show');

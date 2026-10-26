@@ -21,9 +21,9 @@ import type {
 } from '@/types';
 
 /**
- * Ответы из очереди у двери, открытые по коду: опросники, HARS и признаки до регистрации,
+ * Ответы из очереди у двери, открытые по коду: опросники, HADS и признаки до регистрации,
  * подсказка направления. Направляют из карточки: сначала «Пригласить на приёме», и после
- * регистрации ответы с HARS переходят пациенту. Без направления — «Не направлять», как в карточке.
+ * регистрации ответы с HADS переходят пациенту. Без направления — «Не направлять», как в карточке.
  */
 type Props = {
     answer: {
@@ -32,14 +32,14 @@ type Props = {
         submitted_at: string;
         expires_at: string;
         alert: { rule: string; trigger: string } | null;
-        // current — решение принято при нынешней подсказке; HARS могла её поднять.
+        // current — решение принято при нынешней подсказке; HADS могла её поднять.
         declined: {
             at: string;
             comment: string | null;
             suggestion: ReferralCategory | null;
             current: boolean;
         } | null;
-        // Признаки, отмеченные вместе с HARS.
+        // Признаки, отмеченные вместе с HADS.
         facts: { name: string; value: boolean }[];
     };
     fillings: (FilledAssessment & { submitted_at: string | null })[];
@@ -69,7 +69,7 @@ const registered = ref<{ id: number; name: string } | null>(null);
 // Открыто окно PIN: страница не обновляется под ним.
 const inviting = ref(false);
 
-// Подсказка «обязательно» — выше категории нет: HARS её уже не изменит.
+// Подсказка «обязательно» — выше категории нет: HADS её уже не изменит.
 const required = computed(() => props.suggestion.category === 'required');
 
 // «Не направлять» действует, пока подсказка та же; выросла — терапевт решает снова.
@@ -115,7 +115,7 @@ const factsText = computed(() =>
         .join('; '),
 );
 
-// HARS уже заполнена: кнопка «Заполнить заново» у ответов.
+// HADS уже заполнена: кнопка «Заполнить заново» у ответов.
 const ratedScales = computed(() =>
     props.doctorScales.filter((scale) =>
         props.fillings.some((filling) => filling.scale === scale.code),
@@ -147,7 +147,7 @@ function returnFocus(event: Event): void {
 // Кнопки «Пригласить на приёме» больше нет: фокус — на сообщение о регистрации. После того,
 // как окно вернёт фокус на исчезнувшую кнопку.
 // Ответы изменились в другом месте: пациент зарегистрировался с этого телефона по общему PIN,
-// HARS или решение в другой вкладке. Привязанные ответы сервер перенаправит в карточку.
+// HADS или решение в другой вкладке. Привязанные ответы сервер перенаправит в карточку.
 useRealtime(
     `App.Models.User.${page.props.auth.user.id}`,
     'queue-answers.changed',
@@ -196,7 +196,7 @@ function onRegistered(patient: { id: number; name: string }): void {
             <p class="flex gap-2 font-medium">
                 <CircleCheck class="mt-0.5 size-5 shrink-0 text-success" />
                 {{
-                    `Регистрация завершена: ${registered.name}. Ответы из очереди и HARS — в карточке пациента, направить можно оттуда.`
+                    `Регистрация завершена: ${registered.name}. Ответы из очереди и HADS — в карточке пациента, направить можно оттуда.`
                 }}
             </p>
             <Button as-child class="self-start">
@@ -317,7 +317,7 @@ function onRegistered(patient: { id: number; name: string }): void {
                 <p class="text-sm text-muted-foreground">
                     Система только подсказывает, решение за вами. Направление
                     оформляется в карточке пациента: сначала он регистрируется
-                    по коду на своём телефоне, ответы и HARS переходят в
+                    по коду на своём телефоне, ответы и HADS переходят в
                     карточку.
                 </p>
 

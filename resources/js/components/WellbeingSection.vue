@@ -25,8 +25,9 @@ import type {
 /**
  * Блок «Самочувствие» в карточке пациента: последние суммы опросников со степенью и изменением,
  * график по датам и заполнения с ответами на каждый вопрос. Ответ на отмеченный вопрос
- * (9-й PHQ-9, мысли о смерти) виден в строке каждого заполнения. Шкалу врача (HARS) врач
- * заполняет на приёме кнопкой в шапке блока.
+ * (9-й PHQ-9, мысли о смерти) виден в строке каждого заполнения. Шкалу врача (HARS у психиатра,
+ * HADS у терапевта) врач заполняет на приёме кнопкой в шапке блока. У HADS — две строки, по тревоге
+ * и по депрессии, и суммы подшкал в строке заполнения.
  */
 const props = withDefaults(
     defineProps<{
@@ -75,12 +76,37 @@ function change(scale: DoctorScale): { delta: number; text: string } | null {
     };
 }
 
+// Источник один на шкалу: у подшкал HADS он общий.
+const sources = computed(() =>
+    props.wellbeing.scales.filter(
+        (scale, index, scales) =>
+            scales.findIndex((other) => other.scale === scale.scale) === index,
+    ),
+);
+
+const KIND = { psychiatrist: 'психиатр', therapist: 'терапевт' } as const;
+
+// Кто заполняет шкалы врача из блока: «HADS заполняет терапевт на приёме, HARS — психиатр».
+// Психиатр видит, что HADS из кабинета терапевта, а не его собственная шкала.
+const ratedHere = computed(() =>
+    sources.value
+        .filter((scale) => scale.rater === 'doctor')
+        .map((scale, index) => {
+            const who = scale.doctor_kind ? KIND[scale.doctor_kind] : 'врач';
+
+            return index === 0
+                ? `${scale.scale_name} заполняет ${who} на приёме`
+                : `${scale.scale_name} — ${who}`;
+        })
+        .join(', '),
+);
+
 // Источник одной строкой: текст и <template v-if> подряд на сервере сливаются в один узел.
 function sourceText(scale: DoctorScale): string {
     const { original, validation, license, note } = scale.source;
 
     return [
-        `${scale.name}: ${original}`,
+        `${scale.scale_name}: ${original}`,
         `Русская версия: ${validation}`,
         license,
         note,
@@ -114,8 +140,9 @@ function highlighted(filling: AssessmentFilling) {
                 <p class="text-sm text-muted-foreground">
                     Пациент заполняет GAD-7 (тревога) и PHQ-9 (депрессия) за
                     последние 2 недели. Сроки от начала наблюдения: день 0, 7,
-                    14, 28, дальше каждые 4 недели. HARS заполняет врач на
-                    приёме.
+                    14, 28, дальше каждые 4 недели.<template v-if="ratedHere">
+                        {{ ` ${ratedHere}.` }}</template
+                    >
                 </p>
             </div>
             <Button
@@ -251,7 +278,7 @@ function highlighted(filling: AssessmentFilling) {
                     :points="scale.points"
                     :max="scale.max"
                     :ticks="scale.thresholds"
-                    :label="`${scale.name}, баллы по датам`"
+                    :label="`${scale.name}: баллы по датам`"
                 />
             </article>
 
@@ -280,18 +307,38 @@ function highlighted(filling: AssessmentFilling) {
                                 :key="assessment.id"
                             >
                                 {{ assessment.name }}:
-                                <span class="font-semibold tabular-nums">{{
-                                    assessment.total
-                                }}</span>
-                                <span class="text-muted-foreground">
-                                    · {{ assessment.band }}</span
-                                >
+                                <!-- HADS: суммы тревоги и депрессии, общей суммы у неё нет. -->
+                                <template v-if="assessment.subscores">
+                                    <template
+                                        v-for="(
+                                            subscore, position
+                                        ) in assessment.subscores"
+                                        :key="subscore.code"
+                                        >{{ position > 0 ? ', ' : ''
+                                        }}{{ `${subscore.name} `
+                                        }}<span
+                                            class="font-semibold tabular-nums"
+                                            >{{ subscore.total }}</span
+                                        ></template
+                                    >
+                                </template>
+                                <template v-else>
+                                    <span class="font-semibold tabular-nums">{{
+                                        assessment.total
+                                    }}</span>
+                                    <span class="text-muted-foreground">
+                                        · {{ assessment.band }}</span
+                                    >
+                                </template>
                                 <span
                                     v-if="assessment.rated_by"
                                     class="text-muted-foreground"
                                     data-test="wellbeing-rated-by"
                                 >
-                                    · {{ `врач ${assessment.rated_by}` }}</span
+                                    ·
+                                    {{
+                                        `${assessment.rated_by_role ?? 'врач'} ${assessment.rated_by}`
+                                    }}</span
                                 >
                             </span>
                             <span
@@ -356,8 +403,8 @@ function highlighted(filling: AssessmentFilling) {
                 Источники и условия использования
             </summary>
             <p
-                v-for="scale in wellbeing.scales"
-                :key="`source-${scale.code}`"
+                v-for="scale in sources"
+                :key="`source-${scale.scale}`"
                 class="mt-1"
             >
                 {{ sourceText(scale) }}
@@ -368,7 +415,7 @@ function highlighted(filling: AssessmentFilling) {
                     class="inline-flex items-center gap-1 text-primary underline underline-offset-4"
                 >
                     Открыть документ<span class="sr-only">{{
-                        ` ${scale.name}`
+                        ` ${scale.scale_name}`
                     }}</span>
                     <ExternalLink class="size-4" />
                 </a>

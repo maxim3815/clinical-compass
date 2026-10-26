@@ -14,7 +14,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * HARS и признаки по ответам из очереди, до регистрации пациента: та же форма, что в карточке.
+ * HADS и признаки по ответам из очереди, до регистрации пациента: та же форма, что в карточке.
  */
 class QueueAnswerScaleController extends Controller
 {
@@ -57,6 +57,7 @@ class QueueAnswerScaleController extends Controller
             $scale,
             $queueAnswer->doctor_scale['total'] ?? 0,
             $queueAnswer->doctor_scale['band'] ?? '',
+            $queueAnswer->doctor_scale['subscores'] ?? null,
             $before,
             $engine->check($queueAnswer->referralData())->category,
         )]);
@@ -69,7 +70,7 @@ class QueueAnswerScaleController extends Controller
         /** @var User $therapist */
         $therapist = $request->user();
 
-        abort_unless($queueAnswer->doctor_id === $therapist->id && DoctorScaleController::isDoctorScale($scale), 404);
+        abort_unless($queueAnswer->doctor_id === $therapist->id && $scale->isRatableBy($therapist->doctorKind()), 404);
         abort_unless($queueAnswer->attached_at !== null || $queueAnswer->isPending(), 404);
     }
 }

@@ -78,9 +78,18 @@ final readonly class ReferralData
         return (int) $answer->score;
     }
 
-    public function total(string $scale): int
+    /**
+     * Сумма шкалы или, с кодом подшкалы, сумма подшкалы (HADS, тревога).
+     */
+    public function total(string $scale, ?string $subscale = null): int
     {
-        return $this->assessment($scale)->total;
+        $assessment = $this->assessment($scale);
+
+        if ($subscale === null) {
+            return $assessment->total;
+        }
+
+        return $assessment->subscore($subscale)['total'] ?? throw new InvalidArgumentException("У шкалы {$scale} нет подшкалы {$subscale}.");
     }
 
     public function fact(string $code): bool|float|string|null

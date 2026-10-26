@@ -6,6 +6,7 @@ use App\Enums\DoctorKind;
 use App\Enums\UserRole;
 use App\Models\AuditLog;
 use App\Models\Referral;
+use App\Models\Scale;
 use App\Models\User;
 use App\Support\DisplayTime;
 use App\Support\Safety\ClinicalProfilePresenter;
@@ -227,26 +228,45 @@ final class ReferralPresenter
     }
 
     /**
-     * Основание одной строкой для очереди: «HARS 28 · GAD-7 16 · PHQ-9, вопрос 9: 2».
+     * Основание одной строкой для очереди: «HADS: тревога 16, депрессия 12 · GAD-7 16 · PHQ-9,
+     * вопрос 9: 2». Суммы подшкал одной шкалы идут вместе.
      *
      * @param  list<array<string, mixed>>  $basis
      */
     private static function summary(array $basis): string
     {
         $parts = [];
+        $subscales = [];
 
         foreach ($basis as $match) {
             foreach ((array) ($match['evidence'] ?? []) as $evidence) {
-                $parts[] = match ($evidence['type'] ?? null) {
+                if (($evidence['type'] ?? null) === 'total' && isset($evidence['subscale'])) {
+                    $key = 'scale:'.$evidence['scale'];
+                    $parts[$key] ??= '';
+                    $subscales[$evidence['scale']]["{$evidence['subscale']} {$evidence['total']}"] = true;
+
+                    continue;
+                }
+
+                $part = match ($evidence['type'] ?? null) {
                     'total' => "{$evidence['name']} {$evidence['total']}",
                     'answer' => "{$evidence['name']}, вопрос {$evidence['item']}: {$evidence['score']}",
                     'fact' => mb_strtolower((string) $evidence['name']),
                     default => null,
                 };
+
+                if ($part !== null) {
+                    $parts[$part] = $part;
+                }
             }
         }
 
-        return implode(' · ', array_values(array_unique(array_filter($parts))));
+        foreach ($subscales as $scale => $values) {
+            $name = Scale::query()->where('code', $scale)->value('name') ?? $scale;
+            $parts["scale:{$scale}"] = "{$name}: ".implode(', ', array_keys($values));
+        }
+
+        return implode(' · ', array_values(array_filter($parts)));
     }
 
     private static function status(Referral $referral): string

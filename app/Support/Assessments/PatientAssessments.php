@@ -2,6 +2,7 @@
 
 namespace App\Support\Assessments;
 
+use App\Enums\DoctorKind;
 use App\Enums\ScaleRater;
 use App\Models\Assessment;
 use App\Models\AssessmentAnswer;
@@ -85,49 +86,39 @@ final class PatientAssessments
 
     /**
      * Блок «Самочувствие» в карточке у врача: последние суммы со степенью и изменением, график,
-     * заполнения с ответами на каждый вопрос. Шкалы врача (HARS) идут после шкал пациента.
+     * заполнения с ответами на каждый вопрос. Шкалы врача (HARS, HADS) идут после шкал пациента.
+     * Шкала с подшкалами — строкой на каждую подшкалу: «HADS, тревога», «HADS, депрессия».
+     * Шкала врача другого вида без заполнений не показывается: психиатру не нужна пустая HADS.
+     * Где врач шкалу не заполняет ($rating = false, страница направления), пустых шкал врача нет.
+     * Заполненные шкалы врача идут перед пустыми: HADS терапевта — перед пустой HARS психиатра.
      *
      * @return array<string, mixed>
      */
-    public static function forDoctor(User $patient): array
+    public static function forDoctor(User $patient, ?DoctorKind $viewer = null, bool $rating = true): array
     {
         $assessments = self::assessments($patient, withAnswers: true);
-        $scales = Scale::query()->active()->orderByRaw('rater = ?', [ScaleRater::Doctor->value])->orderBy('position')->orderBy('id')->get();
+        $scales = Scale::query()->active()->orderByRaw('rater = ?', [ScaleRater::Doctor->value])->orderBy('position')->orderBy('id')->get()
+            ->filter(fn (Scale $scale): bool => $scale->rater === ScaleRater::Patient
+                || $assessments->contains('scale_id', $scale->id)
+                || ($rating && ($viewer === null || $scale->isRatableBy($viewer))))
+            ->sortBy(fn (Scale $scale): int => match (true) {
+                $scale->rater === ScaleRater::Patient => 0,
+                $assessments->contains('scale_id', $scale->id) => 1,
+                default => 2,
+            });
 
         return [
             'status' => self::status($patient, 'DD.MM.YYYY'),
             'scales' => $scales
-                ->map(function (Scale $scale) use ($assessments): array {
+                ->flatMap(function (Scale $scale) use ($assessments): array {
                     $own = $assessments->where('scale_id', $scale->id)->values();
-                    $latest = $own->last();
-                    $previous = $own->count() > 1 ? $own[$own->count() - 2] : null;
-                    // Ответ на терапию оценивают от первого заполнения.
-                    $first = $own->count() > 2 ? $own->first() : null;
 
-                    return [
-                        'code' => $scale->code,
-                        'name' => $scale->name,
-                        'title' => $scale->title,
-                        'rater' => $scale->rater->value,
-                        'max' => $scale->maxTotal(),
-                        // Границы степеней — линии на графике врача.
-                        'thresholds' => array_map(fn (array $band): int => $band['min'], array_slice($scale->bands, 1)),
-                        'latest' => $latest === null ? null : [
-                            'total' => $latest->total,
-                            'band' => $latest->band,
-                            'date' => DisplayTime::formatDate($latest->local_date),
-                        ],
-                        'previous' => $previous === null ? null : [
-                            'total' => $previous->total,
-                            'date' => DisplayTime::formatDate($previous->local_date),
-                        ],
-                        'first' => $first === null ? null : [
-                            'total' => $first->total,
-                            'date' => DisplayTime::formatDate($first->local_date),
-                        ],
-                        'points' => self::points($own, 'DD.MM.YYYY'),
-                        'source' => self::source($scale),
-                    ];
+                    // Пустая HADS — одна строка «Не заполнялась», а не две.
+                    if (! $scale->hasSubscales() || $own->isEmpty()) {
+                        return [self::summary($scale, $own, null)];
+                    }
+
+                    return array_map(fn (array $subscale): array => self::summary($scale, $own, $subscale['code']), $scale->subscales ?? []);
                 })
                 ->values()
                 ->all(),
@@ -146,6 +137,23 @@ final class PatientAssessments
                 ->values()
                 ->all(),
         ];
+    }
+
+    /**
+     * Шкалы врача, которые этот вид врача заполняет на приёме: кнопки «Заполнить HARS» или
+     * «Заполнить HADS».
+     *
+     * @return list<array{code: string, name: string}>
+     */
+    public static function ratableScales(?DoctorKind $kind): array
+    {
+        return array_values(Scale::query()
+            ->active()
+            ->forDoctors($kind ?? DoctorKind::Psychiatrist)
+            ->orderBy('position')
+            ->get()
+            ->map(fn (Scale $scale): array => ['code' => $scale->code, 'name' => $scale->name])
+            ->all());
     }
 
     /**
@@ -184,27 +192,97 @@ final class PatientAssessments
      */
     public static function presentFilled(Assessment $assessment): array
     {
+        $scale = $assessment->scale;
+
         return [
             'id' => $assessment->id,
-            'scale' => $assessment->scale->code,
-            'name' => $assessment->scale->name,
-            // Шкалу врача заполнил врач на приёме: кто именно.
+            'scale' => $scale->code,
+            'name' => $scale->name,
+            // Шкалу врача заполнил врач на приёме: кто именно и кто он — терапевт или психиатр.
             'rated_by' => $assessment->ratedBy?->name,
+            'rated_by_role' => $assessment->ratedBy === null ? null : mb_strtolower($assessment->ratedBy->doctorKind()?->specialty() ?? 'врач'),
             'total' => $assessment->total,
-            'max' => $assessment->scale->maxTotal(),
+            'max' => $scale->maxTotal(),
             'band' => $assessment->band,
+            // У HADS суммы и степени по подшкалам вместо общей.
+            'subscores' => $assessment->subscores === null ? null : array_map(fn (array $subscore): array => [
+                'code' => $subscore['code'],
+                'name' => $scale->subscale($subscore['code'])['name'] ?? $subscore['code'],
+                'total' => $subscore['total'],
+                'max' => $scale->maxTotal($subscore['code']),
+                'band' => $subscore['band'],
+            ], $assessment->subscores),
             'answers' => $assessment->answers
-                ->map(fn (AssessmentAnswer $answer): array => [
-                    'item' => $answer->item,
-                    'text' => $assessment->scale->items[$answer->item - 1]['text'] ?? "Вопрос {$answer->item}",
-                    'hint' => $assessment->scale->items[$answer->item - 1]['hint'] ?? null,
-                    'score' => $answer->score,
-                    'label' => $assessment->scale->optionLabel($answer->score),
-                    'highlight' => $assessment->scale->items[$answer->item - 1]['highlight'] ?? false,
-                ])
+                ->map(function (AssessmentAnswer $answer) use ($scale): array {
+                    $item = $scale->items[$answer->item - 1] ?? [];
+
+                    return [
+                        'item' => $answer->item,
+                        'text' => $item['text'] ?? "Вопрос {$answer->item}",
+                        'hint' => $item['hint'] ?? null,
+                        // Подшкала вопроса: «тревога» или «депрессия» у HADS.
+                        'group' => isset($item['subscale']) ? ($scale->subscale($item['subscale'])['name'] ?? null) : null,
+                        'score' => $answer->score,
+                        'label' => $scale->optionLabel($answer->score, $answer->item),
+                        'highlight' => $item['highlight'] ?? false,
+                    ];
+                })
                 ->values()
                 ->all(),
         ];
+    }
+
+    /**
+     * Строка шкалы в «Самочувствии»: последняя сумма со степенью, прошлая и первая, точки графика.
+     * С кодом подшкалы — то же по подшкале.
+     *
+     * @param  BaseCollection<int, Assessment>  $own  заполнения шкалы по порядку
+     * @return array<string, mixed>
+     */
+    private static function summary(Scale $scale, BaseCollection $own, ?string $subscale): array
+    {
+        $latest = $own->last();
+        $previous = $own->count() > 1 ? $own[$own->count() - 2] : null;
+        // Ответ на терапию оценивают от первого заполнения.
+        $first = $own->count() > 2 ? $own->first() : null;
+        $bands = $subscale === null ? $scale->bands : ($scale->subscale($subscale)['bands'] ?? []);
+
+        return [
+            'code' => $subscale === null ? $scale->code : "{$scale->code}_{$subscale}",
+            'scale' => $scale->code,
+            'scale_name' => $scale->name,
+            'name' => $subscale === null ? $scale->name : $scale->subscaleName($subscale),
+            'title' => $scale->title,
+            'rater' => $scale->rater->value,
+            // Кто заполняет шкалу врача: «HADS заполняет терапевт на приёме».
+            'doctor_kind' => $scale->doctor_kind?->value,
+            'max' => $scale->maxTotal($subscale),
+            // Границы степеней — линии на графике врача.
+            'thresholds' => array_map(fn (array $band): int => $band['min'], array_slice($bands, 1)),
+            'latest' => $latest === null ? null : [
+                'total' => self::total($latest, $subscale),
+                'band' => $subscale === null ? $latest->band : ($latest->subscore($subscale)['band'] ?? ''),
+                'date' => DisplayTime::formatDate($latest->local_date),
+            ],
+            'previous' => $previous === null ? null : [
+                'total' => self::total($previous, $subscale),
+                'date' => DisplayTime::formatDate($previous->local_date),
+            ],
+            'first' => $first === null ? null : [
+                'total' => self::total($first, $subscale),
+                'date' => DisplayTime::formatDate($first->local_date),
+            ],
+            'points' => self::points($own, 'DD.MM.YYYY', $subscale),
+            'source' => self::source($scale),
+        ];
+    }
+
+    /**
+     * Сумма заполнения или его подшкалы.
+     */
+    private static function total(Assessment $assessment, ?string $subscale): int
+    {
+        return $subscale === null ? $assessment->total : ($assessment->subscore($subscale)['total'] ?? 0);
     }
 
     /**
@@ -250,7 +328,7 @@ final class PatientAssessments
     {
         return Assessment::query()
             ->where('patient_id', $patient->id)
-            ->with($withAnswers ? ['scale', 'answers', 'ratedBy'] : ['scale'])
+            ->with($withAnswers ? ['scale', 'answers', 'ratedBy.doctorProfile'] : ['scale'])
             ->orderBy('submitted_at')
             ->orderBy('id')
             ->get();
@@ -258,12 +336,12 @@ final class PatientAssessments
 
     /**
      * Точки графика по порядку заполнения: дата для расстояния по оси (ISO), подпись, короткая
-     * подпись оси и сумма.
+     * подпись оси и сумма (с кодом подшкалы — сумма подшкалы).
      *
      * @param  BaseCollection<int, Assessment>  $assessments
      * @return array<int, array{id: int, iso: string, date: string, short: string, total: int}>
      */
-    private static function points(BaseCollection $assessments, string $format): array
+    private static function points(BaseCollection $assessments, string $format, ?string $subscale = null): array
     {
         return $assessments
             ->map(fn (Assessment $assessment): array => [
@@ -271,7 +349,7 @@ final class PatientAssessments
                 'iso' => $assessment->local_date->toDateString(),
                 'date' => self::date($assessment->local_date, $format),
                 'short' => $assessment->local_date->format('d.m'),
-                'total' => $assessment->total,
+                'total' => self::total($assessment, $subscale),
             ])
             ->values()
             ->all();

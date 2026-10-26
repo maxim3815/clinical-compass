@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Пациент зарегистрировался у терапевта по PIN, и ответы из очереди переходят в его аккаунт:
- * опросники становятся обычными заполнениями с исходным временем ответа, HARS — заполнением шкалы
+ * опросники становятся обычными заполнениями с исходным временем ответа, HADS — заполнением шкалы
  * врача, признаки — фактами профиля. Заполнение дня 0 этим закрыто.
  *
  * Правила алертинга проверяются заново, теперь уже с пациентом. Если терапевт ответы открывал,
@@ -50,6 +50,7 @@ class AttachQueueAnswer
                     'scale_version' => $draft->scale_version,
                     'total' => $draft->total,
                     'band' => $draft->band,
+                    'subscores' => $draft->subscores,
                     'local_date' => QueueAnswer::localDate($draft->submitted_at, $timezone),
                     'submitted_at' => $draft->submitted_at,
                     'rated_by_id' => $draft->rated_by_id,
@@ -75,6 +76,7 @@ class AttachQueueAnswer
                     'scale' => $doctorScale->scale->code,
                     'total' => $doctorScale->total,
                     'band' => $doctorScale->band,
+                    'subscores' => $doctorScale->subscores,
                     'scores' => $answer->doctor_scale['scores'] ?? [],
                     'facts' => $answer->facts ?? [],
                     'queue_code' => $answer->code,

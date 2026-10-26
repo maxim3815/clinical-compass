@@ -8,8 +8,8 @@ use App\Enums\ReferralCategory;
 use App\Http\Controllers\Controller;
 use App\Models\QueueAnswer;
 use App\Models\Referral;
-use App\Models\Scale;
 use App\Models\User;
+use App\Support\Assessments\PatientAssessments;
 use App\Support\JoinAddress;
 use App\Support\QueueAnswers\QueueAnswerPresenter;
 use App\Support\Referrals\ReferralEngine;
@@ -20,7 +20,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Ответы из очереди у терапевта: страница кода с ответами, HARS и подсказкой, «Не направлять»
+ * Ответы из очереди у терапевта: страница кода с ответами, HADS и подсказкой, «Не направлять»
  * и плакат с QR-кодом для двери кабинета.
  */
 class QueueAnswerController extends Controller
@@ -34,7 +34,7 @@ class QueueAnswerController extends Controller
         // Пациент зарегистрировался: ответы уже в его карточке. Переход объясняется сообщением.
         if ($queueAnswer->attached_at !== null && $queueAnswer->patient_id !== null) {
             $name = $queueAnswer->patient?->name;
-            Inertia::flash('toast', ['type' => 'success', 'message' => "Код {$queueAnswer->code}: пациент зарегистрирован".($name === null ? '' : " ({$name})").', ответы и HARS в карточке.']);
+            Inertia::flash('toast', ['type' => 'success', 'message' => "Код {$queueAnswer->code}: пациент зарегистрирован".($name === null ? '' : " ({$name})").', ответы и HADS в карточке.']);
 
             return to_route('doctor.patients.show', $queueAnswer->patient_id);
         }
@@ -48,10 +48,8 @@ class QueueAnswerController extends Controller
             'answer' => QueueAnswerPresenter::present($queueAnswer, $suggestion->category),
             'fillings' => QueueAnswerPresenter::fillings($queueAnswer),
             'suggestion' => $suggestion->toArray(),
-            // Шкалы, которые врач заполняет на приёме: кнопка «Заполнить HARS».
-            'doctorScales' => Scale::query()->active()->forDoctors()->orderBy('position')->get(['code', 'name'])
-                ->map(fn (Scale $scale): array => ['code' => $scale->code, 'name' => $scale->name])
-                ->values(),
+            // Шкалы, которые терапевт заполняет на приёме: кнопка «Заполнить HADS».
+            'doctorScales' => PatientAssessments::ratableScales($therapist->doctorKind()),
             'commentLimit' => Referral::MAX_COMMENT_LENGTH,
         ]);
     }

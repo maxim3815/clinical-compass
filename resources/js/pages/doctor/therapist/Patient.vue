@@ -40,7 +40,7 @@ import type {
 } from '@/types';
 
 /**
- * Карточка пациента у терапевта: шкалы пациента, HARS, подсказка направления к психиатру
+ * Карточка пациента у терапевта: шкалы пациента, HADS, подсказка направления к психиатру
  * и решение терапевта. Назначений, приёма и чата здесь нет: лечение ведёт психиатр.
  */
 type Props = {
@@ -105,7 +105,7 @@ const missingDoctorScales = computed(() =>
     props.suggestion.missing.filter((scale) => scale.rater === 'doctor'),
 );
 
-// «Не направлять» решали при другой подсказке: HARS или новые ответы её изменили.
+// «Не направлять» решали при другой подсказке: HADS или новые ответы её изменили.
 const declinedStale = computed(
     () =>
         props.declined !== null &&
@@ -370,12 +370,17 @@ useRealtime(channel, 'alerts.changed', () =>
                     </div>
                 </section>
 
-                <!-- Пока HARS сегодня нет, кнопка заполнения — в блоке направления, а не здесь. -->
+                <!--
+                    Пока HADS сегодня нет, кнопка заполнения — в блоке подсказки, а не здесь. Когда
+                    направление уже отправлено, подсказки нет: кнопка снова здесь.
+                -->
                 <WellbeingSection
                     :wellbeing="wellbeing"
                     :patient-id="patient.id"
                     :rate-scales="
-                        missingDoctorScales.length > 0 ? [] : doctorScales
+                        referral === null && missingDoctorScales.length > 0
+                            ? []
+                            : doctorScales
                     "
                 />
             </div>

@@ -11,7 +11,6 @@ use App\Models\AuditLog;
 use App\Models\CareRelationship;
 use App\Models\QueueAnswer;
 use App\Models\Referral;
-use App\Models\Scale;
 use App\Models\User;
 use App\Support\Alerts\AlertPresenter;
 use App\Support\Alerts\AlertSignals;
@@ -33,7 +32,7 @@ use Inertia\Response;
 
 /**
  * Кабинет терапевта: список пациентов («Ответили сегодня», «Направлены», все) и карточка отбора
- * со шкалами, HARS, подсказкой и направлением к психиатру. Адреса те же, что у психиатра:
+ * со шкалами, HADS, подсказкой и направлением к психиатру. Адреса те же, что у психиатра:
  * PatientController передаёт сюда запросы терапевта.
  */
 class TherapistPatientController extends Controller
@@ -125,11 +124,9 @@ class TherapistPatientController extends Controller
             'alerts' => AlertPresenter::forPatient($patient),
             'alertDecisions' => AlertDecision::options(),
             'alertCommentLimit' => AlertController::MAX_COMMENT_LENGTH,
-            'wellbeing' => PatientAssessments::forDoctor($patient),
-            // Шкалы, которые врач заполняет на приёме: кнопка «Заполнить HARS».
-            'doctorScales' => Scale::query()->active()->forDoctors()->orderBy('position')->get(['code', 'name'])
-                ->map(fn (Scale $scale): array => ['code' => $scale->code, 'name' => $scale->name])
-                ->values(),
+            'wellbeing' => PatientAssessments::forDoctor($patient, $therapist->doctorKind()),
+            // Шкалы, которые терапевт заполняет на приёме: кнопка «Заполнить HADS».
+            'doctorScales' => PatientAssessments::ratableScales($therapist->doctorKind()),
             'suggestion' => $this->engine->suggest($patient)->toArray(),
             ...ReferralPresenter::forTherapistCard($therapist, $patient),
             'psychiatrists' => ReferralPresenter::psychiatrists(),
@@ -227,12 +224,12 @@ class TherapistPatientController extends Controller
                     )),
                     'alert' => isset($alerting[$patient->id]),
                     'suggestion' => $suggestion->category?->value,
-                    // Без HARS подсказка может быть ниже, чем станет на приёме.
+                    // Без HADS подсказка может быть ниже, чем станет на приёме.
                     'scales_missing' => array_column($suggestion->missing, 'name'),
                     // Решение терапевта: направлен (категория) или «не направлять» после этих ответов.
                     'decision' => match (true) {
                         $category !== null => ['kind' => 'referred', 'category' => $category instanceof ReferralCategory ? $category->value : (string) $category],
-                        // Решение после этих ответов и при той же подсказке: HARS могла её поднять.
+                        // Решение после этих ответов и при той же подсказке: HADS могла её поднять.
                         $decline !== null
                             && $decline->created_at->gte($last->submitted_at)
                             && ($decline->after['suggested_category'] ?? null) === $suggestion->category?->value => ['kind' => 'declined', 'category' => null],

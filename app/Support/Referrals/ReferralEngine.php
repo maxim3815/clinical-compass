@@ -67,7 +67,7 @@ final readonly class ReferralEngine
     }
 
     /**
-     * @param  array{0: 'answer', 1: string, 2: int}|array{0: 'total', 1: string}|array{0: 'fact', 1: string}  $reference
+     * @param  array{0: 'answer', 1: string, 2: int}|array{0: 'total', 1: string, 2?: string}|array{0: 'fact', 1: string}  $reference
      * @return ReferralEvidence
      */
     private function evidence(array $reference, ReferralData $data): array
@@ -91,6 +91,21 @@ final readonly class ReferralEngine
         $assessment = $data->assessment($reference[1]);
         $scale = $assessment->scale;
 
+        if ($reference[0] === 'total' && isset($reference[2])) {
+            $subscore = $assessment->subscore($reference[2]);
+
+            return [
+                'type' => 'total',
+                'scale' => $scale->code,
+                'name' => $scale->subscaleName($reference[2]),
+                // Подшкала словом: в строке очереди суммы одной шкалы идут вместе.
+                'subscale' => $scale->subscale($reference[2])['name'] ?? $reference[2],
+                'total' => $subscore['total'] ?? 0,
+                'max' => $scale->maxTotal($reference[2]),
+                'band' => $subscore['band'] ?? '',
+            ];
+        }
+
         if ($reference[0] === 'total') {
             return [
                 'type' => 'total',
@@ -111,7 +126,7 @@ final readonly class ReferralEngine
             'item' => $reference[2],
             'text' => $scale->items[$reference[2] - 1]['text'],
             'score' => $score,
-            'label' => $scale->optionLabel($score),
+            'label' => $scale->optionLabel($score, $reference[2]),
         ];
     }
 

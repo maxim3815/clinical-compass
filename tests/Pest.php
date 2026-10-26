@@ -535,17 +535,47 @@ function loadReferralRules(): void
 }
 
 /**
- * Врач заполняет HARS с заданной суммой сегодняшним числом: баллы по пунктам по порядку, не больше
- * 4 на пункт. Терапевт передаёт признаки (mania_signs, psychotic_symptoms).
- *
- * @param  array<string, bool>  $facts
+ * Психиатр заполняет HARS с заданной суммой сегодняшним числом: баллы по пунктам по порядку, не
+ * больше 4 на пункт.
  */
-function rateHars(User $doctor, User $patient, int $total, array $facts = []): Assessment
+function rateHars(User $doctor, User $patient, int $total): Assessment
 {
     $scale = Scale::query()->where('code', 'hars')->sole();
     $scores = array_map(fn (int $item): int => max(0, min(4, $total - 4 * $item)), range(0, count($scale->items) - 1));
 
-    return app(RateScale::class)->handle($doctor, $patient, $scale, $scores, $facts);
+    return app(RateScale::class)->handle($doctor, $patient, $scale, $scores);
+}
+
+/**
+ * Баллы HADS по порядку утверждений с заданными суммами тревоги и депрессии: не больше 3 на
+ * утверждение, сначала первые утверждения подшкалы.
+ *
+ * @return list<int>
+ */
+function hadsScores(int $anxiety, int $depression): array
+{
+    $scale = Scale::query()->where('code', 'hads')->sole();
+    $left = ['anxiety' => $anxiety, 'depression' => $depression];
+
+    return array_map(function (array $item) use (&$left): int {
+        $score = min(3, $left[$item['subscale']]);
+        $left[$item['subscale']] -= $score;
+
+        return $score;
+    }, $scale->items);
+}
+
+/**
+ * Терапевт заполняет HADS с заданными суммами тревоги и депрессии сегодняшним числом и признаки
+ * (mania_signs, psychotic_symptoms).
+ *
+ * @param  array<string, bool>  $facts
+ */
+function rateHads(User $therapist, User $patient, int $anxiety, int $depression = 0, array $facts = []): Assessment
+{
+    $scale = Scale::query()->where('code', 'hads')->sole();
+
+    return app(RateScale::class)->handle($therapist, $patient, $scale, hadsScores($anxiety, $depression), $facts);
 }
 
 /**

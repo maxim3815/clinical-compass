@@ -1,6 +1,6 @@
 /**
- * Опросники пациента (GAD-7, PHQ-9) и шкала врача (HARS): календарь, суммы для графика,
- * заполнения у врача.
+ * Опросники пациента (GAD-7, PHQ-9) и шкалы врача (HARS у психиатра, HADS у терапевта): календарь,
+ * суммы для графика, заполнения у врача.
  */
 
 // Пора ли заполнить опросники по календарю.
@@ -50,12 +50,18 @@ export type QuestionnaireScale = {
     source: ScaleSource;
 };
 
+// Строка «Самочувствия»: шкала или подшкала (у HADS — «HADS, тревога» и «HADS, депрессия»).
 export type DoctorScale = {
     code: string;
+    // Код и название шкалы: у подшкал HADS общие, по ним один источник на шкалу.
+    scale: string;
+    scale_name: string;
     name: string;
     title: string;
-    // Кто заполняет: пациент сам или врач на приёме (HARS).
+    // Кто заполняет: пациент сам или врач на приёме (HARS, HADS).
     rater: 'patient' | 'doctor';
+    // Какой врач заполняет шкалу врача: HARS — психиатр, HADS — терапевт.
+    doctor_kind: 'psychiatrist' | 'therapist' | null;
     max: number;
     // Границы степеней: линии на графике.
     thresholds: number[];
@@ -72,6 +78,8 @@ export type AssessmentAnswer = {
     text: string;
     // Пояснение к пункту шкалы врача: что в него входит.
     hint?: string | null;
+    // Подшкала вопроса: «тревога» или «депрессия» у HADS.
+    group?: string | null;
     score: number;
     label: string;
     // Вопрос, ответ на который врач видит отдельно (9-й PHQ-9).
@@ -83,12 +91,23 @@ export type FilledAssessment = {
     id: number;
     scale: string;
     name: string;
-    // Шкалу врача заполнил врач на приёме.
+    // Шкалу врача заполнил врач на приёме: ФИО и «терапевт» или «психиатр».
     rated_by: string | null;
+    rated_by_role: string | null;
     total: number;
     max: number;
     band: string;
+    // У HADS суммы и степени по подшкалам вместо общей.
+    subscores: AssessmentSubscore[] | null;
     answers: AssessmentAnswer[];
+};
+
+export type AssessmentSubscore = {
+    code: string;
+    name: string;
+    total: number;
+    max: number;
+    band: string;
 };
 
 // Заполнения одной отправки.
@@ -103,20 +122,34 @@ export type RatableScale = {
     name: string;
 };
 
-// Форма шкалы врача.
+type ScaleOption = { score: number; label: string };
+type ScaleBand = { min: number; max: number; label: string };
+
+// Форма шкалы врача. Варианты общие (HARS: оценки 0–4) или свои у пункта (HADS).
 export type DoctorScaleForm = {
     code: string;
     name: string;
     title: string;
     instruction: string;
-    options: { score: number; label: string }[];
-    items: { text: string; hint: string | null }[];
+    // Строка над утверждениями для того, кто отвечает (HADS: «последние 7 дней»).
+    prompt: string | null;
+    options: ScaleOption[];
+    items: {
+        text: string;
+        hint: string | null;
+        options: ScaleOption[] | null;
+        subscale: string | null;
+    }[];
     max: number;
-    bands: { min: number; max: number; label: string }[];
+    bands: ScaleBand[];
+    // Подшкалы HADS: свои суммы и степени.
+    subscales:
+        | { code: string; name: string; max: number; bands: ScaleBand[] }[]
+        | null;
     source: { validation: string; url: string; note: string | null };
 };
 
-// Признак, который терапевт отмечает вместе с HARS.
+// Признак, который терапевт отмечает вместе с HADS.
 export type ScreeningFact = {
     code: string;
     name: string;

@@ -276,7 +276,7 @@ const gutter = computed(() =>
                     aria-hidden="true"
                 />
 
-                <!-- Подпись последней точки: на неё смотрят первой. -->
+                <!-- Подпись последней точки: на неё смотрят первой. Фон — чтобы линия степени её не перечёркивала. -->
                 <span
                     v-if="last && active === null"
                     :class="
@@ -292,7 +292,9 @@ const gutter = computed(() =>
                     }"
                     aria-hidden="true"
                     data-test="score-chart-last"
-                    >{{ last.total }}</span
+                    ><span class="rounded-sm bg-card px-0.5">{{
+                        last.total
+                    }}</span></span
                 >
 
                 <!-- Область касания шире графика на поля: крайние точки легко задеть. -->

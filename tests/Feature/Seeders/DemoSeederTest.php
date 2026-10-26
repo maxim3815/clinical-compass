@@ -29,6 +29,7 @@ use App\Support\PatientSignals;
 use App\Support\Safety\SafetyPresenter;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DemoSeeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -67,16 +68,19 @@ test('demo seeder builds the planned doctors, patients and courses and can be ru
         ->and(PatientSignals::count($doctor))->toBe(5)
         ->and(PatientSignals::count($doctor2))->toBe(1);
 
-    // Зайцеву терапевт направил к Смирновой «желательно» по HARS и опросникам, направление ждёт.
+    // Зайцеву терапевт направил к Смирновой «желательно» по HADS и опросникам, направление ждёт.
+    // Вторая выкладка HADS не добавляет: она уже есть с приёма.
     $referral = Referral::query()->sole();
+    $hads = Assessment::query()->whereNotNull('rated_by_id')->sole();
 
     expect($referral->patient_id)->toBe($patient('patient_4c')->id)
         ->and($referral->from_doctor_id)->toBe($therapist->id)
         ->and($referral->to_doctor_id)->toBe($doctor->id)
         ->and($referral->category)->toBe(ReferralCategory::Desirable)
-        ->and(array_column($referral->basis, 'code'))->toBe(['hars_moderate', 'gad7_severe', 'phq9_moderate'])
+        ->and(array_column($referral->basis, 'code'))->toBe(['hads_anxiety_moderate', 'gad7_severe', 'phq9_moderate'])
         ->and($referral->isOpen())->toBeTrue()
-        ->and(Assessment::query()->whereNotNull('rated_by_id')->sole()->total)->toBe(22);
+        ->and($hads->rated_by_id)->toBe($therapist->id)
+        ->and(array_column($hads->subscores ?? [], 'total', 'code'))->toBe(['anxiety' => 14, 'depression' => 9]);
 
     // Клинический профиль у всех: пол и действующий диагноз.
     $patients = User::query()->where('role', UserRole::Patient)->with('patientProfile')->get();
@@ -231,6 +235,22 @@ test('demo seeder builds the planned doctors, patients and courses and can be ru
     $this->get(route('join.show', DemoSeeder::JOIN_CODE))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page->where('doctor.name', 'Смирнова Анна Сергеевна'));
+
+    // Стенд, выложенный до HADS: у Зайцевой её нет. Выкладка без сброса добавляет HADS сегодня, один раз.
+    DB::unprepared('ALTER TABLE assessments DISABLE TRIGGER assessments_append_only; ALTER TABLE assessment_answers DISABLE TRIGGER assessment_answers_append_only;');
+    DB::table('assessment_answers')->where('assessment_id', $hads->id)->delete();
+    DB::table('assessments')->where('id', $hads->id)->delete();
+    DB::unprepared('ALTER TABLE assessments ENABLE TRIGGER assessments_append_only; ALTER TABLE assessment_answers ENABLE TRIGGER assessment_answers_append_only;');
+
+    $this->seed(DemoSeeder::class);
+    $this->seed(DemoSeeder::class);
+
+    $added = Assessment::query()->whereNotNull('rated_by_id')->sole();
+
+    expect($added->patient_id)->toBe($patient('patient_4c')->id)
+        ->and($added->rated_by_id)->toBe($therapist->id)
+        ->and($added->local_date->toDateString())->toBe($today->toDateString())
+        ->and($added->total)->toBe(23);
 });
 
 test('only the planned patients have an adherence signal and the counters are the same at any time of day', function (string $time) {

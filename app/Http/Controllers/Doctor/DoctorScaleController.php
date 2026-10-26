@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Doctor;
 
 use App\Actions\RateScale;
 use App\Enums\ReferralCategory;
-use App\Enums\ScaleRater;
 use App\Http\Controllers\Controller;
 use App\Models\Observation;
 use App\Models\ObservationType;
@@ -18,8 +17,11 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Шкала врача (HARS) на приёме: форма и сохранение. Терапевт вместе с ней отмечает признаки,
- * которых нет ни в одной шкале: по ним подсказка направления ставит «обязательно».
+ * Шкала врача на приёме: форма и сохранение. Психиатр заполняет HARS, терапевт — HADS и вместе
+ * с ней отмечает признаки, которых нет ни в одной шкале: по ним подсказка направления ставит
+ * «обязательно». Шкала чужого вида врача отвечает 404.
+ *
+ * @phpstan-import-type Subscore from Scale
  */
 class DoctorScaleController extends Controller
 {
@@ -31,10 +33,10 @@ class DoctorScaleController extends Controller
     public function create(Request $request, User $patient, Scale $scale): Response
     {
         Gate::authorize('view', $patient);
-        abort_unless($this->isDoctorScale($scale), 404);
 
         /** @var User $doctor */
         $doctor = $request->user();
+        abort_unless($scale->isRatableBy($doctor->doctorKind()), 404);
 
         return Inertia::render('doctor/ScaleForm', [
             'patient' => ['id' => $patient->id, 'name' => $patient->name],
@@ -48,13 +50,13 @@ class DoctorScaleController extends Controller
     public function store(Request $request, User $patient, Scale $scale, RateScale $rateScale, ReferralEngine $engine): RedirectResponse
     {
         Gate::authorize('view', $patient);
-        abort_unless($this->isDoctorScale($scale), 404);
 
         /** @var User $doctor */
         $doctor = $request->user();
+        abort_unless($scale->isRatableBy($doctor->doctorKind()), 404);
 
         $validated = $request->validate(...self::rules($scale, $doctor->isTherapist()));
-        // Терапевту HARS может поднять подсказку направления: об этом — в сообщении о сохранении.
+        // Терапевту HADS может поднять подсказку направления: об этом — в сообщении о сохранении.
         $before = $doctor->isTherapist() ? $engine->suggest($patient)->category : null;
 
         $assessment = $rateScale->handle(
@@ -69,6 +71,7 @@ class DoctorScaleController extends Controller
             $scale,
             $assessment->total,
             $assessment->band,
+            $assessment->subscores,
             $before,
             $doctor->isTherapist() ? $engine->suggest($patient)->category : null,
         )]);
@@ -77,11 +80,21 @@ class DoctorScaleController extends Controller
     }
 
     /**
-     * «HARS сохранена: 28 из 56, …». Если подсказка направления изменилась, это видно сразу.
+     * «HARS сохранена: 28 из 56, …», у HADS — суммы подшкал без степеней, они рядом в карточке:
+     * «HADS сохранена: тревога 12, депрессия 6 из 21». Если подсказка направления изменилась,
+     * это видно сразу.
+     *
+     * @param  list<Subscore>|null  $subscores
      */
-    public static function savedMessage(Scale $scale, int $total, string $band, ?ReferralCategory $before, ?ReferralCategory $after): string
+    public static function savedMessage(Scale $scale, int $total, string $band, ?array $subscores, ?ReferralCategory $before, ?ReferralCategory $after): string
     {
-        $message = "{$scale->name} сохранена: {$total} из {$scale->maxTotal()}, {$band}.";
+        $result = $subscores === null
+            ? "{$total} из {$scale->maxTotal()}, {$band}"
+            : implode(', ', array_map(
+                fn (array $subscore): string => ($scale->subscale($subscore['code'])['name'] ?? $subscore['code'])." {$subscore['total']}",
+                $subscores,
+            )).' из '.$scale->maxTotal($subscores[0]['code'] ?? null);
+        $message = "{$scale->name} сохранена: {$result}.";
 
         if ($before === $after) {
             return $message;
@@ -93,13 +106,9 @@ class DoctorScaleController extends Controller
         return "{$message} Подсказка изменилась: {$now}, {$was}.";
     }
 
-    public static function isDoctorScale(Scale $scale): bool
-    {
-        return $scale->rater === ScaleRater::Doctor && $scale->is_active;
-    }
-
     /**
-     * Шкала для формы: пункты с подсказками, варианты, степени и источник.
+     * Шкала для формы: пункты с подсказками, варианты (общие или свои у пункта), подшкалы,
+     * степени и источник.
      *
      * @return array<string, mixed>
      */
@@ -110,10 +119,24 @@ class DoctorScaleController extends Controller
             'name' => $scale->name,
             'title' => $scale->title,
             'instruction' => $scale->instruction,
+            'prompt' => $scale->prompt,
             'options' => $scale->options,
-            'items' => array_map(fn (array $item): array => ['text' => $item['text'], 'hint' => $item['hint'] ?? null], $scale->items),
+            'items' => array_map(fn (array $item): array => [
+                'text' => $item['text'],
+                'hint' => $item['hint'] ?? null,
+                'options' => $item['options'] ?? null,
+                'subscale' => $item['subscale'] ?? null,
+            ], $scale->items),
             'max' => $scale->maxTotal(),
             'bands' => $scale->bands,
+            'subscales' => $scale->hasSubscales()
+                ? array_map(fn (array $subscale): array => [
+                    'code' => $subscale['code'],
+                    'name' => $subscale['name'],
+                    'max' => $scale->maxTotal($subscale['code']),
+                    'bands' => $subscale['bands'],
+                ], $scale->subscales ?? [])
+                : null,
             'source' => [
                 'validation' => $scale->source_validation,
                 'url' => $scale->source_url,
@@ -152,11 +175,17 @@ class DoctorScaleController extends Controller
     {
         $count = count($scale->items);
         $facts = $withFacts ? self::THERAPIST_FACTS : [];
+        // Баллы каждого пункта — из его вариантов: у HADS они свои у пункта.
+        $scores = [];
+
+        foreach (array_keys($scale->items) as $index) {
+            $scores["scores.{$index}"] = ['required', 'integer', 'in:'.implode(',', array_column($scale->optionsFor($index + 1), 'score'))];
+        }
 
         return [
             [
-                'scores' => ['required', 'array', "size:{$count}"],
-                'scores.*' => ['required', 'integer', 'in:'.implode(',', array_column($scale->options, 'score'))],
+                'scores' => ['required', 'list', "size:{$count}"],
+                ...$scores,
                 'facts' => [$facts === [] ? 'prohibited' : 'required', 'array:'.implode(',', $facts)],
                 ...array_combine(
                     array_map(fn (string $code): string => "facts.{$code}", $facts),
@@ -165,6 +194,7 @@ class DoctorScaleController extends Controller
             ],
             [
                 'scores.required' => 'Оцените все пункты шкалы.',
+                'scores.list' => 'Оцените все пункты шкалы.',
                 'scores.size' => 'Оцените все пункты шкалы.',
                 'scores.*' => 'Оцените все пункты шкалы.',
                 'facts.*.required' => 'Отметьте, есть ли признак.',

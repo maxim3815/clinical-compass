@@ -20,6 +20,7 @@ use App\Events\UnreadMessagesChanged;
 use App\Jobs\CheckAlertRules;
 use App\Models\AccessLink;
 use App\Models\AdverseEvent;
+use App\Models\Assessment;
 use App\Models\HelpEvent;
 use App\Models\Referral;
 use App\Models\Scale;
@@ -73,10 +74,12 @@ class DemoSeeder extends Seeder
     public const string THERAPIST_JOIN_CODE = 'kravtsova';
 
     /**
-     * HARS Зайцевой на приёме у терапевта: 22 из 56, средняя выраженность. Выше всего страхи
-     * (агорафобия) и тревожное настроение [медик].
+     * HADS Зайцевой на приёме у терапевта, утверждения о тревоге и депрессии вперемешку, как в шкале:
+     * тревога 14 из 21 (клинически выраженная, «желательно»), депрессия 9 (субклинически
+     * выраженная). Выше всего страх, что случится ужасное, и внезапная паника; неусидчивости нет —
+     * из дома она не выходит [медик].
      */
-    private const array ZAYTSEVA_HARS = [3, 2, 4, 2, 1, 2, 1, 1, 2, 2, 1, 0, 1, 0];
+    public const array ZAYTSEVA_HADS = [2, 1, 3, 1, 2, 2, 2, 1, 2, 1, 0, 2, 3, 1];
 
     public function run(CreateDoctor $createDoctor, DemoHistory $history): void
     {
@@ -116,6 +119,26 @@ class DemoSeeder extends Seeder
         $this->adverseEvent('patient', 'headache', AdverseEventSeverity::Mild, started: 2, reported: [2, '19:10'], resolved: 5, reviewed: [3, '10:05']);
         // Зайцеву терапевт направил к Смирновой «желательно»: направление ждёт психиатра.
         $this->quietly(fn () => $this->referral('patient_4c', $doctors['therapist'], $doctors['doctor']));
+        // На стенде, выложенном до HADS, у Зайцевой только HARS: терапевт заполняет HADS сегодня.
+        $this->quietly(fn () => $this->hads('patient_4c', $doctors['therapist']));
+    }
+
+    /**
+     * HADS пациента терапевта сегодня, если её ещё нет ни одной: на стенде, выложенном до HADS,
+     * демо-пациентка увидит новую шкалу без сброса базы. Пока психиатр не принял направление,
+     * пациента ведёт терапевт, иначе ничего не меняется.
+     */
+    private function hads(string $login, User $therapist): void
+    {
+        $patient = User::query()->where('login', $login)->first();
+        $scale = Scale::query()->active()->forDoctors(DoctorKind::Therapist)->where('code', 'hads')->first();
+
+        if ($patient === null || $scale === null || $patient->activeCareRelationship()->first()?->doctor_id !== $therapist->id
+            || Assessment::query()->where('patient_id', $patient->id)->where('scale_id', $scale->id)->exists()) {
+            return;
+        }
+
+        app(RateScale::class)->handle($therapist, $patient, $scale, self::ZAYTSEVA_HADS, ['mania_signs' => false, 'psychotic_symptoms' => false]);
     }
 
     /**
@@ -152,14 +175,14 @@ class DemoSeeder extends Seeder
 
     /**
      * Приём у терапевта в вечер, когда пациент подключился и ответил на опросники: через 40 минут
-     * терапевт заполняет HARS, ещё через 10 направляет к психиатру. Только если пациента ведёт
+     * терапевт заполняет HADS, ещё через 10 направляет к психиатру. Только если пациента ведёт
      * этот терапевт и направлений у него ещё не было: при выкладке без сброса пациент не меняется.
      */
     private function referral(string $login, User $therapist, User $psychiatrist): void
     {
         $patient = User::query()->where('login', $login)->first();
         $care = $patient?->activeCareRelationship()->first();
-        $scale = Scale::query()->active()->forDoctors()->where('code', 'hars')->first();
+        $scale = Scale::query()->active()->forDoctors(DoctorKind::Therapist)->where('code', 'hads')->first();
 
         if ($patient === null || $care === null || $scale === null || $care->doctor_id !== $therapist->id
             || Referral::query()->where('patient_id', $patient->id)->exists()) {
@@ -170,7 +193,7 @@ class DemoSeeder extends Seeder
 
         try {
             $this->travelTo($care->started_at->addMinutes(40));
-            app(RateScale::class)->handle($therapist, $patient, $scale, self::ZAYTSEVA_HARS, ['mania_signs' => false, 'psychotic_symptoms' => false]);
+            app(RateScale::class)->handle($therapist, $patient, $scale, self::ZAYTSEVA_HADS, ['mania_signs' => false, 'psychotic_symptoms' => false]);
 
             $this->travelTo($care->started_at->addMinutes(50));
             app(ReferPatient::class)->handle(
