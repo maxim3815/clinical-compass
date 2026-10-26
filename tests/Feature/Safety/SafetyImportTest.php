@@ -68,11 +68,11 @@ beforeEach(fn () => expect(Artisan::call('app:drugs:import'))->toBe(0));
 test('rule files load all rules, fact types and drug groups', function () {
     $this->artisan('app:rules:import')
         ->assertSuccessful()
-        ->expectsOutputToContain('Правил в файлах: 52.');
+        ->expectsOutputToContain('Правил в файлах: 62.');
 
-    expect(SafetyRule::query()->active()->count())->toBe(52)
+    expect(SafetyRule::query()->active()->count())->toBe(62)
         ->and(ObservationType::query()->orderBy('position')->pluck('code')->first())->toBe('pregnancy')
-        ->and(DrugGroup::query()->pluck('code')->sort()->values()->all())->toBe(['cyp2d6_inhibitor', 'maoi', 'qt_prolonging', 'sedative', 'serotonergic'])
+        ->and(DrugGroup::query()->pluck('code')->sort()->values()->all())->toBe(['anticoagulant', 'bleeding', 'cyp2c19_inhibitor', 'cyp2d6_inhibitor', 'maoi', 'maoi_irreversible', 'maoi_reversible', 'qt_prolonging', 'sedative', 'serotonergic'])
         ->and(Drug::query()->where('code', 'escitalopram')->sole()->groups)->toBe(['serotonergic', 'cyp2d6_inhibitor', 'qt_prolonging']);
 
     $gfr = SafetyRule::query()->where('code', 'maritupirdine.gfr')->sole();
@@ -83,7 +83,7 @@ test('rule files load all rules, fact types and drug groups', function () {
 
     $this->artisan('app:rules:import')
         ->assertSuccessful()
-        ->expectsOutputToContain('Правила не изменились. Правил в файлах: 52.');
+        ->expectsOutputToContain('Правила не изменились. Правил в файлах: 62.');
 });
 
 test('texts of the rule files are not cut short', function () {
@@ -111,6 +111,12 @@ test('changed rule gets a new version and removed rule is deactivated', function
         ->and(SafetyRule::query()->count())->toBe(2);
 });
 
+test('condition may name a drug from the list of drugs from other doctors', function () {
+    [$code] = importRules([ruleRecord(['condition' => "taking('tamoxifen')"])]);
+
+    expect($code)->toBe(0);
+});
+
 test('invalid rule stops the import without changes', function (array $rule, string $message) {
     importRules([ruleRecord()]);
     $before = SafetyRule::query()->get()->toArray();
@@ -122,7 +128,7 @@ test('invalid rule stops the import without changes', function (array $rule, str
         ->and(SafetyRule::query()->get()->toArray())->toBe($before);
 })->with([
     'unknown fact' => [ruleRecord(['condition' => "fact('creatinine') > 100"]), 'вида факта creatinine нет'],
-    'unknown drug' => [ruleRecord(['condition' => "taking('fluoxetine')"]), 'препарата fluoxetine нет в справочнике'],
+    'unknown drug' => [ruleRecord(['condition' => "taking('agomelatine')"]), 'препарата agomelatine нет в справочнике'],
     'unknown group' => [ruleRecord(['condition' => "taking_group('triptans')"]), 'группы препаратов triptans нет'],
     'syntax error' => [ruleRecord(['condition' => "fact('gfr') <"]), 'условие не разбирается'],
     'variable' => [ruleRecord(['condition' => 'patient.delete()']), 'условие не разбирается'],
@@ -136,8 +142,11 @@ test('invalid rule stops the import without changes', function (array $rule, str
 ]);
 
 test('rules file must belong to a catalog drug and be named after it', function () {
+    [$code, $output] = importRules([ruleRecord()], 'agomelatine');
+    expect($code)->toBe(1)->and($output)->toContain('препарата agomelatine нет в справочнике');
+
     [$code, $output] = importRules([ruleRecord()], 'fluoxetine');
-    expect($code)->toBe(1)->and($output)->toContain('препарата fluoxetine нет в справочнике');
+    expect($code)->toBe(1)->and($output)->toContain('Правила пишутся только для препаратов справочника, а не списка препаратов от других врачей');
 
     [$code, $output] = importRules([ruleRecord()], 'maritupirdine', 'aviandr');
     expect($code)->toBe(1)->and($output)->toContain('должен называться maritupirdine.yaml');

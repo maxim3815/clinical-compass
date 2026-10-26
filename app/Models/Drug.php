@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\DrugKind;
 use Carbon\CarbonImmutable;
 use Database\Factories\DrugFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -13,26 +14,31 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * Препарат справочника по МНН. Источник данных — инструкция конкретного
- * зарегистрированного препарата (source_*).
+ * Препарат по МНН. У препарата справочника (catalog) источник данных — инструкция конкретного
+ * зарегистрированного препарата (source_*), поля инструкции заполнены. У препарата из списка
+ * препаратов от других врачей (known) их нет: только группы, торговые названия, основание
+ * (reason) и номер РУ одного препарата из ГРЛС (source_trade_name, source_registration_number).
  *
  * @property int $id
  * @property string $code
+ * @property DrugKind $kind
  * @property string $name
  * @property string $inn
  * @property string $atc
- * @property string $dosage_form
- * @property string $regimen
- * @property string $patient_instruction
- * @property string $missed_dose
+ * @property string|null $dosage_form
+ * @property string|null $regimen
+ * @property string|null $patient_instruction
+ * @property string|null $missed_dose
  * @property int|null $window_hours
  * @property string $source_trade_name
- * @property string $source_document
+ * @property string|null $source_document
  * @property string $source_registration_number
- * @property string $source_url
- * @property string $source_edition
+ * @property string|null $source_url
+ * @property string|null $source_edition
  * @property bool $is_active
  * @property list<string> $groups
+ * @property list<string> $trade_names
+ * @property string|null $reason
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  * @property-read Collection<int, DrugStrength> $strengths
@@ -41,6 +47,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 #[Fillable([
     'code',
+    'kind',
     'name',
     'inn',
     'atc',
@@ -56,6 +63,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'source_edition',
     'is_active',
     'groups',
+    'trade_names',
+    'reason',
 ])]
 class Drug extends Model
 {
@@ -107,6 +116,17 @@ class Drug extends Model
     }
 
     /**
+     * Препараты справочника: их назначает врач, у них есть правила и побочные эффекты.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function catalog(Builder $query): void
+    {
+        $query->where('kind', DrugKind::Catalog);
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -114,9 +134,11 @@ class Drug extends Model
     protected function casts(): array
     {
         return [
+            'kind' => DrugKind::class,
             'window_hours' => 'integer',
             'is_active' => 'boolean',
             'groups' => 'array',
+            'trade_names' => 'array',
         ];
     }
 }

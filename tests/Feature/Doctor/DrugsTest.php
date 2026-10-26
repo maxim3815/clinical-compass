@@ -13,6 +13,7 @@ test('doctor sees active drugs sorted by name with active strengths', function (
     $aviandr = Drug::factory()->create(['code' => 'maritupirdine', 'name' => 'Авиандр']);
     DrugStrength::factory()->for($aviandr)->create(['mg' => 20, 'divisible' => false]);
     Drug::factory()->inactive()->create(['name' => 'Агомелатин']);
+    Drug::factory()->known(['serotonergic'])->create(['name' => 'Трамадол']);
 
     $this->actingAs(User::factory()->doctor()->create())
         ->get(route('doctor.drugs.index'))
@@ -81,6 +82,14 @@ test('card of a drug removed from the catalog still opens', function () {
         ->get(route('doctor.drugs.show', $drug))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page->where('drug.is_active', false));
+});
+
+test('drug from the list of drugs from other doctors has no catalog card', function () {
+    $drug = Drug::factory()->known()->create();
+
+    $this->actingAs(User::factory()->doctor()->create())
+        ->get(route('doctor.drugs.show', $drug))
+        ->assertNotFound();
 });
 
 test('unknown drug code answers not found', function (string $code) {

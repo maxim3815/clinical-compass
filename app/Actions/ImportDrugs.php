@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Enums\DrugKind;
 use App\Exceptions\InvalidDrugCatalog;
 use App\Models\Drug;
 use App\Models\DrugGroup;
@@ -14,15 +15,18 @@ use Symfony\Component\Yaml\Yaml;
 
 /**
  * Загрузка справочника препаратов из YAML-файла вместе с группами препаратов для правил
- * взаимодействий. Файлы проверяются целиком до записи в БД, поэтому при ошибке справочник
- * остаётся прежним. Записи сопоставляются по коду, и повторная загрузка тех же файлов ничего
- * не меняет. Препараты и дозировки, которых в файле больше нет, выключаются, а не удаляются:
- * на них ссылаются назначения. Группа, которой больше нет в файле, удаляется: на неё ссылаются
- * только препараты и правила, а их файлы проверяются по списку групп.
+ * взаимодействий и списком препаратов от других врачей. Файлы проверяются целиком до записи
+ * в БД, поэтому при ошибке справочник остаётся прежним. Записи сопоставляются по коду, и повторная
+ * загрузка тех же файлов ничего не меняет. Препараты и дозировки, которых в файле больше нет,
+ * выключаются, а не удаляются: на них ссылаются назначения. Загрузка одного файла выключает только
+ * препараты своего вида. Группа, которой больше нет в файле, удаляется: на неё ссылаются только
+ * препараты и правила, а их файлы проверяются по списку групп.
  *
  * @phpstan-type StrengthData array{mg: int|float|string, divisible: bool}
  * @phpstan-type SourceData array{trade_name: string, document: string, registration_number: string, url: string, edition: string}
- * @phpstan-type DrugData array{code: string, name: string, inn: string, atc: string, groups: list<string>, dosage_form: string, strengths: list<StrengthData>, regimen: string, patient_instruction: string, missed_dose: string, window_hours: int|string|null, source: SourceData}
+ * @phpstan-type DrugData array{code: string, name: string, inn: string, atc: string, trade_names: list<string>, groups: list<string>, dosage_form: string, strengths: list<StrengthData>, regimen: string, patient_instruction: string, missed_dose: string, window_hours: int|string|null, source: SourceData}
+ * @phpstan-type RegistrationData array{trade_name: string, number: string}
+ * @phpstan-type KnownDrugData array{code: string, name: string, inn: string, atc: string, trade_names: list<string>, groups: list<string>, reason: string, registration: RegistrationData}
  * @phpstan-type GroupData array{code: string, name: string}
  */
 class ImportDrugs
@@ -31,11 +35,14 @@ class ImportDrugs
 
     public const string DEFAULT_GROUPS_PATH = 'database/data/drug-groups.yaml';
 
+    public const string DEFAULT_KNOWN_PATH = 'database/data/known-drugs.yaml';
+
     private const array FIELDS = [
         'code',
         'name',
         'inn',
         'atc',
+        'trade_names',
         'groups',
         'dosage_form',
         'strengths',
@@ -50,15 +57,44 @@ class ImportDrugs
 
     private const array SOURCE_FIELDS = ['trade_name', 'document', 'registration_number', 'url', 'edition'];
 
+    private const array KNOWN_FIELDS = ['code', 'name', 'inn', 'atc', 'trade_names', 'groups', 'reason', 'registration'];
+
+    private const array REGISTRATION_FIELDS = ['trade_name', 'number'];
+
+    private const array NAMES_AND_GROUPS_MESSAGES = [
+        'groups.present' => 'Поле groups обязательно. Если препарат не входит в группы, укажите [].',
+        'trade_names.present' => 'Поле trade_names обязательно. Если торговых названий для поиска нет, укажите [].',
+    ];
+
     /**
+     * @param  string|null  $knownPath  Файл списка препаратов от других врачей. Без него список не меняется.
+     *
      * @throws InvalidDrugCatalog
      */
-    public function handle(string $path, string $groupsPath): DrugImportResult
+    public function handle(string $path, string $groupsPath, ?string $knownPath = null): DrugImportResult
     {
         $groups = $this->validateGroups($this->parse($groupsPath));
-        $drugs = $this->validate($this->parse($path), array_column($groups, 'code'));
+        $groupCodes = array_column($groups, 'code');
+        /** @var list<DrugData> $drugs */
+        $drugs = $this->validate($this->parse($path), DrugKind::Catalog, $groupCodes);
+        /** @var list<KnownDrugData>|null $known */
+        $known = $knownPath === null ? null : $this->validate($this->parse($knownPath), DrugKind::Known, $groupCodes);
+        $this->validateAcrossFiles($drugs, $known);
 
-        return DB::transaction(fn (): DrugImportResult => $this->sync($drugs, $this->syncGroups($groups)));
+        return DB::transaction(function () use ($groups, $drugs, $known): DrugImportResult {
+            $groupsChanged = $this->syncGroups($groups);
+            $catalog = $this->sync($drugs);
+            $list = $known === null ? null : $this->syncKnown($known);
+
+            return new DrugImportResult(
+                total: count($drugs),
+                created: [...$catalog['created'], ...$list['created'] ?? []],
+                updated: [...$catalog['updated'], ...$list['updated'] ?? []],
+                deactivated: [...$catalog['deactivated'], ...$list['deactivated'] ?? []],
+                groupsChanged: $groupsChanged,
+                knownTotal: $known === null ? null : count($known),
+            );
+        });
     }
 
     private function parse(string $path): mixed
@@ -120,12 +156,14 @@ class ImportDrugs
 
     /**
      * @param  list<string>  $groups  коды групп из файла групп
-     * @return list<DrugData>
+     * @return list<DrugData>|list<KnownDrugData>
      */
-    private function validate(mixed $data, array $groups): array
+    private function validate(mixed $data, DrugKind $kind, array $groups): array
     {
         if (! is_array($data) || ! array_is_list($data) || $data === []) {
-            throw new InvalidDrugCatalog(['Файл должен содержать список препаратов.']);
+            throw new InvalidDrugCatalog([$kind === DrugKind::Known
+                ? 'Файл списка препаратов от других врачей должен содержать список препаратов.'
+                : 'Файл должен содержать список препаратов.']);
         }
 
         $errors = [];
@@ -135,19 +173,19 @@ class ImportDrugs
             $position = $index + 1;
 
             if (! is_array($drug) || array_is_list($drug)) {
-                $errors[] = "Препарат №{$position}: запись должна состоять из полей препарата.";
+                $errors[] = self::label($kind, "№{$position}").': запись должна состоять из полей препарата.';
 
                 continue;
             }
 
             $code = $drug['code'] ?? null;
-            $label = is_string($code) && $code !== '' ? "Препарат {$code}" : "Препарат №{$position}";
+            $label = self::label($kind, is_string($code) && $code !== '' ? $code : "№{$position}");
 
-            foreach ($this->unknownFields($drug) as $field) {
+            foreach ($kind === DrugKind::Known ? $this->unknownKnownFields($drug) : $this->unknownFields($drug) as $field) {
                 $errors[] = "{$label}: неизвестное поле {$field}.";
             }
 
-            foreach ($this->validationErrors($drug) as $message) {
+            foreach ($kind === DrugKind::Known ? $this->knownValidationErrors($drug) : $this->validationErrors($drug) as $message) {
                 $errors[] = "{$label}: {$message}";
             }
 
@@ -164,7 +202,7 @@ class ImportDrugs
 
         foreach ($positionsByCode as $code => $positions) {
             if (count($positions) > 1) {
-                $errors[] = "Препарат {$code}: код повторяется в записях ".implode(', ', $positions).'.';
+                $errors[] = self::label($kind, $code).': код повторяется в записях '.implode(', ', $positions).'.';
             }
         }
 
@@ -172,8 +210,75 @@ class ImportDrugs
             throw new InvalidDrugCatalog($errors);
         }
 
-        /** @var list<DrugData> $data */
+        /** @var list<DrugData>|list<KnownDrugData> $data */
         return $data;
+    }
+
+    /**
+     * Код и торговое название указывают на один препарат: код не повторяется в справочнике и списке
+     * и не меняет вид препарата в БД, торговое название не встречается у двух препаратов. Без файла
+     * списка препараты справочника сверяются с препаратами списка в БД.
+     *
+     * @param  list<DrugData>  $drugs
+     * @param  list<KnownDrugData>|null  $known
+     *
+     * @throws InvalidDrugCatalog
+     */
+    private function validateAcrossFiles(array $drugs, ?array $known): void
+    {
+        $errors = [];
+        $catalogCodes = array_column($drugs, 'code');
+        $knownCodes = $known === null ? [] : array_column($known, 'code');
+        $repeated = array_intersect($knownCodes, $catalogCodes);
+
+        foreach ($repeated as $code) {
+            $errors[] = "Препарат {$code}: код есть и в справочнике, и в списке препаратов от других врачей. Препарат справочника в список не добавляют.";
+        }
+
+        /** @var \Illuminate\Support\Collection<string, DrugKind> $stored */
+        $stored = Drug::query()->pluck('kind', 'code');
+
+        foreach ([[DrugKind::Catalog, $catalogCodes], [DrugKind::Known, $knownCodes]] as [$kind, $codes]) {
+            foreach (array_diff($codes, $repeated) as $code) {
+                $was = $stored->get($code);
+
+                if ($was !== null && $was !== $kind) {
+                    $errors[] = self::label($kind, $code).': код уже занят '
+                        .($was === DrugKind::Known ? 'препаратом из списка препаратов от других врачей' : 'препаратом справочника').'. Возьмите другой код.';
+                }
+            }
+        }
+
+        $owners = [];
+
+        foreach ([...$drugs, ...$known ?? []] as $drug) {
+            foreach ([$drug['name'], ...$drug['trade_names']] as $name) {
+                $owners[self::searchKey($name)][$drug['code']] = $name;
+            }
+        }
+
+        foreach ($owners as $codes) {
+            if (count($codes) > 1) {
+                $errors[] = 'Название «'.reset($codes).'» есть у нескольких препаратов: '.implode(', ', array_keys($codes)).'.';
+            }
+        }
+
+        if ($errors !== []) {
+            throw new InvalidDrugCatalog($errors);
+        }
+    }
+
+    private static function label(DrugKind $kind, string $code): string
+    {
+        return ($kind === DrugKind::Known ? 'Препарат списка ' : 'Препарат ').$code;
+    }
+
+    /**
+     * Название для сравнения: без регистра, «ё» и значков ® и ™.
+     */
+    private static function searchKey(string $name): string
+    {
+        return trim(str_replace(['ё', '®', '™'], ['е', '', ''], mb_strtolower($name)));
     }
 
     /**
@@ -187,9 +292,7 @@ class ImportDrugs
             'name' => ['required', 'string', 'max:255'],
             'inn' => ['required', 'string', 'max:255'],
             'atc' => ['required', 'string', 'max:16'],
-            // Ключ обязателен, как window_hours: препарат без групп записывается явно, [].
-            'groups' => ['present', 'list'],
-            'groups.*' => ['string', 'distinct'],
+            ...self::namesAndGroupsRules(),
             'dosage_form' => ['required', 'string', 'max:255'],
             'strengths' => ['required', 'list'],
             'strengths.*' => ['array'],
@@ -214,10 +317,67 @@ class ImportDrugs
 
         $validator = Validator::make($drug, $rules, [
             'window_hours.present' => 'Поле window_hours обязательно. Если окно в источнике не задано, укажите ~.',
-            'groups.present' => 'Поле groups обязательно. Если препарат не входит в группы, укажите [].',
+            ...self::NAMES_AND_GROUPS_MESSAGES,
         ], array_combine($fields, $fields));
 
         return array_values($validator->errors()->all());
+    }
+
+    /**
+     * @return array<string, list<string>>
+     */
+    private static function namesAndGroupsRules(): array
+    {
+        return [
+            // Ключи обязательны, как window_hours: пустой список записывается явно, [].
+            'trade_names' => ['present', 'list'],
+            'trade_names.*' => ['required', 'string', 'max:255', 'distinct:ignore_case'],
+            'groups' => ['present', 'list'],
+            'groups.*' => ['string', 'distinct'],
+        ];
+    }
+
+    /**
+     * Запись списка препаратов от других врачей: без инструкции, дозировок и окна приёма, с основанием
+     * и номером РУ одного препарата из ГРЛС.
+     *
+     * @param  array<mixed>  $drug
+     * @return list<string>
+     */
+    private function knownValidationErrors(array $drug): array
+    {
+        $rules = [
+            'code' => ['required', 'string', 'max:64', 'regex:/^'.Drug::CODE_PATTERN.'$/'],
+            'name' => ['required', 'string', 'max:255'],
+            'inn' => ['required', 'string', 'max:255'],
+            'atc' => ['required', 'string', 'max:16'],
+            ...self::namesAndGroupsRules(),
+            'reason' => ['required', 'string'],
+            'registration' => ['required', 'array'],
+            'registration.trade_name' => ['required', 'string', 'max:255'],
+            'registration.number' => ['required', 'string', 'max:255'],
+        ];
+
+        $fields = array_values(array_filter(array_keys($rules), fn (string $field): bool => ! str_contains($field, '*')));
+
+        $validator = Validator::make($drug, $rules, self::NAMES_AND_GROUPS_MESSAGES, array_combine($fields, $fields));
+
+        return array_values($validator->errors()->all());
+    }
+
+    /**
+     * @param  array<mixed>  $drug
+     * @return list<string>
+     */
+    private function unknownKnownFields(array $drug): array
+    {
+        $unknown = self::extraKeys($drug, self::KNOWN_FIELDS, '');
+
+        if (is_array($drug['registration'] ?? null)) {
+            $unknown = [...$unknown, ...self::extraKeys($drug['registration'], self::REGISTRATION_FIELDS, 'registration.')];
+        }
+
+        return $unknown;
     }
 
     /**
@@ -261,21 +421,23 @@ class ImportDrugs
 
     /**
      * @param  list<DrugData>  $drugs
+     * @return array{created: list<string>, updated: list<string>, deactivated: list<string>}
      */
-    private function sync(array $drugs, bool $groupsChanged): DrugImportResult
+    private function sync(array $drugs): array
     {
-        $existing = Drug::query()->with('strengths')->get()->keyBy('code');
+        $existing = Drug::query()->catalog()->with('strengths')->get()->keyBy('code');
         $created = [];
         $updated = [];
 
         foreach ($drugs as $data) {
-            $drug = $existing->get($data['code']) ?? new Drug(['code' => $data['code']]);
+            $drug = $existing->get($data['code']) ?? new Drug(['code' => $data['code'], 'kind' => DrugKind::Catalog]);
             $isNew = ! $drug->exists;
 
             $drug->fill([
                 'name' => $data['name'],
                 'inn' => $data['inn'],
                 'atc' => $data['atc'],
+                'trade_names' => $data['trade_names'],
                 'groups' => $data['groups'],
                 'dosage_form' => $data['dosage_form'],
                 'regimen' => $data['regimen'],
@@ -301,7 +463,57 @@ class ImportDrugs
             }
         }
 
-        $codes = array_column($drugs, 'code');
+        return ['created' => $created, 'updated' => $updated, 'deactivated' => self::deactivateMissing($existing, array_column($drugs, 'code'))];
+    }
+
+    /**
+     * @param  list<KnownDrugData>  $drugs
+     * @return array{created: list<string>, updated: list<string>, deactivated: list<string>}
+     */
+    private function syncKnown(array $drugs): array
+    {
+        $existing = Drug::query()->where('kind', DrugKind::Known)->get()->keyBy('code');
+        $created = [];
+        $updated = [];
+
+        foreach ($drugs as $data) {
+            $drug = $existing->get($data['code']) ?? new Drug(['code' => $data['code'], 'kind' => DrugKind::Known]);
+            $isNew = ! $drug->exists;
+
+            $drug->fill([
+                'name' => $data['name'],
+                'inn' => $data['inn'],
+                'atc' => $data['atc'],
+                'trade_names' => $data['trade_names'],
+                'groups' => $data['groups'],
+                'reason' => $data['reason'],
+                'source_trade_name' => $data['registration']['trade_name'],
+                'source_registration_number' => $data['registration']['number'],
+                'is_active' => true,
+            ]);
+
+            $changed = $drug->isDirty();
+            $drug->save();
+
+            if ($isNew) {
+                $created[] = $drug->code;
+            } elseif ($changed) {
+                $updated[] = $drug->code;
+            }
+        }
+
+        return ['created' => $created, 'updated' => $updated, 'deactivated' => self::deactivateMissing($existing, array_column($drugs, 'code'))];
+    }
+
+    /**
+     * Выключает препараты, которых больше нет в файле.
+     *
+     * @param  Collection<string, Drug>  $existing  препараты того же вида из БД
+     * @param  list<string>  $codes  коды из файла
+     * @return list<string>
+     */
+    private static function deactivateMissing(Collection $existing, array $codes): array
+    {
         $deactivated = [];
 
         foreach ($existing as $drug) {
@@ -311,7 +523,7 @@ class ImportDrugs
             }
         }
 
-        return new DrugImportResult(count($drugs), $created, $updated, $deactivated, $groupsChanged);
+        return $deactivated;
     }
 
     /**

@@ -63,7 +63,7 @@ test('demo seeder builds the planned doctors, patients and courses and can be ru
         ->and(PatientProfile::query()->whereNull('rules_acknowledged_at')->exists())->toBeFalse()
         ->and(User::query()->get()->every(fn (User $user) => Hash::check('password', $user->password)))->toBeTrue()
         ->and($doctor2->can('view', $patient('patient')))->toBeFalse()
-        ->and(Drug::query()->active()->count())->toBe(5)
+        ->and(Drug::query()->catalog()->active()->count())->toBe(5)
         ->and(AccessLink::query()->count())->toBe(1)
         ->and(AdherenceSignals::count($doctor))->toBe(3)
         // Плюс Кузнецова с противопоказанием без решения и направление Зайцевой; у второго врача — Николаев.

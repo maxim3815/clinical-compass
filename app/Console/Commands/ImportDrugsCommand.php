@@ -16,23 +16,34 @@ class ImportDrugsCommand extends Command
     protected $signature = 'app:drugs:import
         {path? : Путь к файлу справочника. По умолчанию database/data/drugs.yaml}
         {--groups= : Путь к файлу групп препаратов. По умолчанию database/data/drug-groups.yaml}
+        {--known= : Путь к списку препаратов от других врачей. По умолчанию database/data/known-drugs.yaml}
         {--side-effects= : Путь к файлу побочных эффектов. По умолчанию database/data/side-effects.yaml}';
 
     /**
      * @var string
      */
-    protected $description = 'Загрузить справочник препаратов и побочные эффекты из файлов';
+    protected $description = 'Загрузить справочник препаратов, список препаратов от других врачей и побочные эффекты из файлов';
 
     public function handle(ImportDrugs $importDrugs, ImportSideEffects $importSideEffects): int
     {
         $path = $this->argument('path');
         $groups = $this->option('groups');
+        $known = $this->option('known');
         $sideEffects = $this->option('side-effects');
+
+        // Для своего файла справочника список задают явно, как побочные эффекты: в стандартном
+        // списке могли бы оказаться коды из стандартного справочника.
+        $knownPath = match (true) {
+            is_string($known) => $known,
+            is_string($path) => null,
+            default => base_path(ImportDrugs::DEFAULT_KNOWN_PATH),
+        };
 
         try {
             $result = $importDrugs->handle(
                 is_string($path) ? $path : base_path(ImportDrugs::DEFAULT_PATH),
                 is_string($groups) ? $groups : base_path(ImportDrugs::DEFAULT_GROUPS_PATH),
+                $knownPath,
             );
         } catch (InvalidDrugCatalog $e) {
             $this->components->error('Справочник не загружен, в базе ничего не изменилось. Исправьте файл и запустите команду снова.');
@@ -41,10 +52,13 @@ class ImportDrugsCommand extends Command
             return self::FAILURE;
         }
 
+        $totals = "Препаратов в справочнике: {$result->total}"
+            .($result->knownTotal === null ? '.' : ", в списке препаратов от других врачей: {$result->knownTotal}.");
+
         if (! $result->hasChanges()) {
-            $this->components->info("Справочник не изменился. Препаратов в файле: {$result->total}.");
+            $this->components->info("Справочник не изменился. {$totals}");
         } else {
-            $this->components->info("Справочник обновлён. Препаратов в файле: {$result->total}.");
+            $this->components->info("Справочник обновлён. {$totals}");
 
             foreach (['Добавлены' => $result->created, 'Изменены' => $result->updated, 'Выключены' => $result->deactivated] as $title => $codes) {
                 if ($codes !== []) {

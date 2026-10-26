@@ -11,7 +11,7 @@ test('rules page lists every active rule with its level and source', function ()
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('doctor/rules/Index')
-            ->where('total', 52)
+            ->where('total', 62)
             ->has('drugs', 5)
             ->where('drugs.0.name', 'Авиандр')
             ->has('drugs.0.rules', 14)

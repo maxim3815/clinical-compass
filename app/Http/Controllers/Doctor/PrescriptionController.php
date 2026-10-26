@@ -241,12 +241,14 @@ class PrescriptionController extends Controller
     /**
      * Активные препараты справочника с активными дозировками. При изменении назначения препарат
      * не меняется, а прежнюю дозировку можно оставить, даже если её убрали из справочника.
+     * Препараты списка препаратов от других врачей врач не назначает.
      *
      * @return array<int, array<string, mixed>>
      */
     private function drugOptions(?Prescription $prescription): array
     {
         return Drug::query()
+            ->catalog()
             ->when(
                 $prescription,
                 fn (Builder $query, Prescription $prescription) => $query->whereKey($prescription->drug_id),

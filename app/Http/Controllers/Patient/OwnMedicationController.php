@@ -114,7 +114,10 @@ class OwnMedicationController extends Controller
         $today = $patient->localToday();
 
         return [
+            // Поиск по списку препаратов от других врачей в форме ещё не сделан: в выборе только справочник.
+            // Запрос при этом принимает препараты обоих видов.
             'drugs' => Drug::query()
+                ->catalog()
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->orderBy('code')

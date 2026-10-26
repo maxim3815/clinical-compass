@@ -165,6 +165,10 @@ class ImportSafetyRules
      */
     private function validateRules(array $files, array $facts): array
     {
+        // Правила пишутся для препаратов справочника, а taking() называет и препараты списка
+        // препаратов от других врачей.
+        /** @var list<string> $catalog */
+        $catalog = Drug::query()->catalog()->pluck('code')->values()->all();
         /** @var list<string> $drugs */
         $drugs = Drug::query()->pluck('code')->values()->all();
         /** @var list<string> $groups */
@@ -184,8 +188,9 @@ class ImportSafetyRules
 
             $drug = $file['drug'] ?? null;
 
-            if (! is_string($drug) || ! in_array($drug, $drugs, true)) {
-                $errors[] = "{$name}: препарата ".(is_string($drug) ? $drug : '(не указан)').' нет в справочнике.';
+            if (! is_string($drug) || ! in_array($drug, $catalog, true)) {
+                $errors[] = "{$name}: препарата ".(is_string($drug) ? $drug : '(не указан)').' нет в справочнике.'
+                    .(is_string($drug) && in_array($drug, $drugs, true) ? ' Правила пишутся только для препаратов справочника, а не списка препаратов от других врачей.' : '');
             } elseif ($name !== $drug.'.yaml') {
                 $errors[] = "{$name}: файл правил препарата {$drug} должен называться {$drug}.yaml.";
             }

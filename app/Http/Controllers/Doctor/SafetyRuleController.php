@@ -19,6 +19,7 @@ class SafetyRuleController extends Controller
     public function index(): Response
     {
         $drugs = Drug::query()
+            ->catalog()
             ->active()
             ->whereHas('safetyRules', fn ($query) => $query->active())
             ->with(['safetyRules' => fn (HasMany $query) => $query->active()->orderBy('position')])

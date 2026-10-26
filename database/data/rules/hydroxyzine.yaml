@@ -116,6 +116,31 @@ rules:
       url: https://lk.regmed.ru/Register/EAEU_SmPC
       quote: Следует избегать одновременного назначения гидроксизина с ингибиторами моноаминоксидазы.
 
+  - id: sedative
+    type: interaction
+    level: caution
+    condition: taking_group('sedative')
+    text: "Гидроксизин усиливает действие препаратов, угнетающих ЦНС: дозу подбирают индивидуально."
+    source:
+      document: ОХЛП «Атаракс», реестр ЕАЭС
+      section: 4.5. Взаимодействие
+      url: https://lk.regmed.ru/Register/EAEU_SmPC
+      quote: >-
+        Потенцирующее действие гидроксизина должно учитываться при применении препарата совместно с лекарственными
+        средствами, оказывающими угнетающее действие на центральную нервную систему или обладающими
+        антихолинергическими свойствами; при этом доза должна подбираться индивидуально.
+
+  - id: anticoagulants
+    type: interaction
+    level: caution
+    condition: taking_group('anticoagulant')
+    text: У пациентов на антикоагулянтах в начале лечения гидроксизином нужен контроль гемостаза.
+    source:
+      document: ОХЛП «Атаракс», реестр ЕАЭС
+      section: 4.5. Взаимодействие
+      url: https://lk.regmed.ru/Register/EAEU_SmPC
+      quote: В случае лечения антикоагулянтами необходим контроль гемостаза в начале терапии.
+
   - id: paroxetine
     type: interaction
     level: caution

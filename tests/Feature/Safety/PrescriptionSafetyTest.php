@@ -228,7 +228,7 @@ test('new prescription form shows the check result of every drug before the choi
         ->assertInertia(fn (Assert $page) => $page
             ->where('drugSafety.'.$id('maritupirdine'), ['level' => 'contraindicated', 'label' => 'Противопоказано', 'reason' => 'СКФ 52 мл/мин/1,73 м² на '.DisplayTime::today()->format('d.m.Y')])
             ->where('drugSafety.'.$id('paroxetine'), ['level' => 'caution', 'label' => 'С осторожностью', 'reason' => 'Принимает Эсциталопрам (добавил пациент)'])
-            ->has('drugSafety', Drug::query()->where('is_active', true)->count())
+            ->has('drugSafety', Drug::query()->catalog()->where('is_active', true)->count())
             // Что уже было с препаратом у пациента.
             ->where('drugHistory', [$id('escitalopram') => 'Принимает, добавил пациент']),
         );

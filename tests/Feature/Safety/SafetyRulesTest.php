@@ -111,6 +111,10 @@ function safetyRuleCases(): array
         'escitalopram.lactation' => $lactation,
         'escitalopram.mania' => $mania,
         'escitalopram.serotonergic' => $taking('sertraline'),
+        // Препараты из списка препаратов от других врачей.
+        'escitalopram.maoi_b' => $taking('rasagiline'),
+        'escitalopram.bleeding' => $taking('warfarin'),
+        'escitalopram.cyp2c19' => $taking('omeprazole'),
 
         // ГТР у сертралина вне показаний.
         'sertraline.indications' => [['diagnoses' => ['F41.1']], ['diagnoses' => []], 'диагноз'],
@@ -121,6 +125,8 @@ function safetyRuleCases(): array
         'sertraline.qt' => $qt,
         'sertraline.qt_drugs' => $taking('escitalopram'),
         'sertraline.serotonergic' => $taking('paroxetine'),
+        'sertraline.maoi_reversible' => $taking('linezolid'),
+        'sertraline.bleeding' => $taking('acetylsalicylic_acid'),
 
         'paroxetine.indications' => $offLabel,
         'paroxetine.age' => $minor,
@@ -131,6 +137,9 @@ function safetyRuleCases(): array
         'paroxetine.qt' => $qt,
         'paroxetine.qt_drugs' => $taking('hydroxyzine'),
         'paroxetine.serotonergic' => $taking('sertraline'),
+        'paroxetine.thioridazine' => $taking('thioridazine'),
+        'paroxetine.bleeding' => $taking('ibuprofen'),
+        'paroxetine.tamoxifen' => $taking('tamoxifen'),
 
         'hydroxyzine.indications' => $offLabel,
         'hydroxyzine.age' => [['age' => 2], ['age' => null], 'дата рождения'],
@@ -142,6 +151,8 @@ function safetyRuleCases(): array
         'hydroxyzine.lactation' => $lactation,
         'hydroxyzine.maoi' => $maoi,
         'hydroxyzine.paroxetine' => $taking('paroxetine'),
+        'hydroxyzine.sedative' => $taking('phenazepam'),
+        'hydroxyzine.anticoagulants' => $taking('apixaban'),
         'hydroxyzine.gfr' => [$fact('gfr', 52), $missing('gfr'), 'СКФ'],
         'hydroxyzine.hepatic' => [$fact('hepatic_impairment', 'b'), $missing('hepatic_impairment'), 'Печёночная недостаточность'],
         'hydroxyzine.elderly' => [['age' => 70], ['age' => null], 'дата рождения'],

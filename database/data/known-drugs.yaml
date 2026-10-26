@@ -1,0 +1,949 @@
+# Список препаратов от других врачей. Загружается вместе со справочником командой
+# `php artisan app:drugs:import`, формат описан в README.
+#
+# Препарат из списка пациент добавляет сам, назначить его врач не может. Своих правил у препаратов списка нет:
+# по группам на них срабатывают правила пяти препаратов справочника. Пару двух препаратов списка правила не
+# проверяют: инструкций этих препаратов у нас нет.
+#
+# В списке препараты, которые инструкции препаратов справочника называют по имени, и распространённые в РФ
+# представители названных там классов (пометка [медик] в reason). Препарат входит в группу, только если правило
+# каждого препарата справочника по этой группе его покрывает (drug-groups.yaml).
+#
+# Регистрация в РФ и торговые названия сверены с ГРЛС 26.10.2026. registration — одно РУ из ГРЛС. Торговое
+# название из trade_names есть в ГРЛС целиком или как начало названия («Трамал» — «Трамал ретард»).
+# Комбинированные препараты («Кардиомагнил», «Корвалол», «Залдиар») записаны торговыми названиями того МНН, по
+# которому они входят в группу [медик].
+#
+# Не вошли: моклобемид, селегилин, хинидин, дизопирамид, пимозид, тиклопидин и циметидин — их называют инструкции,
+# но в ГРЛС их нет; сафинамид — обратимый ингибитор МАО-B, его не покрывает правило эсциталопрама; зверобой —
+# «Негрустина» и «Деприма» в ГРЛС нет.
+
+# Ингибиторы МАО
+
+- code: pirlindole
+  name: Пирлиндол
+  inn: пирлиндол
+  atc: N06AX
+  trade_names: [Пиразидол]
+  groups: [maoi, maoi_reversible]
+  reason: >-
+    Обратимый ингибитор МАО-А, как моклобемид в ОХЛП «Ципралекса» (4.3) и листке-вкладыше «Золофта» [медик].
+    Моклобемид в РФ не зарегистрирован. Ингибиторы МАО называют инструкции всех пяти препаратов.
+  registration:
+    trade_name: Пиразидол
+    number: ЛП-№(001788)-(РГ-RU)
+
+- code: rasagiline
+  name: Разагилин
+  inn: разагилин
+  atc: N04BD02
+  trade_names: [Азилект]
+  groups: [maoi, maoi_irreversible]
+  reason: >-
+    Назван в листке-вкладыше «Авиандра» среди ингибиторов МАО. Необратимый ингибитор МАО-B, как селегилин в ОХЛП
+    «Золофта» (4.5) и листке-вкладыше «Ципралекса» [медик]. Селегилин в РФ не зарегистрирован.
+  registration:
+    trade_name: Азилект
+    number: ЛП-№(011759)-(РГ-RU)
+
+- code: linezolid
+  name: Линезолид
+  inn: линезолид
+  atc: J01XX08
+  trade_names: [Зивокс, Амизолид]
+  groups: [maoi, maoi_reversible]
+  reason: >-
+    Назван в ОХЛП «Ципралекса» (4.3), «Золофта» и «Паксила» (4.5) как обратимый неселективный ингибитор МАО.
+  registration:
+    trade_name: Зивокс
+    number: ЛП-№(009022)-(РГ-RU)
+
+# Серотонинергические: опиоиды, триптаны, литий, антидепрессанты
+
+- code: tramadol
+  name: Трамадол
+  inn: трамадол
+  atc: N02AX02
+  trade_names: [Трамал, Залдиар]
+  groups: [serotonergic]
+  reason: >-
+    Назван среди серотонинергических в ОХЛП «Ципралекса», «Паксила» и «Авиандра» (4.5). «Залдиар» — трамадол с
+    парацетамолом [медик].
+  registration:
+    trade_name: Трамал ретард
+    number: ЛП-№(014690)-(РГ-RU)
+
+- code: fentanyl
+  name: Фентанил
+  inn: фентанил
+  atc: N02AB03
+  trade_names: []
+  groups: [serotonergic]
+  reason: >-
+    Назван среди серотонинергических в ОХЛП «Золофта», «Паксила» и «Авиандра» (4.5).
+  registration:
+    trade_name: Фентанил
+    number: ЛП-№(011103)-(РГ-RU)
+
+- code: sumatriptan
+  name: Суматриптан
+  inn: суматриптан
+  atc: N02CC01
+  trade_names: [Амигренин, Сумамигрен]
+  groups: [serotonergic]
+  reason: >-
+    Назван среди серотонинергических в ОХЛП «Ципралекса» (4.5) и листке-вкладыше «Авиандра». Триптаны
+    серотонинергические и по ОХЛП «Золофта» и «Паксила» (4.5).
+  registration:
+    trade_name: Амигренин
+    number: ЛП-№(001243)-(РГ-RU)
+
+- code: zolmitriptan
+  name: Золмитриптан
+  inn: золмитриптан
+  atc: N02CC03
+  trade_names: [Мигрепам, Золмифаст]
+  groups: [serotonergic]
+  reason: >-
+    Назван в листке-вкладыше «Авиандра» среди триптанов. Триптаны серотонинергические по ОХЛП трёх СИОЗС и
+    «Авиандра» (4.5).
+  registration:
+    trade_name: Мигрепам
+    number: ЛП-№(001350)-(РГ-RU)
+
+- code: eletriptan
+  name: Элетриптан
+  inn: элетриптан
+  atc: N02CC06
+  trade_names: [Релпакс]
+  groups: [serotonergic]
+  reason: >-
+    Триптан [медик]. Триптаны серотонинергические по ОХЛП трёх СИОЗС и «Авиандра» (4.5).
+  registration:
+    trade_name: Релпакс
+    number: ЛП-№(002222)-(РГ-RU)
+
+- code: lithium_carbonate
+  name: Лития карбонат
+  inn: лития карбонат
+  atc: N05AN01
+  trade_names: [Седалит]
+  groups: [serotonergic]
+  reason: >-
+    Литий назван среди серотонинергических в ОХЛП «Паксила» и «Авиандра» (4.5), осторожность — в ОХЛП
+    «Ципралекса» и «Золофта» (4.5).
+  registration:
+    trade_name: Седалит
+    number: ЛП-№(004190)-(РГ-RU)
+
+- code: amitriptyline
+  name: Амитриптилин
+  inn: амитриптилин
+  atc: N06AA09
+  trade_names: []
+  groups: [serotonergic, qt_prolonging]
+  reason: >-
+    Назван в листке-вкладыше «Авиандра» среди серотонинергических. Трициклические антидепрессанты удлиняют QT по
+    ОХЛП «Ципралекса» (4.5) [медик].
+  registration:
+    trade_name: Амитриптилин-АЛСИ
+    number: ЛП-№(013366)-(РГ-RU)
+
+- code: clomipramine
+  name: Кломипрамин
+  inn: кломипрамин
+  atc: N06AA04
+  trade_names: [Анафранил]
+  groups: [serotonergic, qt_prolonging]
+  reason: >-
+    Трициклический антидепрессант [медик]: серотонинергические по ОХЛП «Авиандра» (4.5), удлиняют QT по ОХЛП
+    «Ципралекса» (4.5).
+  registration:
+    trade_name: Анафранил СР
+    number: ЛП-№(011715)-(РГ-RU)
+
+- code: imipramine
+  name: Имипрамин
+  inn: имипрамин
+  atc: N06AA02
+  trade_names: [Мелипрамин]
+  groups: [serotonergic, qt_prolonging]
+  reason: >-
+    Трициклический антидепрессант [медик]: серотонинергические по ОХЛП «Авиандра» (4.5), удлиняют QT по ОХЛП
+    «Ципралекса» (4.5).
+  registration:
+    trade_name: Мелипрамин
+    number: ЛП-№(000221)-(РГ-RU)
+
+- code: fluoxetine
+  name: Флуоксетин
+  inn: флуоксетин
+  atc: N06AB03
+  trade_names: [Прозак, Профлузак]
+  groups: [serotonergic, cyp2d6_inhibitor]
+  reason: >-
+    Назван в листке-вкладыше «Авиандра» среди ингибиторов CYP2D6. СИОЗС серотонинергические по ОХЛП трёх СИОЗС и
+    «Авиандра» (4.5).
+  registration:
+    trade_name: Профлузак
+    number: ЛП-№(006534)-(РГ-RU)
+
+- code: fluvoxamine
+  name: Флувоксамин
+  inn: флувоксамин
+  atc: N06AB08
+  trade_names: [Феварин]
+  groups: [serotonergic, cyp2d6_inhibitor, cyp2c19_inhibitor]
+  reason: >-
+    Назван в ОХЛП «Ципралекса» (4.5) среди ингибиторов CYP2C19. СИОЗС: серотонинергический и ингибитор CYP2D6 по
+    ОХЛП «Авиандра» (4.5) [медик].
+  registration:
+    trade_name: Феварин
+    number: ЛП-№(008757)-(РГ-RU)
+
+- code: citalopram
+  name: Циталопрам
+  inn: циталопрам
+  atc: N06AB04
+  trade_names: [Ципрамил]
+  groups: [serotonergic, cyp2d6_inhibitor, qt_prolonging]
+  reason: >-
+    Назван в ОХЛП «Атаракса» (4.5) среди удлиняющих QT. СИОЗС: серотонинергический и ингибитор CYP2D6 по ОХЛП
+    «Авиандра» (4.5) [медик].
+  registration:
+    trade_name: Ципрамил
+    number: ЛП-№(010733)-(РГ-RU)
+
+- code: venlafaxine
+  name: Венлафаксин
+  inn: венлафаксин
+  atc: N06AX16
+  trade_names: [Велаксин, Велафакс]
+  groups: [serotonergic]
+  reason: >-
+    Серотонинергический антидепрессант, ОХЛП «Золофта» (4.5) [медик].
+  registration:
+    trade_name: Велафакс
+    number: ЛП-№(008375)-(РГ-RU)
+
+- code: duloxetine
+  name: Дулоксетин
+  inn: дулоксетин
+  atc: N06AX21
+  trade_names: [Симбалта]
+  groups: [serotonergic]
+  reason: >-
+    Назван в ОХЛП «Авиандра» (4.5): в исследовании взаимодействия серотонинового синдрома не было, но
+    осторожность с серотонинергическими остаётся. Серотонинергический антидепрессант, ОХЛП «Золофта» (4.5)
+    [медик].
+  registration:
+    trade_name: Симбалта
+    number: ЛП-№(002221)-(РГ-RU)
+
+- code: trazodone
+  name: Тразодон
+  inn: тразодон
+  atc: N06AX05
+  trade_names: [Триттико]
+  groups: [serotonergic]
+  reason: >-
+    Серотонинергический антидепрессант, ОХЛП «Золофта» (4.5) [медик].
+  registration:
+    trade_name: Триттико
+    number: ЛП-№(001171)-(РГ-RU)
+
+# Ингибиторы CYP2D6
+
+- code: diphenhydramine
+  name: Дифенгидрамин
+  inn: дифенгидрамин
+  atc: R06AA02
+  trade_names: [Димедрол]
+  groups: [cyp2d6_inhibitor, sedative]
+  reason: >-
+    Назван в ОХЛП «Авиандра» (4.5) среди ингибиторов CYP2D6. Блокатор H1-рецепторов: седативные по ОХЛП
+    «Авиандра» (4.5).
+  registration:
+    trade_name: ДИМЕДРОЛ АВЕКСИМА
+    number: ЛП-№(015879)-(РГ-RU)
+
+- code: terbinafine
+  name: Тербинафин
+  inn: тербинафин
+  atc: D01BA02
+  trade_names: [Ламизил, Термикон]
+  groups: [cyp2d6_inhibitor]
+  reason: >-
+    Назван в ОХЛП «Авиандра» (4.5) среди ингибиторов CYP2D6.
+  registration:
+    trade_name: Термикон
+    number: ЛП-№(002323)-(РГ-RU)
+
+- code: hydroxychloroquine
+  name: Гидроксихлорохин
+  inn: гидроксихлорохин
+  atc: P01BA02
+  trade_names: [Плаквенил, Иммард]
+  groups: [cyp2d6_inhibitor, qt_prolonging]
+  reason: >-
+    Назван в ОХЛП «Атаракса» (4.5) среди удлиняющих QT и в ОХЛП «Авиандра» (4.5) среди ингибиторов CYP2D6.
+  registration:
+    trade_name: Иммард
+    number: ЛП-№(007721)-(ГП-RU)
+
+# Седативные: бензодиазепины, барбитураты, снотворные, блокаторы H1-рецепторов
+
+- code: diazepam
+  name: Диазепам
+  inn: диазепам
+  atc: N05BA01
+  trade_names: [Сибазон, Релиум]
+  groups: [sedative]
+  reason: >-
+    Назван в листке-вкладыше «Авиандра» среди противотревожных. Производное бензодиазепина: седативные по ОХЛП
+    «Авиандра» (4.5).
+  registration:
+    trade_name: Релиум
+    number: ЛП-№(007645)-(ГП-RU)
+
+- code: alprazolam
+  name: Алпразолам
+  inn: алпразолам
+  atc: N05BA12
+  trade_names: [Золомакс]
+  groups: [sedative]
+  reason: >-
+    Назван в листке-вкладыше «Авиандра» среди противотревожных. Производное бензодиазепина: седативные по ОХЛП
+    «Авиандра» (4.5).
+  registration:
+    trade_name: ЗОЛОМАКС
+    number: ЛСР-001893/10
+
+- code: phenazepam
+  name: Бромдигидрохлорфенилбензодиазепин
+  inn: бромдигидрохлорфенилбензодиазепин
+  atc: N05BX
+  trade_names: [Феназепам, Элзепам]
+  groups: [sedative]
+  reason: >-
+    Производное бензодиазепина [медик]: седативные по ОХЛП «Авиандра» (4.5).
+  registration:
+    trade_name: ЭЛЗЕПАМ
+    number: ЛП-№(013884)-(РГ-RU)
+
+- code: clonazepam
+  name: Клоназепам
+  inn: клоназепам
+  atc: N03AE01
+  trade_names: []
+  groups: [sedative]
+  reason: >-
+    Производное бензодиазепина [медик]: седативные по ОХЛП «Авиандра» (4.5).
+  registration:
+    trade_name: Клоназепам
+    number: ЛП-№(012167)-(РГ-RU)
+
+- code: phenobarbital
+  name: Фенобарбитал
+  inn: фенобарбитал
+  atc: N03AA02
+  trade_names: [Корвалол, Валокордин]
+  groups: [sedative]
+  reason: >-
+    Назван в листке-вкладыше «Авиандра» среди снотворных. Барбитурат: седативные по ОХЛП «Авиандра» (4.5).
+    «Корвалол» и «Валокордин» содержат фенобарбитал [медик].
+  registration:
+    trade_name: ФЕНОБАРБИТАЛ
+    number: ЛП-№(016127)-(РГ-RU)
+
+- code: zopiclone
+  name: Зопиклон
+  inn: зопиклон
+  atc: N05CF01
+  trade_names: [Имован, Сомнол]
+  groups: [sedative]
+  reason: >-
+    Назван в листке-вкладыше «Авиандра» среди снотворных: усиливает седацию.
+  registration:
+    trade_name: Имован
+    number: ЛП-№(005315)-(РГ-RU)
+
+- code: zolpidem
+  name: Золпидем
+  inn: золпидем
+  atc: N05CF02
+  trade_names: []
+  groups: [sedative]
+  reason: >-
+    Назван в листке-вкладыше «Авиандра» среди снотворных: усиливает седацию.
+  registration:
+    trade_name: Золпидем
+    number: ЛП-№(007249)-(РГ-RU)
+
+- code: doxylamine
+  name: Доксиламин
+  inn: доксиламин
+  atc: R06AA09
+  trade_names: [Донормил]
+  groups: [sedative]
+  reason: >-
+    Назван в листке-вкладыше «Авиандра» среди снотворных. Блокатор H1-рецепторов: седативные по ОХЛП «Авиандра»
+    (4.5).
+  registration:
+    trade_name: Донормил
+    number: ЛП-№(001263)-(РГ-RU)
+
+- code: chloropyramine
+  name: Хлоропирамин
+  inn: хлоропирамин
+  atc: R06AC03
+  trade_names: [Супрастин]
+  groups: [sedative]
+  reason: >-
+    Назван в листке-вкладыше «Авиандра» среди противоаллергических. Блокатор H1-рецепторов: седативные по ОХЛП
+    «Авиандра» (4.5).
+  registration:
+    trade_name: Супрастин
+    number: ЛП-№(000101)-(РГ-RU)
+
+- code: clemastine
+  name: Клемастин
+  inn: клемастин
+  atc: R06AA04
+  trade_names: [Тавегил]
+  groups: [sedative]
+  reason: >-
+    Назван в листке-вкладыше «Авиандра» среди противоаллергических. Блокатор H1-рецепторов: седативные по ОХЛП
+    «Авиандра» (4.5).
+  registration:
+    trade_name: Тавегил
+    number: ЛП-№(014758)-(РГ-RU)
+
+- code: cetirizine
+  name: Цетиризин
+  inn: цетиризин
+  atc: R06AE07
+  trade_names: [Зиртек, Зодак, Цетрин]
+  groups: [sedative]
+  reason: >-
+    Назван в листке-вкладыше «Авиандра» среди противоаллергических. Блокатор H1-рецепторов: седативные по ОХЛП
+    «Авиандра» (4.5).
+  registration:
+    trade_name: Зиртек
+    number: ЛП-№(010965)-(РГ-RU)
+
+- code: levocetirizine
+  name: Левоцетиризин
+  inn: левоцетиризин
+  atc: R06AE09
+  trade_names: [Ксизал, Супрастинекс]
+  groups: [sedative]
+  reason: >-
+    Блокатор H1-рецепторов [медик]: седативные по ОХЛП «Авиандра» (4.5). Изомер цетиризина, который назван в
+    листке-вкладыше «Авиандра».
+  registration:
+    trade_name: Ксизал
+    number: ЛП-№(005009)-(РГ-RU)
+
+- code: alimemazine
+  name: Алимемазин
+  inn: алимемазин
+  atc: R06AD01
+  trade_names: [Тералиджен]
+  groups: [sedative]
+  reason: >-
+    Назван в листке-вкладыше «Авиандра» среди противотревожных: усиливает седацию.
+  registration:
+    trade_name: Тералиджен
+    number: ЛП-№(008569)-(РГ-RU)
+
+# Нейролептики: седативные и удлиняющие интервал QT
+
+- code: haloperidol
+  name: Галоперидол
+  inn: галоперидол
+  atc: N05AD01
+  trade_names: []
+  groups: [sedative, qt_prolonging]
+  reason: >-
+    Назван среди удлиняющих QT в ОХЛП «Ципралекса» и «Атаракса» (4.5) и среди нейролептиков в листке-вкладыше
+    «Авиандра» (седация).
+  registration:
+    trade_name: Галоперидол
+    number: ЛП-№(016273)-(РГ-RU)
+
+- code: chlorpromazine
+  name: Хлорпромазин
+  inn: хлорпромазин
+  atc: N05AA01
+  trade_names: [Аминазин]
+  groups: [sedative, qt_prolonging]
+  reason: >-
+    Производное фенотиазина [медик]: удлиняют QT по ОХЛП «Ципралекса» (4.5). Нейролептик: седативные по ОХЛП
+    «Авиандра» (4.5).
+  registration:
+    trade_name: Аминазин
+    number: ЛП-№(000871)-(РГ-RU)
+
+- code: levomepromazine
+  name: Левомепромазин
+  inn: левомепромазин
+  atc: N05AA02
+  trade_names: [Тизерцин]
+  groups: [sedative, qt_prolonging]
+  reason: >-
+    Производное фенотиазина [медик]: удлиняют QT по ОХЛП «Ципралекса» (4.5). Нейролептик: седативные по ОХЛП
+    «Авиандра» (4.5).
+  registration:
+    trade_name: Тизерцин
+    number: ЛП-№(000079)-(РГ-RU)
+
+- code: thioridazine
+  name: Тиоридазин
+  inn: тиоридазин
+  atc: N05AC02
+  trade_names: [Сонапакс]
+  groups: [sedative, qt_prolonging]
+  reason: >-
+    Назван в ОХЛП «Паксила» (4.3): противопоказан. Производное фенотиазина: удлиняют QT по ОХЛП «Ципралекса»
+    (4.5). Нейролептик: седативные по ОХЛП «Авиандра» (4.5).
+  registration:
+    trade_name: Сонапакс
+    number: ЛП-№(010434)-(РГ-RU)
+
+- code: quetiapine
+  name: Кветиапин
+  inn: кветиапин
+  atc: N05AH04
+  trade_names: [Сероквель]
+  groups: [sedative, qt_prolonging]
+  reason: >-
+    Назван в листке-вкладыше «Авиандра» среди нейролептиков (седация). Антипсихотики удлиняют QT по ОХЛП
+    «Ципралекса» (4.5) [медик].
+  registration:
+    trade_name: Сероквель Пролонг
+    number: ЛП-№(006094)-(РГ-RU)
+
+- code: risperidone
+  name: Рисперидон
+  inn: рисперидон
+  atc: N05AX08
+  trade_names: [Рисполепт]
+  groups: [sedative, qt_prolonging]
+  reason: >-
+    Назван в листке-вкладыше «Авиандра» среди нейролептиков (седация). Антипсихотики удлиняют QT по ОХЛП
+    «Ципралекса» (4.5) [медик].
+  registration:
+    trade_name: Рисперидон
+    number: ЛП-№(012805)-(РГ-RU)
+
+- code: olanzapine
+  name: Оланзапин
+  inn: оланзапин
+  atc: N05AH03
+  trade_names: [Зипрекса]
+  groups: [sedative, qt_prolonging]
+  reason: >-
+    Нейролептик [медик]: седативные по ОХЛП «Авиандра» (4.5), антипсихотики удлиняют QT по ОХЛП «Ципралекса»
+    (4.5).
+  registration:
+    trade_name: Зипрекса
+    number: ЛП-№(011108)-(РГ-RU)
+
+- code: sulpiride
+  name: Сульпирид
+  inn: сульпирид
+  atc: N05AL01
+  trade_names: [Эглонил]
+  groups: [sedative, qt_prolonging]
+  reason: >-
+    Нейролептик [медик]: седативные по ОХЛП «Авиандра» (4.5), антипсихотики удлиняют QT по ОХЛП «Ципралекса»
+    (4.5).
+  registration:
+    trade_name: Эглонил
+    number: ЛП-№(011547)-(РГ-RU)
+
+# Удлиняют интервал QT
+
+- code: amiodarone
+  name: Амиодарон
+  inn: амиодарон
+  atc: C01BD01
+  trade_names: [Кордарон]
+  groups: [qt_prolonging]
+  reason: >-
+    Назван в ОХЛП «Атаракса» (4.5) среди удлиняющих QT. Антиаритмик III класса: удлиняют QT и по ОХЛП
+    «Ципралекса» (4.5).
+  registration:
+    trade_name: Кордарон
+    number: ЛП-№(000016)-(РГ-RU)
+
+- code: sotalol
+  name: Соталол
+  inn: соталол
+  atc: C07AA07
+  trade_names: [Сотагексал]
+  groups: [qt_prolonging]
+  reason: >-
+    Назван в ОХЛП «Атаракса» (4.5) среди удлиняющих QT. Антиаритмик III класса: удлиняют QT и по ОХЛП
+    «Ципралекса» (4.5).
+  registration:
+    trade_name: Сотагексал
+    number: ЛП-№(004461)-(РГ-RU)
+
+- code: procainamide
+  name: Прокаинамид
+  inn: прокаинамид
+  atc: C01BA02
+  trade_names: [Новокаинамид]
+  groups: [qt_prolonging]
+  reason: >-
+    Антиаритмик IA класса [медик]: удлиняют QT по ОХЛП «Ципралекса» и «Атаракса» (4.5). Названные там хинидин и
+    дизопирамид в РФ не зарегистрированы.
+  registration:
+    trade_name: Новокаинамид
+    number: ЛП-№(008931)-(РГ-RU)
+
+- code: moxifloxacin
+  name: Моксифлоксацин
+  inn: моксифлоксацин
+  atc: J01MA14
+  trade_names: [Авелокс]
+  groups: [qt_prolonging]
+  reason: >-
+    Назван в ОХЛП «Ципралекса» и «Атаракса» (4.5) среди удлиняющих QT.
+  registration:
+    trade_name: Авелокс
+    number: ЛП-№(003604)-(РГ-RU)
+
+- code: levofloxacin
+  name: Левофлоксацин
+  inn: левофлоксацин
+  atc: J01MA12
+  trade_names: [Таваник]
+  groups: [qt_prolonging]
+  reason: >-
+    Назван в ОХЛП «Атаракса» (4.5) среди удлиняющих QT.
+  registration:
+    trade_name: Таваник
+    number: ЛП-№(002605)-(РГ-RU)
+
+- code: prucalopride
+  name: Прукалоприд
+  inn: прукалоприд
+  atc: A06AX05
+  trade_names: [Вегапрат]
+  groups: [qt_prolonging]
+  reason: >-
+    Назван в ОХЛП «Атаракса» (4.5) среди удлиняющих QT.
+  registration:
+    trade_name: ВЕГАПРАТ
+    number: ЛП-№(008086)-(РГ-RU)
+
+- code: toremifene
+  name: Торемифен
+  inn: торемифен
+  atc: L02BA02
+  trade_names: []
+  groups: [qt_prolonging]
+  reason: >-
+    Назван в ОХЛП «Атаракса» (4.5) среди удлиняющих QT.
+  registration:
+    trade_name: ТОРЕМИФЕН
+    number: ЛП-№(000304)-(РГ-RU)
+
+- code: mefloquine
+  name: Мефлохин
+  inn: мефлохин
+  atc: P01BC02
+  trade_names: []
+  groups: [qt_prolonging]
+  reason: >-
+    Назван в ОХЛП «Атаракса» (4.5) среди удлиняющих QT. Противомалярийные удлиняют QT и по ОХЛП «Ципралекса»
+    (4.5).
+  registration:
+    trade_name: Мефлохин
+    number: ЛП-№(004583)-(РГ-RU)
+
+# Повышают риск кровотечения: ацетилсалициловая кислота, НПВС, антиагреганты
+
+- code: acetylsalicylic_acid
+  name: Ацетилсалициловая кислота
+  inn: ацетилсалициловая кислота
+  atc: N02BA01
+  trade_names: [Аспирин, Кардиомагнил, Тромбо АСС]
+  groups: [bleeding]
+  reason: >-
+    Названа в ОХЛП «Ципралекса», «Золофта» (4.4) и «Паксила» (4.5): риск кровотечений. «Кардиомагнил» —
+    ацетилсалициловая кислота с магния гидроксидом [медик].
+  registration:
+    trade_name: Аспирин
+    number: ЛП-№(014031)-(РГ-RU)
+
+- code: ibuprofen
+  name: Ибупрофен
+  inn: ибупрофен
+  atc: M01AE01
+  trade_names: [Нурофен]
+  groups: [bleeding]
+  reason: >-
+    НПВС: риск кровотечений по ОХЛП «Ципралекса», «Золофта» и «Паксила» (4.4). Назван в листке-вкладыше
+    «Золофта».
+  registration:
+    trade_name: Нурофен Экспресс Табс
+    number: ЛП-№(015502)-(РГ-RU)
+
+- code: diclofenac
+  name: Диклофенак
+  inn: диклофенак
+  atc: M01AB05
+  trade_names: [Вольтарен, Ортофен]
+  groups: [bleeding]
+  reason: >-
+    НПВС [медик]: риск кровотечений по ОХЛП «Ципралекса», «Золофта» и «Паксила» (4.4).
+  registration:
+    trade_name: Вольтарен
+    number: ЛП-№(009713)-(РГ-RU)
+
+- code: ketorolac
+  name: Кеторолак
+  inn: кеторолак
+  atc: M01AB15
+  trade_names: [Кеторол, Кетанов]
+  groups: [bleeding]
+  reason: >-
+    НПВС [медик]: риск кровотечений по ОХЛП «Ципралекса», «Золофта» и «Паксила» (4.4).
+  registration:
+    trade_name: Кеторолак
+    number: ЛП-№(013373)-(ГП-RU)
+
+- code: nimesulide
+  name: Нимесулид
+  inn: нимесулид
+  atc: M01AX17
+  trade_names: [Найз, Нимесил]
+  groups: [bleeding]
+  reason: >-
+    НПВС [медик]: риск кровотечений по ОХЛП «Ципралекса», «Золофта» и «Паксила» (4.4).
+  registration:
+    trade_name: Нимесил
+    number: ЛП-№(009687)-(РГ-RU)
+
+- code: meloxicam
+  name: Мелоксикам
+  inn: мелоксикам
+  atc: M01AC06
+  trade_names: [Мовалис, Амелотекс]
+  groups: [bleeding]
+  reason: >-
+    НПВС [медик]: риск кровотечений по ОХЛП «Ципралекса», «Золофта» и «Паксила» (4.4).
+  registration:
+    trade_name: Мовалис
+    number: ЛП-№(007614)-(РГ-RU)
+
+- code: ketoprofen
+  name: Кетопрофен
+  inn: кетопрофен
+  atc: M01AE03
+  trade_names: [Кетонал, Артрум]
+  groups: [bleeding]
+  reason: >-
+    НПВС [медик]: риск кровотечений по ОХЛП «Ципралекса», «Золофта» и «Паксила» (4.4).
+  registration:
+    trade_name: Артрум
+    number: ЛП-№(013876)-(РГ-RU)
+
+- code: naproxen
+  name: Напроксен
+  inn: напроксен
+  atc: M01AE02
+  trade_names: [Налгезин]
+  groups: [bleeding]
+  reason: >-
+    НПВС [медик]: риск кровотечений по ОХЛП «Ципралекса», «Золофта» и «Паксила» (4.4).
+  registration:
+    trade_name: Налгезин форте
+    number: ЛП-№(000259)-(РГ-RU)
+
+- code: celecoxib
+  name: Целекоксиб
+  inn: целекоксиб
+  atc: M01AH01
+  trade_names: [Целебрекс]
+  groups: [bleeding]
+  reason: >-
+    Ингибитор ЦОГ-2, назван классом в ОХЛП «Паксила» (4.5). НПВС [медик]: риск кровотечений по ОХЛП
+    «Ципралекса», «Золофта» и «Паксила» (4.4).
+  registration:
+    trade_name: Целебрекс
+    number: ЛП-№(007000)-(РГ-RU)
+
+- code: etoricoxib
+  name: Эторикоксиб
+  inn: эторикоксиб
+  atc: M01AH05
+  trade_names: [Аркоксиа]
+  groups: [bleeding]
+  reason: >-
+    Ингибитор ЦОГ-2, назван классом в ОХЛП «Паксила» (4.5). НПВС [медик]: риск кровотечений по ОХЛП
+    «Ципралекса», «Золофта» и «Паксила» (4.4).
+  registration:
+    trade_name: Аркоксиа
+    number: ЛП-№(000508)-(РГ-RU)
+
+- code: clopidogrel
+  name: Клопидогрел
+  inn: клопидогрел
+  atc: B01AC04
+  trade_names: [Плавикс, Зилт]
+  groups: [bleeding]
+  reason: >-
+    Антиагрегант, влияет на функцию тромбоцитов [медик]: риск кровотечений по ОХЛП «Ципралекса», «Золофта» и
+    «Паксила» (4.4).
+  registration:
+    trade_name: Зилт
+    number: ЛП-№(001341)-(РГ-RU)
+
+- code: ticagrelor
+  name: Тикагрелор
+  inn: тикагрелор
+  atc: B01AC24
+  trade_names: [Брилинта]
+  groups: [bleeding]
+  reason: >-
+    Антиагрегант, влияет на функцию тромбоцитов [медик]: риск кровотечений по ОХЛП «Ципралекса», «Золофта» и
+    «Паксила» (4.4).
+  registration:
+    trade_name: Брилинта
+    number: ЛП-№(006712)-(РГ-RU)
+
+- code: dipyridamole
+  name: Дипиридамол
+  inn: дипиридамол
+  atc: B01AC07
+  trade_names: [Курантил]
+  groups: [bleeding]
+  reason: >-
+    Назван в ОХЛП «Ципралекса» (4.4) среди влияющих на функцию тромбоцитов: риск кровотечений по ОХЛП
+    «Ципралекса», «Золофта» и «Паксила» (4.4).
+  registration:
+    trade_name: Курантил N 75
+    number: ЛП-№(011966)-(РГ-RU)
+
+# Пероральные антикоагулянты
+
+- code: warfarin
+  name: Варфарин
+  inn: варфарин
+  atc: B01AA03
+  trade_names: []
+  groups: [bleeding, anticoagulant]
+  reason: >-
+    Назван в ОХЛП «Золофта» (4.5) и листке-вкладыше «Ципралекса». Пероральный антикоагулянт: риск кровотечений
+    по ОХЛП «Ципралекса», «Золофта» и «Паксила» (4.4), контроль гемостаза по ОХЛП «Атаракса» (4.5).
+  registration:
+    trade_name: ВАРФАЛАН
+    number: ЛП-№(014340)-(РГ-RU)
+
+- code: rivaroxaban
+  name: Ривароксабан
+  inn: ривароксабан
+  atc: B01AF01
+  trade_names: [Ксарелто]
+  groups: [bleeding, anticoagulant]
+  reason: >-
+    Пероральный антикоагулянт: риск кровотечений по ОХЛП «Ципралекса», «Золофта» и «Паксила» (4.4), контроль
+    гемостаза по ОХЛП «Атаракса» (4.5) [медик].
+  registration:
+    trade_name: Ксарелто
+    number: ЛП-№(010871)-(РГ-RU)
+
+- code: apixaban
+  name: Апиксабан
+  inn: апиксабан
+  atc: B01AF02
+  trade_names: [Эликвис]
+  groups: [bleeding, anticoagulant]
+  reason: >-
+    Пероральный антикоагулянт: риск кровотечений по ОХЛП «Ципралекса», «Золофта» и «Паксила» (4.4), контроль
+    гемостаза по ОХЛП «Атаракса» (4.5) [медик].
+  registration:
+    trade_name: Эликвис
+    number: ЛП-№(015795)-(ГП-RU)
+
+- code: dabigatran_etexilate
+  name: Дабигатрана этексилат
+  inn: дабигатрана этексилат
+  atc: B01AE07
+  trade_names: [Прадакса]
+  groups: [bleeding, anticoagulant]
+  reason: >-
+    Пероральный антикоагулянт: риск кровотечений по ОХЛП «Ципралекса», «Золофта» и «Паксила» (4.4), контроль
+    гемостаза по ОХЛП «Атаракса» (4.5) [медик].
+  registration:
+    trade_name: Прадакса
+    number: ЛП-№(001907)-(РГ-RU)
+
+# Ингибиторы CYP2C19
+
+- code: omeprazole
+  name: Омепразол
+  inn: омепразол
+  atc: A02BC01
+  trade_names: [Омез, Лосек]
+  groups: [cyp2c19_inhibitor]
+  reason: >-
+    Назван в ОХЛП «Ципралекса» (4.5) среди ингибиторов CYP2C19.
+  registration:
+    trade_name: ЛОСЕК МАПС
+    number: ЛП-№(011926)-(РГ-RU)
+
+- code: esomeprazole
+  name: Эзомепразол
+  inn: эзомепразол
+  atc: A02BC05
+  trade_names: [Нексиум]
+  groups: [cyp2c19_inhibitor]
+  reason: >-
+    Назван в ОХЛП «Ципралекса» (4.5) среди ингибиторов CYP2C19.
+  registration:
+    trade_name: Нексиум
+    number: ЛП-№(009827)-(РГ-RU)
+
+- code: lansoprazole
+  name: Лансопразол
+  inn: лансопразол
+  atc: A02BC03
+  trade_names: [Ланцид]
+  groups: [cyp2c19_inhibitor]
+  reason: >-
+    Назван в ОХЛП «Ципралекса» (4.5) среди ингибиторов CYP2C19.
+  registration:
+    trade_name: Ланцид
+    number: П N014267/01
+
+- code: fluconazole
+  name: Флуконазол
+  inn: флуконазол
+  atc: J02AC01
+  trade_names: [Дифлюкан, Флюкостат]
+  groups: [cyp2c19_inhibitor]
+  reason: >-
+    Назван в ОХЛП «Ципралекса» (4.5) среди ингибиторов CYP2C19.
+  registration:
+    trade_name: Флюкостат
+    number: ЛП-№(004748)-(РГ-RU)
+
+# Правило пароксетина по имени
+
+- code: tamoxifen
+  name: Тамоксифен
+  inn: тамоксифен
+  atc: L02BA01
+  trade_names: [Синфен]
+  groups: []
+  reason: >-
+    Назван в ОХЛП «Паксила» (4.4, 4.5): пароксетин снижает эффективность тамоксифена.
+  registration:
+    trade_name: Синфен
+    number: ЛП-№(001113)-(РГ-RU)

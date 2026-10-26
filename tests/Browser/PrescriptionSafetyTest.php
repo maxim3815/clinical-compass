@@ -150,7 +150,7 @@ test('safety check fits a phone screen', function () {
     $page->assertSee('Обоснование (обязательно)')
         ->assertScript('document.documentElement.scrollWidth <= window.innerWidth')
         ->navigate(route('doctor.rules.index'))
-        ->assertSee('Действующих правил: 52.')
+        ->assertSee('Действующих правил: 62.')
         ->assertScript('document.documentElement.scrollWidth <= window.innerWidth')
         ->assertNoJavaScriptErrors();
 });

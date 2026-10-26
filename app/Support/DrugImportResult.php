@@ -4,7 +4,7 @@ namespace App\Support;
 
 /**
  * Что изменила загрузка справочника препаратов: коды добавленных, изменённых и выключенных
- * препаратов и изменились ли группы препаратов.
+ * препаратов (справочника и списка препаратов от других врачей) и изменились ли группы препаратов.
  */
 final readonly class DrugImportResult
 {
@@ -19,6 +19,8 @@ final readonly class DrugImportResult
         public array $updated,
         public array $deactivated,
         public bool $groupsChanged = false,
+        // Препаратов в файле списка препаратов от других врачей; null, если список не загружался.
+        public ?int $knownTotal = null,
     ) {}
 
     public function hasChanges(): bool

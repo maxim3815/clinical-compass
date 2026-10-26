@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Doctor;
 
+use App\Enums\DrugKind;
 use App\Enums\PrescriptionKind;
 use App\Enums\PrescriptionSource;
 use App\Enums\TimeOfDay;
@@ -65,7 +66,8 @@ class PrescriptionRequest extends FormRequest
 
         return [
             'drug_id' => $prescription === null
-                ? ['bail', 'required', 'integer', Rule::exists('drugs', 'id')->where('is_active', true)]
+                // Только справочник: препараты списка препаратов от других врачей врач не назначает.
+                ? ['bail', 'required', 'integer', Rule::exists('drugs', 'id')->where('is_active', true)->where('kind', DrugKind::Catalog->value)]
                 : ['exclude'],
             'drug_strength_id' => ['bail', 'required', 'integer', $this->strengthExists()],
             'kind' => $prescription === null ? ['required', Rule::enum(PrescriptionKind::class)] : ['exclude'],

@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\DrugKind;
 use App\Models\Drug;
 use App\Models\DrugStrength;
 use Illuminate\Support\Arr;
@@ -19,6 +20,7 @@ function drugRecord(array $overrides = []): array
         'name' => 'Сертралин',
         'inn' => 'сертралин',
         'atc' => 'N06AB06',
+        'trade_names' => ['Золофт'],
         'groups' => ['serotonergic'],
         'dosage_form' => 'таблетки, покрытые плёночной оболочкой',
         'strengths' => [
@@ -36,6 +38,26 @@ function drugRecord(array $overrides = []): array
             'url' => 'https://grls.minzdrav.gov.ru/InstrImg/zoloft.pdf',
             'edition' => 'выложен 25.06.2026',
         ],
+    ], ...$overrides];
+}
+
+/**
+ * Запись списка препаратов от других врачей в формате файла.
+ *
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function knownDrugRecord(array $overrides = []): array
+{
+    return [...[
+        'code' => 'tramadol',
+        'name' => 'Трамадол',
+        'inn' => 'трамадол',
+        'atc' => 'N02AX02',
+        'trade_names' => ['Трамал', 'Залдиар'],
+        'groups' => ['serotonergic'],
+        'reason' => 'Назван среди серотонинергических в ОХЛП «Ципралекса» (4.5).',
+        'registration' => ['trade_name' => 'Трамадол', 'number' => 'ЛП-№(013557)-(РГ-RU)'],
     ], ...$overrides];
 }
 
@@ -69,9 +91,9 @@ function importDrugs(array $drugs): string
 test('catalog file loads five drugs', function () {
     $this->artisan('app:drugs:import')
         ->assertSuccessful()
-        ->expectsOutputToContain('Препаратов в файле: 5.');
+        ->expectsOutputToContain('Препаратов в справочнике: 5, в списке препаратов от других врачей: ');
 
-    expect(Drug::query()->orderBy('id')->pluck('code')->all())
+    expect(Drug::query()->catalog()->orderBy('id')->pluck('code')->all())
         ->toBe(['maritupirdine', 'escitalopram', 'sertraline', 'paroxetine', 'hydroxyzine'])
         ->and(Drug::query()->where('is_active', false)->exists())->toBeFalse()
         ->and(Drug::query()->whereNotNull('window_hours')->exists())->toBeFalse();
@@ -102,7 +124,7 @@ test('repeated import of the same file changes nothing', function () {
 
     $this->artisan('app:drugs:import')
         ->assertSuccessful()
-        ->expectsOutputToContain('Справочник не изменился. Препаратов в файле: 5.');
+        ->expectsOutputToContain('Справочник не изменился. Препаратов в справочнике: 5, в списке препаратов от других врачей: ');
 
     expect(Drug::query()->orderBy('id')->get(['id', 'updated_at'])->toArray())->toBe($drugs)
         ->and(DrugStrength::query()->orderBy('id')->get(['id', 'updated_at'])->toArray())->toBe($strengths);
@@ -138,7 +160,7 @@ test('changed strength updates the drug', function () {
 });
 
 test('drug removed from the file becomes inactive and returns when added back', function () {
-    $escitalopram = drugRecord(['code' => 'escitalopram', 'name' => 'Эсциталопрам']);
+    $escitalopram = drugRecord(['code' => 'escitalopram', 'name' => 'Эсциталопрам', 'trade_names' => ['Ципралекс']]);
 
     $this->artisan('app:drugs:import', ['path' => drugsFile([drugRecord(), $escitalopram])])->assertSuccessful();
 
@@ -263,4 +285,80 @@ test('missing file stops the import', function () {
     $this->artisan('app:drugs:import', ['path' => '/nonexistent/drugs.yaml'])
         ->assertFailed()
         ->expectsOutputToContain('Файл /nonexistent/drugs.yaml не найден');
+});
+
+test('list of drugs from other doctors loads without instruction fields', function () {
+    $this->artisan('app:drugs:import', ['path' => drugsFile([drugRecord()]), '--known' => drugsFile([knownDrugRecord()])])
+        ->assertSuccessful()
+        ->expectsOutputToContain('Препаратов в справочнике: 1, в списке препаратов от других врачей: 1.');
+
+    $tramadol = Drug::query()->where('code', 'tramadol')->sole();
+
+    expect($tramadol->kind)->toBe(DrugKind::Known)
+        ->and($tramadol->trade_names)->toBe(['Трамал', 'Залдиар'])
+        ->and($tramadol->groups)->toBe(['serotonergic'])
+        ->and($tramadol->reason)->toBe('Назван среди серотонинергических в ОХЛП «Ципралекса» (4.5).')
+        ->and($tramadol->source_trade_name)->toBe('Трамадол')
+        ->and($tramadol->source_registration_number)->toBe('ЛП-№(013557)-(РГ-RU)')
+        ->and($tramadol->regimen)->toBeNull()
+        ->and($tramadol->source_url)->toBeNull()
+        ->and($tramadol->strengths()->exists())->toBeFalse()
+        ->and(Drug::query()->where('code', 'sertraline')->sole()->kind)->toBe(DrugKind::Catalog);
+});
+
+test('each file deactivates only drugs of its own kind', function () {
+    $catalog = drugsFile([drugRecord()]);
+    $sumatriptan = knownDrugRecord(['code' => 'sumatriptan', 'name' => 'Суматриптан', 'inn' => 'суматриптан', 'trade_names' => ['Амигренин']]);
+    $this->artisan('app:drugs:import', ['path' => $catalog, '--known' => drugsFile([knownDrugRecord(), $sumatriptan])])->assertSuccessful();
+
+    // Справочник без списка: препараты списка не трогаются.
+    $this->artisan('app:drugs:import', ['path' => drugsFile([drugRecord(['code' => 'paroxetine', 'trade_names' => ['Паксил']])])])->assertSuccessful();
+
+    expect(Drug::query()->where('is_active', true)->orderBy('code')->pluck('code')->all())->toBe(['paroxetine', 'sumatriptan', 'tramadol']);
+
+    // Список без суматриптана: выключается только он.
+    $this->artisan('app:drugs:import', ['path' => drugsFile([drugRecord(['code' => 'paroxetine', 'trade_names' => ['Паксил']])]), '--known' => drugsFile([knownDrugRecord()])])
+        ->assertSuccessful()
+        ->expectsOutputToContain('sumatriptan');
+
+    expect(Drug::query()->where('is_active', true)->orderBy('code')->pluck('code')->all())->toBe(['paroxetine', 'tramadol']);
+});
+
+test('invalid list stops the import without changes', function (array $known, string $message) {
+    $this->artisan('app:drugs:import', ['path' => drugsFile([drugRecord()])])->assertSuccessful();
+    $before = Drug::query()->get()->toArray();
+
+    $this->artisan('app:drugs:import', ['path' => drugsFile([drugRecord()]), '--known' => drugsFile($known)])
+        ->assertFailed()
+        ->expectsOutputToContain('в базе ничего не изменилось')
+        ->expectsOutputToContain($message);
+
+    expect(Drug::query()->get()->toArray())->toBe($before);
+})->with([
+    'missing reason' => fn () => [[Arr::except(knownDrugRecord(), 'reason')], 'Препарат списка tramadol: Поле reason обязательно'],
+    'missing registration number' => fn () => [
+        [knownDrugRecord(['registration' => ['trade_name' => 'Трамадол']])],
+        'Препарат списка tramadol: Поле registration.number обязательно',
+    ],
+    'instruction field' => fn () => [[[...knownDrugRecord(), 'regimen' => '1 раз в сутки.']], 'Препарат списка tramadol: неизвестное поле regimen'],
+    'unknown group' => fn () => [[knownDrugRecord(['groups' => ['opioid']])], 'Препарат списка tramadol: группы opioid нет в файле групп'],
+    'missing trade names' => fn () => [[Arr::except(knownDrugRecord(), 'trade_names')], 'Поле trade_names обязательно'],
+    'code of a catalog drug' => fn () => [
+        [knownDrugRecord(['code' => 'sertraline'])],
+        'Препарат sertraline: код есть и в справочнике, и в списке препаратов от других врачей',
+    ],
+    'trade name of another drug' => fn () => [
+        [knownDrugRecord(['trade_names' => ['золофт']])],
+        'Название «Золофт» есть у нескольких препаратов: sertraline, tramadol',
+    ],
+]);
+
+test('catalog code can not take the code of a drug from the list', function () {
+    $this->artisan('app:drugs:import', ['path' => drugsFile([drugRecord()]), '--known' => drugsFile([knownDrugRecord()])])->assertSuccessful();
+
+    $this->artisan('app:drugs:import', ['path' => drugsFile([drugRecord(), drugRecord(['code' => 'tramadol', 'name' => 'Трамадол', 'trade_names' => []])])])
+        ->assertFailed()
+        ->expectsOutputToContain('Препарат tramadol: код уже занят препаратом из списка препаратов от других врачей');
+
+    expect(Drug::query()->where('code', 'tramadol')->sole()->kind)->toBe(DrugKind::Known);
 });

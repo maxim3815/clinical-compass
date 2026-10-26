@@ -119,7 +119,7 @@ class ImportSideEffects
             }
         }
 
-        $known = Drug::query()->active()->pluck('code')->flip();
+        $known = Drug::query()->active()->catalog()->pluck('code')->flip();
 
         foreach ($drugs as $code => $groups) {
             $label = "Препарат {$code}";

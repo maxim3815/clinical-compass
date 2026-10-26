@@ -60,6 +60,8 @@ function ownIntakes(Prescription $prescription): array
 test('medication form offers active drugs of the catalog and suggested times', function () {
     catalogDrug('Агомелатин', attributes: ['is_active' => false]);
     $aviandr = catalogDrug('Авиандр', [20 => false]);
+    // Поиска по списку препаратов от других врачей в форме пока нет.
+    Drug::factory()->known()->create(['name' => 'Трамадол']);
 
     $this->actingAs($this->patient)
         ->get(route('patient.own-medications.create'))
@@ -137,6 +139,35 @@ test('patient adds a catalog drug taken regularly and gets dose events at once',
             ->where('ownMedications.0.prescribed_by', 'терапевт Петрова И. А.')
             ->where('ownMedications.0.can_change', false),
         );
+});
+
+test('patient adds a drug from the list of drugs from other doctors', function () {
+    $tramadol = Drug::factory()->known(['serotonergic'])->create(['name' => 'Трамадол']);
+
+    $this->actingAs($this->patient)
+        ->post(route('patient.own-medications.store'), ownMedicationPayload([
+            'drug_id' => $tramadol->id,
+            'dose' => '1 капсула 50 мг',
+            'prescribed_by' => 'невролог',
+        ]))
+        ->assertRedirect(route('patient.medications'));
+
+    $prescription = Prescription::query()->sole();
+
+    expect($prescription->source)->toBe(PrescriptionSource::Patient)
+        ->and($prescription->drug_id)->toBe($tramadol->id)
+        ->and($prescription->drug_name)->toBeNull()
+        ->and($prescription->drugName())->toBe('Трамадол');
+});
+
+test('inactive drug from the list can not be added', function () {
+    $tramadol = Drug::factory()->known()->inactive()->create();
+
+    $this->actingAs($this->patient)
+        ->post(route('patient.own-medications.store'), ownMedicationPayload(['drug_id' => $tramadol->id]))
+        ->assertSessionHasErrors(['drug_id' => 'Выберите препарат из списка.']);
+
+    expect(Prescription::query()->exists())->toBeFalse();
 });
 
 test('patient adds another drug as needed with or without a daily limit', function (?int $limit) {

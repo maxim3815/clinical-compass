@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\DrugKind;
 use App\Models\Drug;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -36,6 +37,29 @@ class DrugFactory extends Factory
             'source_edition' => 'выложен 01.10.2026',
             'is_active' => true,
         ];
+    }
+
+    /**
+     * Препарат из списка препаратов от других врачей: без инструкции, дозировок и окна приёма.
+     *
+     * @param  list<string>  $groups
+     */
+    public function known(array $groups = []): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'kind' => DrugKind::Known,
+            'groups' => $groups,
+            'trade_names' => [$attributes['name'].' форте'],
+            'reason' => 'Назван в инструкции препарата справочника.',
+            'dosage_form' => null,
+            'regimen' => null,
+            'patient_instruction' => null,
+            'missed_dose' => null,
+            'window_hours' => null,
+            'source_document' => null,
+            'source_url' => null,
+            'source_edition' => null,
+        ]);
     }
 
     /**

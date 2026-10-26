@@ -53,7 +53,7 @@ test('doctor goes from the drug card to its rules and filters them by level', fu
         ->navigate(route('doctor.drugs.show', 'maritupirdine'))
         ->click('Правила проверки')
         ->assertPathIs('/doctor/rules')
-        ->assertSee('Действующих правил: 52.')
+        ->assertSee('Действующих правил: 62.')
         ->assertPresent('[data-test="rule"][data-level="caution"]')
         ->click('input[name="level"][value="contraindicated"]')
         ->assertMissing('[data-test="rule"][data-level="caution"]')

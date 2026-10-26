@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Doctor;
 
+use App\Enums\DrugKind;
 use App\Enums\PrescriptionSource;
 use App\Http\Controllers\Controller;
 use App\Models\Drug;
@@ -24,7 +25,7 @@ class SafetyCheckController extends Controller
         Gate::authorize('view', $patient);
 
         $validated = $request->validate([
-            'drug_id' => ['required', 'integer', Rule::exists('drugs', 'id')],
+            'drug_id' => ['required', 'integer', Rule::exists('drugs', 'id')->where('kind', DrugKind::Catalog->value)],
             // Назначение, которое врач меняет: его заменит новая версия.
             'prescription_id' => ['nullable', 'integer'],
         ]);

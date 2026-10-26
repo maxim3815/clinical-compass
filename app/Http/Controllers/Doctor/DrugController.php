@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Doctor;
 
+use App\Enums\DrugKind;
 use App\Http\Controllers\Controller;
 use App\Models\Drug;
 use App\Models\DrugStrength;
@@ -14,6 +15,7 @@ class DrugController extends Controller
     public function index(): Response
     {
         $drugs = Drug::query()
+            ->catalog()
             ->active()
             ->with(['strengths' => fn (HasMany $query) => $query->where('is_active', true)->orderBy('mg')])
             ->orderBy('name')
@@ -34,9 +36,12 @@ class DrugController extends Controller
 
     /**
      * Карточка открывается и у выключенного препарата: на него могут ссылаться действующие назначения.
+     * У препарата списка препаратов от других врачей карточки справочника нет.
      */
     public function show(Drug $drug): Response
     {
+        abort_unless($drug->kind === DrugKind::Catalog, 404);
+
         $strengths = $drug->strengths()->active()->orderBy('mg')->get();
 
         return Inertia::render('doctor/drugs/Show', [
