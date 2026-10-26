@@ -23,6 +23,8 @@ use App\Support\Alerts\HelpEventPresenter;
 use App\Support\Assessments\PatientAssessments;
 use App\Support\AttentionQueue;
 use App\Support\DisplayTime;
+use App\Support\Moods\MoodPresenter;
+use App\Support\Moods\MoodSignals;
 use App\Support\PrescriptionPresenter;
 use App\Support\Referrals\ReferralPresenter;
 use App\Support\Safety\ClinicalProfilePresenter;
@@ -75,6 +77,8 @@ class PatientController extends Controller
         $doctor = $request->user();
         $ids = $patients->getCollection()->map(fn (CareRelationship $care): int => $care->patient_id);
         $misses = AdherenceSignals::consecutiveMisses($patients->getCollection()->map(fn (CareRelationship $care): User => $care->patient));
+        // Плохое настроение несколько дней подряд: метка в «Внимании», не алерт и не очередь.
+        $moods = MoodSignals::streaks($patients->getCollection()->map(fn (CareRelationship $care): User => $care->patient));
         $awaiting = SafetySignals::awaitingCounts($ids);
         $alerting = array_flip(AlertSignals::patientIds($doctor));
         $unread = UnreadMessages::byPatient($doctor, $ids->all());
@@ -90,6 +94,7 @@ class PatientController extends Controller
                 'adherence' => (new AdherenceSignal($care->adherence_share, $misses[$care->patient_id] ?? 0))->toArray(),
                 // Открытый алерт: врач ещё не закрыл его решением.
                 'alert' => isset($alerting[$care->patient_id]),
+                'low_mood' => $moods[$care->patient_id] ?? null,
                 // Красные находки проверки безопасности без решения врача.
                 'contraindications' => $awaiting[$care->patient_id] ?? 0,
                 'unread' => $unread[$care->patient_id] ?? 0,
@@ -159,6 +164,8 @@ class PatientController extends Controller
                 ->map(fn (Prescription $prescription): array => PrescriptionPresenter::present($prescription, $today))
                 ->values(),
             'adherence' => PatientAdherence::present($patient, $today),
+            // Лица настроения после отметок приёма за две недели и серия грустных дней.
+            'moods' => MoodPresenter::forDoctor($patient),
             'adherenceSignal' => AdherenceSignals::forPatient($patient)->toArray(),
             // Непрочитанные сообщения пациента: число на кнопке «Написать».
             'unread' => UnreadMessages::byPatient($doctor, [$patient->id])[$patient->id] ?? 0,

@@ -77,6 +77,8 @@ const props = defineProps<{
     } | null;
     // Ссылка «Сообщить о побочном эффекте»: есть лечащий врач.
     canReportSideEffects: boolean;
+    // Лица настроения после отметки: только у пациента психиатра.
+    moodEnabled: boolean;
     // Сегодня «не принял» из-за самочувствия и ещё ни о чём не сообщил.
     unwellSuggestion: boolean;
     hasIntakeHistory: boolean;
@@ -330,6 +332,7 @@ function keepInView(card: Element, container: HTMLElement): () => void {
                 :group="group"
                 day="today"
                 :highlighted="isHighlighted(group)"
+                :mood-enabled="moodEnabled"
                 @mark="openMark"
             />
         </section>

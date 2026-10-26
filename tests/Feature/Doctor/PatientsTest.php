@@ -54,6 +54,7 @@ test('patient row shows age and the date the observation started', function () {
             'started_at' => '01.10.2026',
             'adherence' => ['share' => null, 'low_share' => false, 'consecutive_misses' => null, 'raised' => false],
             'alert' => false,
+            'low_mood' => null,
             'contraindications' => 0,
             'unread' => 0,
         ]));

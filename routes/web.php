@@ -33,6 +33,7 @@ use App\Http\Controllers\Patient\HomeController as PatientHomeController;
 use App\Http\Controllers\Patient\IntakeCalendarController;
 use App\Http\Controllers\Patient\IntakeTimeController;
 use App\Http\Controllers\Patient\MedicationController;
+use App\Http\Controllers\Patient\MoodController;
 use App\Http\Controllers\Patient\OwnMedicationController;
 use App\Http\Controllers\Patient\RulesController;
 use App\Http\Controllers\Patient\SideEffectController;
@@ -242,6 +243,10 @@ Route::middleware('auth')->group(function () {
         Route::put('medications/{prescription}/times', [IntakeTimeController::class, 'update'])
             ->whereNumber('prescription')
             ->name('intake-times.update');
+
+        // Настроение лицом после отметки приёма: по желанию, одно на время приёма сегодня.
+        Route::post('moods', [MoodController::class, 'store'])->middleware('throttle:60,1')->name('moods.store');
+        Route::delete('moods', [MoodController::class, 'destroy'])->middleware('throttle:60,1')->name('moods.destroy');
 
         // Опросники: раздел «Самочувствие», заполнение и экран после отправки.
         Route::get('wellbeing', [AssessmentController::class, 'index'])->name('wellbeing');

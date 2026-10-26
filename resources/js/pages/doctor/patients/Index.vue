@@ -4,6 +4,7 @@ import {
     ArrowDown,
     ArrowUp,
     ArrowUpDown,
+    Frown,
     MessageCircle,
     OctagonAlert,
     Search,
@@ -20,7 +21,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { useRealtime } from '@/composables/useRealtime';
-import { CHIP_ICON, DANGER_CHIP, MESSAGE_CHIP } from '@/lib/chips';
+import {
+    CHIP_ICON,
+    DANGER_CHIP,
+    MESSAGE_CHIP,
+    WARNING_CHIP,
+} from '@/lib/chips';
+import { lowMoodText } from '@/lib/moods';
 import { formatAge, plural } from '@/lib/plural';
 import { index as invitations } from '@/routes/doctor/invitations';
 import { index, show } from '@/routes/doctor/patients';
@@ -370,6 +377,7 @@ useRealtime<InvitationChanged>(channel, 'invitation.changed', (event) => {
                                             v-if="
                                                 patient.alert ||
                                                 patient.contraindications > 0 ||
+                                                patient.low_mood !== null ||
                                                 patient.unread > 0
                                             "
                                             class="inline-flex flex-wrap items-center gap-1.5"
@@ -395,6 +403,27 @@ useRealtime<InvitationChanged>(channel, 'invitation.changed', (event) => {
                                                 />
                                                 Противопоказание без решения
                                             </span>
+                                            <!--
+                                                Не алерт и не очередь: пациент сам выбирал только плохое лицо
+                                                несколько дней подряд. Ведёт к разделу настроения в карточке.
+                                            -->
+                                            <Link
+                                                v-if="patient.low_mood !== null"
+                                                :href="`${show(patient.id).url}#moods`"
+                                                class="relative z-10 hover:underline pointer-coarse:min-h-11 pointer-coarse:items-center"
+                                                :class="WARNING_CHIP"
+                                                title="Пациент сам выбирал только плохое лицо, когда отмечал приём"
+                                                data-test="low-mood-mark"
+                                            >
+                                                <Frown :class="CHIP_ICON" />
+                                                {{
+                                                    lowMoodText(
+                                                        patient.low_mood,
+                                                    )
+                                                }}<span class="sr-only">{{
+                                                    `, ${patient.name}`
+                                                }}</span>
+                                            </Link>
                                             <Link
                                                 v-if="patient.unread > 0"
                                                 :href="chat(patient.id)"

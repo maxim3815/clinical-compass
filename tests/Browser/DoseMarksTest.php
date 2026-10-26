@@ -37,13 +37,35 @@ test('patient on a phone marks doses during the day', function () {
         ->assertSee('Сегодня, '.$day->isoFormat('D MMMM'))
         ->assertSee('Отметить приём можно с 19:00.')
         ->assertSeeIn('[data-test="today-progress"]', 'Отмечено 0 из 2')
+        // Лиц настроения до отметки нет: они появляются после неё, по желанию.
+        ->assertMissing('[data-test="mood-picker"]')
         ->click('[data-test="take-dose"]')
         ->assertSee('Отметка сохранена.')
         ->assertSee('Принят в 8:30')
         ->assertSeeIn('[data-test="today-progress"]', 'Отмечено 1 из 2')
         ->assertSee('Следующий приём препаратов в 20:00')
+        ->assertSeeIn('[data-test="mood-picker"]', 'Как настроение?')
+        ->assertSeeIn('[data-test="mood-picker"]', 'Ответ увидит ваш врач. Отвечать не обязательно.')
+        ->assertSeeIn('[data-test="mood-sad"]', 'Плохое')
+        ->click('[data-test="mood-sad"]')
+        ->assertAttribute('[data-test="mood-sad"]', 'aria-pressed', 'true')
+        // Двойное касание не снимает только что выбранное лицо…
+        ->click('[data-test="mood-sad"]')
+        ->assertAttribute('[data-test="mood-sad"]', 'aria-pressed', 'true')
+        // …а повторное касание позже снимает: нажатое по ошибке не уходит врачу.
+        ->wait(1)
+        ->click('[data-test="mood-sad"]')
+        ->assertAttribute('[data-test="mood-sad"]', 'aria-pressed', 'false')
+        ->click('[data-test="mood-happy"]')
+        ->assertAttribute('[data-test="mood-happy"]', 'aria-pressed', 'true')
+        // Передумал — выбор меняется до конца дня.
+        ->click('[data-test="mood-neutral"]')
+        ->assertAttribute('[data-test="mood-neutral"]', 'aria-pressed', 'true')
+        ->assertAttribute('[data-test="mood-happy"]', 'aria-pressed', 'false')
         ->assertScript(FITS_SCREEN)
         ->assertNoJavaScriptErrors();
+
+    expect($patient->moodMarks()->sole()->mood->value)->toBe('neutral');
 
     // Вечером: вечерний приём не принят, приём «по необходимости» сверх лимита с подтверждением.
     $this->travelTo($day->setTime(19, 30));

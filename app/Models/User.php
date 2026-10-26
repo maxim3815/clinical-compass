@@ -112,6 +112,16 @@ class User extends Authenticatable
     }
 
     /**
+     * Настроение, которое пациент отметил после отметки приёма.
+     *
+     * @return HasMany<MoodMark, $this>
+     */
+    public function moodMarks(): HasMany
+    {
+        return $this->hasMany(MoodMark::class, 'patient_id');
+    }
+
+    /**
      * Приёмы «по необходимости», которые записал пациент.
      *
      * @return HasMany<AsNeededDose, $this>

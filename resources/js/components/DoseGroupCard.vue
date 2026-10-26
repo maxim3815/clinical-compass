@@ -4,6 +4,7 @@ import { CircleCheck, Clock } from '@lucide/vue';
 import { computed, nextTick, ref, useTemplateRef } from 'vue';
 import DoseController from '@/actions/App/Http/Controllers/Patient/DoseController';
 import DoseItem from '@/components/DoseItem.vue';
+import MoodPicker from '@/components/MoodPicker.vue';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { useDoseWords } from '@/composables/useDoseWords';
@@ -15,6 +16,8 @@ const props = defineProps<{
     day: 'today' | 'yesterday';
     // Пациент пришёл из напоминания об этих приёмах.
     highlighted?: boolean;
+    // Лица настроения: только у пациента психиатра, смотреть их больше некому.
+    moodEnabled?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -37,6 +40,19 @@ const allMarked = computed(
     () =>
         props.group.doses.length > 1 &&
         props.group.doses.every(
+            (dose) => dose.status === 'taken' || dose.status === 'skipped',
+        ),
+);
+
+// После отметки «Принял» или «Не принял» сегодня — три лица настроения, по желанию. Отмеченные
+// кнопкой в пуше тоже: лица ждут на карточке до конца дня. Пока в группе есть неотмеченный
+// приём, лиц нет: на карточке одно главное действие.
+const moodShown = computed(
+    () =>
+        props.day === 'today' &&
+        props.moodEnabled &&
+        !props.group.doses.some((dose) => dose.status === 'scheduled') &&
+        props.group.doses.some(
             (dose) => dose.status === 'taken' || dose.status === 'skipped',
         ),
 );
@@ -164,5 +180,12 @@ function takeAll(): void {
             <Clock class="size-5 shrink-0" />
             Отметить приём можно с {{ notDueYet.due_from }}.
         </p>
+
+        <MoodPicker
+            v-if="moodShown"
+            :slot="group.time"
+            :mood="group.mood"
+            :time-id="timeId"
+        />
     </article>
 </template>

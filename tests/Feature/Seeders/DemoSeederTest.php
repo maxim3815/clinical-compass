@@ -15,6 +15,7 @@ use App\Models\DoseEvent;
 use App\Models\Drug;
 use App\Models\HelpEvent;
 use App\Models\Message;
+use App\Models\MoodMark;
 use App\Models\PatientProfile;
 use App\Models\Prescription;
 use App\Models\Referral;
@@ -25,6 +26,7 @@ use App\Support\Adherence\AdherenceSignals;
 use App\Support\Adherence\PatientAdherence;
 use App\Support\Assessments\PatientAssessments;
 use App\Support\DisplayTime;
+use App\Support\Moods\MoodSignals;
 use App\Support\PatientSignals;
 use App\Support\Safety\SafetyPresenter;
 use Carbon\CarbonImmutable;
@@ -231,6 +233,11 @@ test('demo seeder builds the planned doctors, patients and courses and can be ru
             ->where('patientName', 'Новиков Артём Сергеевич'),
         );
 
+    // Лица настроения — к отметкам приёма за две недели, у пациентов психиатра. Второй запуск
+    // сидера их не добавляет: повтор упёрся бы в уникальный ключ дня и времени.
+    expect(MoodMark::query()->count())->toBeGreaterThan(100)
+        ->and(MoodMark::query()->whereIn('patient_id', $therapist->patients()->select('users.id'))->exists())->toBeFalse();
+
     // Адрес doctor для подключения на приёме постоянный: карточку с QR печатают заранее.
     $this->get(route('join.show', DemoSeeder::JOIN_CODE))
         ->assertOk()
@@ -268,6 +275,9 @@ test('only the planned patients have an adherence signal and the counters are th
     expect($signals->filter->isRaised()->keys()->all())->toBe(['patient3', 'patient_3b', 'patient_3c'])
         ->and($signals['patient3']->isLowShare())->toBeTrue()
         ->and($signals['patient_3c']->hasConsecutiveMisses())->toBeTrue()
+        // Плохое настроение несколько дней подряд — только у Смирнова, в любое время суток.
+        ->and(array_keys(MoodSignals::streaks(User::query()->where('role', UserRole::Patient)->get())))
+        ->toBe([User::query()->where('login', DemoSeeder::LOW_MOOD_LOGIN)->value('id')])
         ->and(AdherenceSignals::count($doctor))->toBe(3)
         ->and(AdherenceSignals::count($doctor2))->toBe(0)
         ->and(PatientSignals::count($doctor))->toBe(5)

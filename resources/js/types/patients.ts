@@ -26,6 +26,8 @@ export type PatientRow = {
     // Красные находки проверки безопасности без решения врача.
     contraindications: number;
     unread: number;
+    // Грустных дней подряд по лицам после отметок приёма, от трёх; не алерт.
+    low_mood: number | null;
 };
 
 /**

@@ -14,6 +14,7 @@ use App\Models\Alert;
 use App\Models\AlertRule;
 use App\Models\AsNeededDose;
 use App\Models\DoseEvent;
+use App\Models\MoodMark;
 use App\Models\Prescription;
 use App\Models\User;
 use App\Support\Adherence\IntakeCalendar;
@@ -67,7 +68,12 @@ class HomeController extends Controller
             'hasPrescriptions' => $patient->prescriptions()->current($today)->exists(),
             'today' => [
                 'date' => $today->isoFormat('D MMMM'),
-                'groups' => $this->groups($todayEvents, $timezone, $today, $now, $female),
+                // У сегодняшнего времени приёма — выбранное лицо настроения, если пациент его отметил.
+                'groups' => $this->groups($todayEvents, $timezone, $today, $now, $female, $patient->moodMarks()
+                    ->where('local_date', $today->toDateString())
+                    ->get()
+                    ->mapWithKeys(fn (MoodMark $mark): array => [$mark->slot => $mark->mood->value])
+                    ->all()),
             ],
             'yesterday' => [
                 'groups' => $this->groups($yesterdayEvents, $timezone, $today, $now, $female),
@@ -85,6 +91,8 @@ class HomeController extends Controller
             'sideEffectAlert' => $this->sideEffectAlert($patient),
             // Ссылка «Сообщить о побочном эффекте»: сообщать есть кому.
             'canReportSideEffects' => $withPsychiatrist,
+            // Лица настроения после отметки: «Ответ увидит ваш врач» — только когда врач-психиатр есть.
+            'moodEnabled' => $withPsychiatrist,
             // Сегодня не принял из-за самочувствия и ещё не рассказал врачу, что беспокоит.
             'unwellSuggestion' => $withPsychiatrist && $this->unwellWithoutReport($patient, $today, $timezone),
             // Направление терапевта к психиатру: к кому, мягкая категория и ждёт ли психиатра.
@@ -154,14 +162,16 @@ class HomeController extends Controller
      * Приёмы по времени: приёмы на одно время — одна группа.
      *
      * @param  Collection<int, DoseEvent>  $events
-     * @return array<int, array{time: string, doses: array<int, array<string, mixed>>}>
+     * @param  array<string, string>  $moods  время приёма => выбранное лицо; у вчерашних групп лиц нет
+     * @return array<int, array{time: string, mood: string|null, doses: array<int, array<string, mixed>>}>
      */
-    private function groups(Collection $events, string $timezone, CarbonImmutable $today, CarbonImmutable $now, bool $female): array
+    private function groups(Collection $events, string $timezone, CarbonImmutable $today, CarbonImmutable $now, bool $female, array $moods = []): array
     {
         return $events
             ->groupBy(fn (DoseEvent $event): string => DoseEventPresenter::clock($event->scheduled_at, $timezone))
             ->map(fn (Collection $group, string $time): array => [
                 'time' => $time,
+                'mood' => $moods[$time] ?? null,
                 'doses' => $group
                     ->sortBy(fn (DoseEvent $event): string => $event->prescription->drugName())
                     ->map(fn (DoseEvent $event): array => DoseEventPresenter::present($event, $timezone, $today, $now, $female))

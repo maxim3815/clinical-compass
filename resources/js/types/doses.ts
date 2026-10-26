@@ -1,3 +1,5 @@
+import type { Mood } from './moods';
+
 /**
  * Плановый приём на экране «Сегодня», как его отдаёт `App\Support\DoseEventPresenter`.
  */
@@ -29,6 +31,8 @@ export type Dose = {
 
 export type DoseGroup = {
     time: string;
+    // Лицо настроения, которое пациент выбрал после отметки этого времени сегодня.
+    mood: Mood | null;
     doses: Dose[];
 };
 

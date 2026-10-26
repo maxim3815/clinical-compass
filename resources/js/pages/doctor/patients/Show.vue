@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Form, Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
+    Frown,
     ArrowDown,
     KeyRound,
     LifeBuoy,
@@ -32,12 +33,14 @@ import OneTimeLink from '@/components/OneTimeLink.vue';
 import PrescriptionDetails from '@/components/PrescriptionDetails.vue';
 import PrescriptionHistory from '@/components/PrescriptionHistory.vue';
 import PrescriptionSafety from '@/components/PrescriptionSafety.vue';
+import MoodSection from '@/components/MoodSection.vue';
 import WellbeingSection from '@/components/WellbeingSection.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useRealtime } from '@/composables/useRealtime';
 import { alertState, alertTitle } from '@/lib/alerts';
 import { CHIP_ICON, DANGER_CHIP, WARNING_CHIP } from '@/lib/chips';
+import { lowMoodText } from '@/lib/moods';
 import { formatAge, plural } from '@/lib/plural';
 import { index, show } from '@/routes/doctor/patients';
 import { show as chat } from '@/routes/doctor/patients/chat';
@@ -56,6 +59,7 @@ import type {
     SideEffectOption,
     RatableScale,
     Referral,
+    DoctorMoods,
     Wellbeing,
 } from '@/types';
 
@@ -95,6 +99,8 @@ const props = defineProps<{
         today: string;
         min_date: string;
     };
+    // Лица настроения после отметок приёма за две недели и серия грустных дней.
+    moods: DoctorMoods;
     // Опросники пациента и шкалы врача (HARS, HADS терапевта): суммы, степени, изменение и ответы.
     wellbeing: Wellbeing;
     // Шкалы, которые врач заполняет на приёме.
@@ -440,6 +446,7 @@ const unreadLabel = computed(
                     awaiting.length > 0 ||
                     adherenceSignal.raised ||
                     adherenceSignal.share !== null ||
+                    moods.streak !== null ||
                     questionnaires !== null
                 "
                 class="flex flex-wrap gap-2 text-sm"
@@ -507,6 +514,19 @@ const unreadLabel = computed(
                             >{{ adherenceSignal.share }}%</span
                         >
                         <ArrowDown class="size-4 shrink-0" />
+                    </a>
+                </li>
+                <!-- Причина из списка видна и здесь, на первом экране: ведёт к разделу настроения. -->
+                <li v-if="moods.streak">
+                    <a
+                        href="#moods"
+                        class="hover:underline pointer-coarse:min-h-11 pointer-coarse:items-center"
+                        :class="WARNING_CHIP"
+                        data-test="card-low-mood"
+                    >
+                        <Frown :class="CHIP_ICON" />
+                        {{ lowMoodText(moods.streak.days) }}
+                        <ArrowDown class="mt-0.5 size-4 shrink-0" />
                     </a>
                 </li>
                 <li v-if="questionnaires">
@@ -804,6 +824,8 @@ const unreadLabel = computed(
                         />
                     </template>
                 </section>
+
+                <MoodSection :moods="moods" class="order-3" />
 
                 <WellbeingSection
                     :wellbeing="wellbeing"

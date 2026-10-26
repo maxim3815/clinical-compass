@@ -9,7 +9,9 @@ use App\Actions\ReferPatient;
 use App\Enums\AccessLinkPurpose;
 use App\Enums\AdverseEventSeverity;
 use App\Enums\DoctorKind;
+use App\Enums\DoseEventStatus;
 use App\Enums\HelpEventType;
+use App\Enums\Mood;
 use App\Enums\PrescriptionSource;
 use App\Enums\ReferralCategory;
 use App\Events\AlertsChanged;
@@ -21,12 +23,15 @@ use App\Jobs\CheckAlertRules;
 use App\Models\AccessLink;
 use App\Models\AdverseEvent;
 use App\Models\Assessment;
+use App\Models\DoseEvent;
 use App\Models\HelpEvent;
 use App\Models\Referral;
 use App\Models\Scale;
 use App\Models\SideEffect;
 use App\Models\User;
 use App\Support\DisplayTime;
+use App\Support\DoseEventPresenter;
+use App\Support\Moods\MoodPresenter;
 use App\Support\Referrals\ReferralEngine;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -72,6 +77,11 @@ class DemoSeeder extends Seeder
      * Постоянный адрес терапевта `therapist` для подключения на приёме: /join/kravtsova.
      */
     public const string THERAPIST_JOIN_CODE = 'kravtsova';
+
+    /**
+     * Смирнов: плохое настроение несколько дней подряд при исправном приёме.
+     */
+    public const string LOW_MOOD_LOGIN = 'patient_1c';
 
     /**
      * HADS Зайцевой на приёме у терапевта, утверждения о тревоге и депрессии вперемешку, как в шкале:
@@ -121,6 +131,8 @@ class DemoSeeder extends Seeder
         $this->quietly(fn () => $this->referral('patient_4c', $doctors['therapist'], $doctors['doctor']));
         // На стенде, выложенном до HADS, у Зайцевой только HARS: терапевт заполняет HADS сегодня.
         $this->quietly(fn () => $this->hads('patient_4c', $doctors['therapist']));
+        // Лица настроения после отметок приёма до вчера; у Смирнова последние дни грустные — метка в списке.
+        $this->moods();
     }
 
     /**
@@ -139,6 +151,53 @@ class DemoSeeder extends Seeder
         }
 
         app(RateScale::class)->handle($therapist, $patient, $scale, self::ZAYTSEVA_HADS, ['mania_signs' => false, 'psychotic_symptoms' => false]);
+    }
+
+    /**
+     * Лица настроения у демо-пациентов к их отметкам приёма за две недели до вчера: сегодняшние
+     * пациент выбирает на показе сам. Чаще хорошее, иногда обычное, изредка плохое, без серий.
+     * У Смирнова плохое последние три дня: при этом он принимает исправно — повод врачу позвонить.
+     * Только пациентам без лиц: на стенде без сброса добавляются к уже сыгранной истории,
+     * повторная выкладка ничего не меняет.
+     */
+    private function moods(): void
+    {
+        foreach (DemoPatients::all() as $index => $plan) {
+            $patient = User::query()->where('login', $plan->login)->first();
+
+            if ($patient === null || $plan->doctor === 'therapist' || $patient->moodMarks()->exists()) {
+                continue;
+            }
+
+            $today = $patient->localToday();
+            $timezone = $patient->localTimezone();
+            $slots = $patient->doseEvents()
+                ->where('local_date', '>=', $today->subDays(MoodPresenter::DAYS - 1)->toDateString())
+                ->where('local_date', '<', $today->toDateString())
+                ->whereIn('status', [DoseEventStatus::Taken, DoseEventStatus::Skipped])
+                ->orderBy('scheduled_at')
+                ->get()
+                ->map(fn (DoseEvent $event): array => [$event->local_date, DoseEventPresenter::clock($event->scheduled_at, $timezone)])
+                ->unique(fn (array $slot): string => $slot[0]->toDateString().' '.$slot[1])
+                ->groupBy(fn (array $slot): string => $slot[0]->toDateString());
+
+            foreach ($slots as $day) {
+                foreach ($day->values() as $position => [$date, $slot]) {
+                    $daysAgo = (int) $date->diffInDays($today);
+                    // Раз в девять дней грустное, по разу-два обычное, остальное хорошее; второе лицо
+                    // за день не грустное: серии бывают только у Смирнова.
+                    $step = ($index * 5 + $daysAgo) % 9;
+                    $mood = match (true) {
+                        $plan->login === self::LOW_MOOD_LOGIN && $daysAgo <= 3 => Mood::Sad,
+                        $step === 0 => $position === 0 ? Mood::Sad : Mood::Neutral,
+                        in_array($step, [2, 5], true) => Mood::Neutral,
+                        default => Mood::Happy,
+                    };
+
+                    $patient->moodMarks()->create(['local_date' => $date->toDateString(), 'slot' => $slot, 'mood' => $mood]);
+                }
+            }
+        }
     }
 
     /**
